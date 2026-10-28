@@ -23,16 +23,25 @@ These rules apply to every channel, before validation, comparison (no-op detecti
 
 | Type | Rule |
 |---|---|
-| `string`, `slug`, `url` | NFC; trim; `''` → null; any C0 control character → 400. |
+| `string`, `slug` | NFC; trim; `''` → null; any C0 control character → 400. |
+| `url` | Trim; `''` → null; any whitespace or C0/C1 control character → 400; scheme `http` or `https` (case-insensitive, stored lowercase); non-empty host; **no userinfo** (`https://a@b/` → 400); host stored IDNA-encoded (punycode); ≤ 2 000 characters. The same rule applies to URLs inside `json` fields (e.g. `source_categories[].url`) and on every channel. |
 | `text` | NFC; CRLF and CR → LF; trim; `''` → null; C0 control characters other than tab and newline → 400. |
 | `url_list`, `string_list`, `vocab_list` | Column `NOT NULL DEFAULT '[]'`; API null → `[]`. Elements are normalised like their scalar type; empty elements are dropped; duplicates are removed, keeping the first occurrence. **Order is significant**: the first element is the main value (CODEBOOK §2.3), and a reorder is a change. |
-| `alias_list` | Items become full objects `{text, lang, case_sensitive, kind, exclude_patterns}` with defaults (`case_sensitive: true`, `kind: "name"`, `exclude_patterns: []`, normalised like `string_list`). Duplicates are items with the same (`text`, `lang`); the first is kept. |
+| `alias_list` | Items become full objects `{text, lang, case_sensitive, kind, exclude_patterns}` with defaults (`case_sensitive: true`, `kind: "name"`, `exclude_patterns: []`, normalised like `string_list`). Duplicates are items with the same (`text`, `lang`); the first is kept. `exclude_patterns` are **literal phrases** (never regular expressions), matched on normalised text. |
 | `doc_links` | Sorted by `subject_id`; at most one link per subject; read-only keys are ignored on input. |
 | `json` | Compared by canonical serialisation (sorted keys); stored as given. |
 
 - **Empty** means null or `[]`; `false` and `0` are values.
 - Required fields and the "at least one name" rule are checked after normalisation.
 - Diffs compare normalised API values as Python objects, never as JSON text.
+
+### 1.3 Limits
+
+Limits are configurable, with these defaults; violations → 400 `validation_error`.
+- **Lists:** list fields ≤ 200 items; `alias_list` ≤ 100 items; `exclude_patterns` ≤ 20 items of ≤ 200 characters.
+- **JSON:** `json` values ≤ 64 KiB serialised, nesting depth ≤ 10.
+- **Text:** comment body ≤ `MAX_COMMENT_CHARS` (10 000); revision notes ≤ 2 000 characters.
+- **Requests:** request limits are in `docs/API.md` §1.4.
 
 ## 2. Entity registry
 
@@ -76,7 +85,10 @@ Every field in the registry has these attributes:
 - `filter`: `text` · `multiselect` · `date_range` · `bool` · `number_range` · `ref` · none;
 - `sortable`, `in_list` (default table column), `bulk_editable`, `help` (tooltip text from the codebook).
 
-**All stored fields are tracked**, including read-only system fields, except `seed_key`.
+Meta also exposes `default` (e.g. `in_paper_scope: false`, `verification_status: "unverified"`, `screening_status: "unscreened"`, `active: true`) and `in_create` (offered in the create form). Each type lists its constraints, e.g. `{"one_of_required": ["name_en", "name_uk"]}`.
+
+- **All stored fields are tracked**, including read-only system fields, except `seed_key`.
+- **Rule:** every field with filter `multiselect` is sortable; a backend test asserts this for the whole registry.
 
 ### 2.3 Common columns of curated entities
 
@@ -93,6 +105,11 @@ Every curated entity table (all tables in §3) has these columns:
 | `verification_status` | TEXT NOT NULL DEFAULT `unverified` | ✓ | record-level review status (§7); vocabulary `verification_status`; group `basics`; filter multiselect; sortable; in list |
 | `notes` | TEXT NULL | ✓ | internal notes; group `sources` |
 | `field_meta` | JSON NOT NULL DEFAULT `{}` | — | provenance per field (§5) |
+
+The system columns are also registry fields (read-only, group `system`), so tables can sort, filter, show and export them (e.g. "changed since Monday by Anna", trash sorted by deletion time):
+- `created_at`, `updated_at`, `deleted_at`: datetime, filter `date_range`, sortable;
+- `created_by`, `updated_by`, `deleted_by`: string, filter `text`, sortable;
+- `version`: int, sortable.
 
 ### 2.4 Common virtual fields
 
@@ -227,7 +244,7 @@ The focal organisation is the row whose `seed_key` equals `FOCAL_ORG_SEED_KEY` (
 |---|---|---|
 | `participation` (`par_`) | `organization_id` (ref organization, R, L), `subject_id` (ref project/service/component, R, L), `role` (vocab `participation_role`, R, L), `start`, `end` (partial_date, L; `end` ≥ `start`), `description` (text) | for D3 |
 | `component` (`cmp_`) | `name_en`/`name_uk` (✱, L), `aliases`, `component_type` (vocab `component_type`, L), `description` (text), `urls` (url_list) | created only from sources |
-| `relation` (`rel_`) | `from_id`, `to_id` (ref project/service/component, R, L, distinct), `relation_type` (vocab `relation_type`, R, L), `description` (text) | read as "from — type — to" |
+| `relation` (`rel_`) | `from_id`, `to_id` (ref project/service/component, R, L, distinct), `relation_type` (vocab `relation_type`, R, L), `description` (text), virtual `endpoint` (ref, filter only: matches `from_id` OR `to_id`) | read as "from — type — to" |
 | `indicator` (`ind_`) | `subject_id` (ref project/service/component/organization, R, L), `metric` (string, R, L), `value` (number, R, L), `unit` (string, L), `as_of` (partial_date, L), `description` (text) | |
 | `evidence` (`evd_`) | `subject_id` (ref any curated type except evidence, R, **create-only**), `target` (string, R, create-only: `entity` \| `field:<field name of the subject type>` \| `dimension:D1`…`D4`), `document_id` (ref document), `url`, `archive_url` (url), `retrieved_at` (datetime; required when `document_id` is null; editable; defaults to now on channel ui), `raw_snapshot_id`, `text_hash` (string, system), `char_start`, `char_end` (int), `quote` (text ≤ 1 000), `locator` (string), `description` (text), `value_snapshot` (json, system: the target field's value when the evidence was created) | `document_id` or `url` is required |
 | `vocabulary_term` (`voc_`) | `vocabulary` (string, R, **create-only**), `code` (`^[a-z0-9_]+$`, R, **create-only**), `label_en` (string, R), `label_uk` (string), `definition`, `include_note`, `exclude_note`, `examples` (text), `sort_order` (int), `active` (bool, default true), `replaced_by` (string code; §7), `attributes` (json) | UNIQUE (`vocabulary`, `code`); the vocabulary must exist; terms are never deleted (§7) |
@@ -240,7 +257,7 @@ The UI tables in Phase 1 cover project, service, event, document and organizatio
 | Table | Columns | Rules |
 |---|---|---|
 | `vocabulary` | `name` PK, `label`, `description`, `multi`, `fixed_codes` (bool), `source_file` | Metadata loaded from `codebook/*.yaml` by the seed. It changes only through the YAML files, which are versioned in git; the terms themselves are revisioned in the database. |
-| `revision` | `id` INTEGER PK AUTOINCREMENT, `entity_type`, `entity_id`, `version`, `at`, `author`, `channel` (`seed`, `ui`, `collector`, `import`, `restore`, `merge`, `system`), `note` (≤ 2 000), `run_id`, `proposal_id`, `restored_from` (revision id), `batch_id`, `schema_revision` (Alembic head at write time), `snapshot` (JSON), `diff` (JSON) | UNIQUE (`entity_id`, `version`). **Append-only:** SQLite triggers abort every UPDATE and DELETE (`RAISE(ABORT, 'revision is append-only')`); see §11 for migrations. |
+| `revision` | `id` INTEGER PK AUTOINCREMENT, `entity_type`, `entity_id`, `version`, `at`, `author`, `channel` (`seed`, `ui`, `collector`, `import`, `restore`, `merge`, `system`), `action` (`create`, `update`, `verify`, `delete`, `undelete`, `restore`, `merge`, `resolve`, `reopen`), `note` (≤ 2 000), `run_id`, `proposal_id`, `restored_from` (revision id), `restored_from_version`, `batch_id`, `schema_revision` (Alembic head at write time), `snapshot` (JSON), `diff` (JSON) | UNIQUE (`entity_id`, `version`). **Append-only:** SQLite triggers abort every UPDATE and DELETE (`RAISE(ABORT, 'revision is append-only')`); see §11 for migrations. |
 | `comment` (`cmt_`) | `id`, `subject_id`, `field`, `parent_id`, `body_md`, `status`, `resolved_by`, `resolved_at`, `version`, `created_*`, `updated_*`, `deleted_*` | rules in §6.5 |
 | `document_text` | `text_hash` PK (sha256 of the normalised text), `text`, `char_count`, `created_at` | immutable |
 | `document_link` | `id`, `document_id` FK, `subject_id`, `origin`, `state`, `matched_aliases` (JSON), `match_count`, `snippet` | UNIQUE (`document_id`, `subject_id`); managed through the document's `links` field and part of its snapshot |
@@ -274,7 +291,7 @@ Later phases add `proposal`, `collector_run`, `fetch_log`, `raw_snapshot`, `sour
 - **Exception on create:** fields that are empty on create get no entry.
 - **Value changes** set `verified = "unverified"`, `evidence_id = null` and `restored_from_version = null` (a restore then sets it).
 - **Restore** sets `verified = "unverified"`, `evidence_id = null`, `restored_from_version = <version>`. A restored value must be verified again.
-- **Field verification** (§6.3) sets `verified` and, for `verified`, `evidence_id`; it also sets `locked = true`.
+- **Field verification** (§6.4) sets `verified` and, for `verified`, `evidence_id`; it also sets `locked = true`.
 - **`evidence_id` write path:** it is written only by field verification. The evidence rows that target a field (`target = field:<name>`) are its full evidence list.
 
 ## 6. Writes
@@ -292,6 +309,10 @@ Later phases add `proposal`, `collector_run`, `fetch_log`, `raw_snapshot`, `sour
 
 ### 6.2 One write path
 
+**Channels:**
+- Every HTTP write uses channel `ui`; the restore endpoints use channel `restore`. No header, query parameter or body field can select a channel or a `src`.
+- The channels `seed`, `collector`, `import`, `merge` and `system` are reachable only from the CLI and in-process jobs.
+
 Every change of a curated entity (including comments, vocabulary terms and saved views) goes through:
 
 `apply_change(session, entity_type, entity_id | None, changes, actor, channel, note=None, expected_version=None, batch_id=None, run_id=None) -> ChangeResult`
@@ -306,7 +327,7 @@ Every change of a curated entity (including comments, vocabulary terms and saved
    - for project and service, the `derived` row is inserted;
    - revision version 1 with `diff = {"fields": {f: [null, value]}}` for the non-empty fields.
 3. **Update:**
-   - **Version check:** `expected_version` is required on channel `ui`; seed and collector use the version read inside the transaction. A mismatch → `ConflictError` (§6.4).
+   - **Version check:** `expected_version` is required on channel `ui`; seed and collector use the version read inside the transaction. A mismatch → `ConflictError` (§6.5).
    - **Deleted rows:** a deleted row → 409 `entity_deleted`.
    - **Diff:** compare normalised values per field. If nothing differs → **no-op**: no revision, no version bump, `changed = false`.
    - **Write:** apply the values, recompute dependent system fields in the same revision (`canonical_url` follows `url`; its `field_meta` mirrors `url`'s entry), bump `version` (compare-and-swap), set `updated_*`, update `field_meta` (§5), write the revision.
@@ -348,8 +369,8 @@ All of these run as write units (§6.1) and create a revision.
 | **Field verification** | `set_field_verification(entity, field, status, actor, note, evidence_id, expected_version)`. The field must be tracked, non-system and non-empty (`verification_status` itself cannot be field-verified). `verified` requires `evidence_id` of a non-deleted evidence row with the same `subject_id` and `target = field:<name>`, else 400 `evidence_required`. `disputed` requires a note. Sets `locked = true`. The revision has a `meta` diff only. |
 | **Soft delete** | `soft_delete(entity, actor, note, expected_version, cascade=False)`. A project with non-deleted services, or a service with non-deleted child services, raises `HasDependentsError` (with counts) unless `cascade=True`. Cascade deletes the dependents with the same `batch_id`, in **one transaction** (all or nothing). Events, comments and evidence are not deleted. Deleting a deleted row → 409 `invalid_state`. Vocabulary terms cannot be deleted (409 `not_deletable`; deactivate instead). |
 | **Undelete** | Clears `deleted_*`. It re-validates uniqueness (409 `unique_violation`) and required references (409 `reference_deleted` {field, id, type}). With `cascade=True` it also undeletes the rows whose latest revision is the delete revision with this row's delete `batch_id`, in one transaction. Undeleting a live row → 409 `invalid_state`. |
-| **Restore version** | `restore_version(entity, version, actor, note, expected_version)`, all or nothing. Applies the tracked, editable, non-create-only fields present in that version's snapshot whose value differs; fields missing from an old snapshot are left unchanged; `state` is never restored; dependent system fields are recomputed. On channel `restore`, inactive vocabulary codes are accepted and reported back in `warnings`. Errors: 409 `unique_violation` {field}; 409 `reference_deleted` {field, id, type}; any other validation error → 400. Not allowed on a deleted entity (409 `entity_deleted`; undelete first). |
-| **Bulk edit** | Each item has its own `expected_version` and runs as its own write unit with a shared `batch_id`. Operations: `set` (field → value), `add` (append missing values at the end, in the given order) and `remove` (delete values) for list fields. The whole request is rejected with 400 if a field is not `bulk_editable`, a field appears in more than one operation, `add`/`remove` targets a non-list field, or an ID is duplicated. Per item, the result is `updated`, `unchanged`, `conflict`, `entity_deleted` or `error`. |
+| **Restore version** | `restore_version(entity, version, actor, note, expected_version, fields=None, dry_run=False)`, all or nothing. Applies the tracked, editable, non-create-only fields present in that version's snapshot whose value differs, optionally limited to `fields`. `dry_run` returns `{field: [current, restored]}` without writing; the UI uses it as a preview. Fields missing from an old snapshot are left unchanged; `state` is never restored; dependent system fields are recomputed. On channel `restore`, inactive vocabulary codes are accepted and reported back in `warnings`. Errors: 409 `unique_violation` {field}; 409 `reference_deleted` {field, id, type}; any other validation error → 400. Not allowed on a deleted entity (409 `entity_deleted`; undelete first). |
+| **Bulk edit** | Each item has its own `expected_version` and runs as its own write unit with a shared `batch_id`. Operations: `set` (field → value), `add` (append missing values at the end, in the given order) and `remove` (delete values) for list fields. The whole request is rejected with 400 if a field is not `bulk_editable`, a field appears in more than one operation, `add`/`remove` targets a non-list field, or an ID is duplicated. Per item, the result is `updated`, `unchanged`, `conflict` (with `current_version` and the current values of the targeted fields), `entity_deleted` or `error` (with the error object of `docs/API.md` §1.2). At most 500 items. |
 
 ### 6.5 Conflicts
 
@@ -361,7 +382,10 @@ All of these run as write units (§6.1) and create a revision.
 - `base_state` and `current_state` (`{deleted_at, deleted_by, merged_into}`);
 - `changed_since_base` (fields where base ≠ current);
 - `your_changes` (the submitted changes, normalised);
-- `conflicting_fields`: fields in `your_changes` that also changed since base, where your value differs from the current value.
+- `conflicting_fields`: fields in `your_changes` that also changed since base, where your value differs from the current value;
+- `meta_changed_since_base` (`{field: {verified: [old, new]}}`), so the UI can warn that applying would reset a colleague's verification;
+- `intervening`: the RevisionSummary list for versions base + 1 … current (author, time, note, action, changed fields);
+- `refs`: labels for every ID in `base`, `current` and `your_changes`.
 
 Nothing is written. For `action = patch` on a live row, the client resolves the conflict field by field and resubmits with `expected_version = current_version`. For every other action, the client reloads.
 
@@ -374,7 +398,7 @@ Nothing is written. For `action = patch` on a live row, the client resolves the 
   - snapshots have `field_meta = {}` and `state = {deleted_at, deleted_by}`.
 - **Subjects:** `subject_id` may reference any curated type of §3, deleted or not. `field` must be a registry field of the subject type (derived fields included).
 - **Threads:** `parent_id` must be a root comment of the same subject. Replying to a deleted root → 400. A reply does not change the root's status.
-- **Status:** roots start `open`; resolve and reopen apply to roots only. Replies have status null.
+- **Status:** roots start `open`; resolve and reopen apply to roots only. Replies have status null. Resolve and reopen are **idempotent**: if the target status is already set, they return without a revision (`changed = false`) and skip the version check.
 - **Deleting a root** hides the whole thread; the replies are not modified and reappear on undelete. Comments are undeletable and restorable to any version, like entities.
 - **`edited`** is true if any revision after version 1 changed `body_md`.
 - **Body rendering:** `body_md` ≤ `MAX_COMMENT_CHARS` (default 10 000). `body_html` is rendered on read (docs/API.md §3.3), so sanitiser changes also apply to old comments.
@@ -405,11 +429,15 @@ Nothing is written. For `action = patch` on a live row, the client resolves the 
 - **Uniqueness:**
   - `project.slug`, `organization.slug`, `seed_key`, `vocabulary_term` (`vocabulary`, `code`) and `document_link` (`document_id`, `subject_id`) are unique including deleted rows;
   - `document.canonical_url` is unique among non-deleted rows (partial index);
-  - collisions are reported as 409 `unique_violation` {field} on create, PATCH, restore and undelete. They are checked explicitly inside the write transaction, with `IntegrityError` mapped to the same response as a fallback.
+  - collisions are reported as 409 `unique_violation` `{field, existing: {id, label, deleted}}` on create, PATCH, restore and undelete. They are checked explicitly inside the write transaction, with `IntegrityError` mapped to the same response as a fallback.
+- **Reference errors:** `reference_deleted` details are `{field, id, type, label}`, so the UI can offer to undelete the referenced row first.
 - **Lengths:** comment body ≤ `MAX_COMMENT_CHARS`; revision notes ≤ 2 000.
-- **Author names:**
-  - 1–100 characters after trimming, no control characters;
-  - names equal to `seed` or `system`, or starting with `collector:`, `import:` or `manual:` (case-insensitive), are rejected (400 `author_invalid`).
+- **Author names** (from the `X-Author` header):
+  - **Decoding:** decoded exactly once with `urllib.parse.unquote(v, encoding="utf-8", errors="strict")`. A `%` not followed by two hex digits, a decoding error, or a header that occurs more than once → 400 `author_invalid`.
+  - **Normalisation:** NFC, trim, runs of whitespace collapsed to one space.
+  - **Rejected characters:** code points of the Unicode categories Cc, Cf, Co, Cs, Cn, Zl and Zp (control, format, bidi override, zero-width and unassigned characters) and the comma.
+  - **Length:** 1–100 code points.
+  - **Reserved:** names equal to `seed` or `system` (case-insensitive) or matching `^[A-Za-z_]+:` are rejected, so no person can be recorded as a machine channel.
 
 ## 8. Derived fields
 
@@ -511,13 +539,15 @@ terms:
   - FTS rows are **kept for soft-deleted entities** (trash search works); the `deleted` parameter filters on the entity table.
 - **`fts_entity.body`:** the normalised values of the entity's `string`, `text`, `slug`, `string_list`, `url_list` fields and alias texts. For documents it excludes the full text.
 - **`fts_document`:** `title` + `title_en` and the document text.
-- **For documents, `q` matches** `fts_entity` OR `fts_document`, and list items get a `search_snippet` (FTS `snippet()`).
+- **For documents, `q` matches** `fts_entity` OR `fts_document`, and list items get a `search_snippet`. It is built with FTS `snippet()` using the private-use markers U+E000/U+E001 internally, then returned as a list of segments `[{"text": "…", "hit": false}, …]`. No markup is ever sent, and Ukrainian «» quotation marks stay ordinary text.
 - **Query building (`q`):**
-  - split into tokens (whitespace; `"…"` keeps phrases);
+  - normalise (`normalize_for_search`) and split into tokens (whitespace; `"…"` keeps phrases); at most 200 characters and 16 tokens;
+  - tokens without a letter or digit (e.g. `-`, `.`, `–`) are dropped; such tokens would otherwise make the whole AND expression match nothing;
   - escape double quotes;
   - every token becomes `"token"*` (prefix match), phrases stay exact;
   - tokens are joined with AND;
-  - an empty or punctuation-only query matches nothing and does not raise.
+  - if no token remains, the query matches nothing and does not raise.
+- **Ranking:** with `sort=relevance` the results are ordered by FTS5 `bm25`.
 - **`mdt reindex`** rebuilds both FTS tables.
 
 ## 11. Migrations

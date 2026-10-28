@@ -404,8 +404,8 @@ For every collector, Phase 0b first looks for **structured access** (XHR/JSON se
 - **CKAN:** datasets of the organisation `mincyfry` → Documents (statistics); figures become Indicators only after human review.
 
 **C8 `manual`**
-- **By URL:** fetched with the polite client, so a snapshot exists.
-- **By upload:** PDF/DOCX/HTML/TXT.
+- **By URL:** fetched with the polite client, so a snapshot exists. **SSRF protection:** the host is resolved and loopback, private and link-local addresses are refused, re-checked on every redirect.
+- **By upload:** PDF/DOCX/HTML/TXT, served back only as attachments (docs/API.md §6).
 - Provenance `manual:<name>`.
 <!-- COLLECTORS:END -->
 
@@ -667,7 +667,7 @@ Further views: **Recent changes** (feed with filters; diff popover), **Collector
 | **0 (this)** | Paper read; environment checked; plan, SOURCES and CODEBOOK drafts; open questions | Approval |
 | **0b — source checks** | Once there is network access (this environment or the server): for each source robots.txt, licence footer, sitemaps/RSS, JSON endpoints (Playwright XHR log on 1–2 pages), pagination, date formats, archive depth (binary search over listing pages), CDX coverage. **Budget:** ≈ 150 requests overall, ≤ 1 request/s per host. Fixtures captured. `docs/SOURCES.md` and the collector strategy (§5.2) finalised. | Every `[hypothesis]` and `[search-summary]` item for S1–S5 is confirmed, refuted or documented as not determinable; fixtures committed |
 | **1 — skeleton** | Repo structure, `CLAUDE.md`, tooling; models, Alembic migrations, FTS, revision triggers; `apply_change` with diff, no-op, restore; field provenance and locks; optimistic locking (409 + payload); soft delete and trash; comments (threads, status, Markdown, revisioned edits); vocabularies (YAML → DB) and seed (19 + 1 projects); API with server-side filters, sort, pagination and facets; UI tables (filters, column chooser, URL state, saved views, bulk edit, CSV/XLSX export of the current view), detail pages with edit, badges, history, diff, restore, conflict dialog, comments; Recent changes; Docker and compose | Definition of Done 1, 2, 4 and 6 on seed data; tests green |
-| **2 — data acquisition** | `PoliteHttpClient`, snapshot store, CollectorRun and FetchLog, run queue and scheduler hook; reconciler, proposals and review inbox; SourceObservations and "possibly discontinued"; collectors C1–C5; alias tagging and event proposals; merging duplicates; importer (CSV/XLSX mapping + dry run); manual documents (URL, upload); collector-run view | Definition of Done 3 and 5; idempotency test green |
+| **2 — data acquisition** | `PoliteHttpClient`, snapshot store, CollectorRun and FetchLog, run queue and scheduler hook; reconciler, proposals and review inbox; SourceObservations and "possibly discontinued"; collectors C1–C5; alias tagging and event proposals; merging duplicates; importer (CSV/XLSX mapping + dry run; `defusedxml` installed against XML bombs in untrusted XLSX); manual documents (URL with SSRF protection, upload); collector-run view | Definition of Done 3 and 5; idempotency test green |
 | **3 — analysis** | Document view with evidence capture; Organizations, Participations, Components, Relations (D2–D4); Indicators; timeline (SVG/PNG); dashboard; all exports (dataset, QDA corpus, codebook); C6 (legal acts) and C7 (Telegram, CKAN) where useful | Definition of Done 7 (except releases) |
 | **4 — operations** | `make release` with manifest and tag; releases view; backups with rotation and restore test; schedules; CI; README, DATA_MODEL, CODEBOOK (generated), SOURCES, METHODS | Definition of Done 1–8 |
 
