@@ -1,0 +1,216 @@
+# Vocabulary beneficiary. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: beneficiary
+label: "Beneficiary"
+description: "Intended beneficiaries (team decision D-7). Codes grounded in the paper carry attributes.paper_basis (the basis in the paper). Candidate codes carry attributes.candidate = true; they are to be confirmed or rejected with data, and their English labels are derived from the codes. Multi-valued fields list all values that the sources support, with the main one first."
+multi: true
+terms:
+  - code: citizens
+    label_en: "Citizens / general population"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {paper_basis: "D1 question; KIIS figures"}
+  - code: businesses
+    label_en: "Businesses"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {paper_basis: "D1 question; business cluster"}
+  - code: public_institutions
+    label_en: "Public institutions"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {paper_basis: "D1 question (\"institutions\")"}
+  - code: veterans
+    label_en: "Veterans"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {paper_basis: "KIIS figures"}
+  - code: idps
+    label_en: "Internally displaced persons"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {paper_basis: "KIIS figures"}
+  - code: startups
+    label_en: "Startups"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {paper_basis: "Brave1 description; \"startups and innovation\""}
+  - code: foreign_investors
+    label_en: "Foreign investors"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {paper_basis: "\"foreign investments\""}
+  - code: international_partners
+    label_en: "International partners"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {paper_basis: "Brave1 description"}
+  - code: military_personnel
+    label_en: "Military personnel"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {candidate: true}
+  - code: military_families
+    label_en: "Military families"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 100
+    active: true
+    attributes: {candidate: true}
+  - code: residents_frontline_occupied
+    label_en: "Residents of frontline or occupied areas"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 110
+    active: true
+    attributes: {candidate: true}
+  - code: ukrainians_abroad
+    label_en: "Ukrainians abroad"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 120
+    active: true
+    attributes: {candidate: true}
+  - code: children_youth
+    label_en: "Children and youth"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 130
+    active: true
+    attributes: {candidate: true}
+  - code: students_learners
+    label_en: "Students and learners"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 140
+    active: true
+    attributes: {candidate: true}
+  - code: educators
+    label_en: "Educators"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 150
+    active: true
+    attributes: {candidate: true}
+  - code: civil_servants
+    label_en: "Civil servants"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 160
+    active: true
+    attributes: {candidate: true}
+  - code: local_governments
+    label_en: "Local governments"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 170
+    active: true
+    attributes: {candidate: true}
+  - code: it_companies
+    label_en: "IT companies"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 180
+    active: true
+    attributes: {candidate: true}
+  - code: defense_tech_developers
+    label_en: "Defense tech developers"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 190
+    active: true
+    attributes: {candidate: true}
+  - code: donors
+    label_en: "Donors"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 200
+    active: true
+    attributes: {candidate: true}
+  - code: international_audiences
+    label_en: "International audiences"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 210
+    active: true
+    attributes: {candidate: true}

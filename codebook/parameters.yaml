@@ -1,0 +1,11 @@
+# Codebook parameters: cut-off dates and time zones (docs/CODEBOOK.md §1, docs/DATA_MODEL.md §8-9).
+# Not a vocabulary file: it has no `vocabulary` key. Set by the team, not data values. See codebook/README.md.
+ministry_founded: 2019-08-29
+full_scale_invasion: 2022-02-24
+publication_timezone: Europe/Kyiv
+storage_timezone: UTC
+sources:
+  ministry_founded: "Paper (case description): the Ministry of Digital Transformation of Ukraine was established on 29 August 2019; assignment §1: founded on 29.08.2019."
+  full_scale_invasion: "Assignment §1: start of the full-scale invasion on 24.02.2022 (the paper gives the month, February 2022)."
+  publication_timezone: "Assignment §4: publication dates as calendar dates in Kyiv time (Europe/Kyiv)."
+  storage_timezone: "Assignment §4: timestamps in UTC."

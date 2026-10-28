@@ -1,0 +1,46 @@
+# Vocabulary date_precision. Source: docs/CODEBOOK.md §3 and §2.6 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: date_precision
+label: "Date precision"
+description: "Precision of a partial date (docs/CODEBOOK.md §2.6). Store what the source says. Never guess: a date without a year stays without a year until a reliable source supplies it. English labels are derived from the codes."
+multi: false
+terms:
+  - code: day
+    label_en: "Day"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: month
+    label_en: "Month"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: quarter
+    label_en: "Quarter"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: year
+    label_en: "Year"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

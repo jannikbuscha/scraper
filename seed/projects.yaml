@@ -1,0 +1,226 @@
+# Seed data: the 19 projects of the paper plus European Integration, and the focal organisation.
+# Only values from the assignment (§1, §3, §5). Format: docs/DATA_MODEL.md §9. See seed/README.md.
+provenance: "Assignment §3; entry URLs checked by the PI on 2026-10-28; focal organisation from assignment §1"
+projects:
+  - slug: diia
+    name_en: "Diia"
+    name_uk: "Дія"
+    paper_cluster: digital_public_services_infrastructure
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/diia-derzhavni-poslugi-onlajn"]
+    official_urls: []
+    aliases:
+      - {text: "Diia", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дії", lang: uk, case_sensitive: true, kind: inflection, exclude_patterns: []}
+      - {text: "Дію", lang: uk, case_sensitive: true, kind: inflection, exclude_patterns: []}
+  - slug: diia-engine
+    name_en: "Diia.Engine"
+    name_uk: "Дія.Engine"
+    paper_cluster: digital_public_services_infrastructure
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/diiaengine"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.Engine", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.Engine", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: diia-center
+    name_en: "Diia.Center"
+    name_uk: "Дія.Центр"
+    paper_cluster: digital_public_services_infrastructure
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/regions/center"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.Center", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.Центр", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: diia-city
+    name_en: "Diia.City"
+    name_uk: "Дія.City"
+    paper_cluster: business_economic_development
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/business/city"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.City", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.City", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: diia-business
+    name_en: "Diia.Business"
+    name_uk: "Дія.Бізнес"
+    paper_cluster: business_economic_development
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/business/business"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.Business", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.Бізнес", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: uresidency
+    name_en: "uResidency"
+    name_uk: null
+    paper_cluster: business_economic_development
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/business/u-residency"]
+    official_urls: []
+    aliases:
+      - {text: "uResidency", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: codeua
+    name_en: "CodeUA"
+    name_uk: null
+    paper_cluster: business_economic_development
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://codeua.com"]
+    aliases:
+      - {text: "CodeUA", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: diia-education
+    name_en: "Diia.Education"
+    name_uk: "Дія.Освіта"
+    paper_cluster: education_digital_capabilities
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/education/osvita"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.Education", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.Освіта", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: mriia
+    name_en: "Mriia"
+    name_uk: "Мрія"
+    paper_cluster: education_digital_capabilities
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/mriia"]
+    official_urls: []
+    aliases:
+      - {text: "Mriia", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Мрія", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: cdto-campus
+    name_en: "CDTO Campus"
+    name_uk: null
+    paper_cluster: education_digital_capabilities
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/ctdo-campus"]
+    official_urls: []
+    aliases:
+      - {text: "CDTO Campus", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: brave1
+    name_en: "Brave1"
+    name_uk: null
+    paper_cluster: defense_technology_innovation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/brave1"]
+    official_urls: []
+    aliases:
+      - {text: "Brave1", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: winwin
+    name_en: "WINWIN"
+    name_uk: null
+    paper_cluster: defense_technology_innovation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://winwin.gov.ua"]
+    aliases:
+      - {text: "WINWIN", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: usf
+    name_en: "Ukrainian Startup Fund"
+    name_uk: "Український фонд стартапів"
+    paper_cluster: defense_technology_innovation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://usf.com.ua"]
+    aliases:
+      - {text: "Ukrainian Startup Fund", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Український фонд стартапів", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: united24
+    name_en: "UNITED24"
+    name_uk: null
+    paper_cluster: fundraising_international_communication
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://u24.gov.ua"]
+    aliases:
+      - {text: "UNITED24", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: united24-media
+    name_en: "UNITED24 Media"
+    name_uk: null
+    paper_cluster: fundraising_international_communication
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://united24media.com"]
+    aliases:
+      - {text: "UNITED24 Media", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: playcity
+    name_en: "PlayCity"
+    name_uk: null
+    paper_cluster: digital_regulation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/derzavne-ahentstvo-z-kontroliu-sfery-azartnykh-ihor-ta-loterey-v-ukrayini-playcity"]
+    official_urls: []
+    aliases:
+      - {text: "PlayCity", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: virtual-assets
+    name_en: "Virtual Assets"
+    name_uk: "Віртуальні активи"
+    paper_cluster: digital_regulation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/business/virtual_assets"]
+    official_urls: []
+    aliases:
+      - {text: "Virtual Assets", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Віртуальні активи", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: diia-digital-community
+    name_en: "Diia.Digital Community"
+    name_uk: "Дія.Цифрова громада"
+    paper_cluster: broader_digital_transformation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: ["https://thedigital.gov.ua/projects/technologies/diiatsyfrova-hromada"]
+    official_urls: []
+    aliases:
+      - {text: "Diia.Digital Community", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Дія.Цифрова громада", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: digital-state-ua
+    name_en: "Digital State UA"
+    name_uk: null
+    paper_cluster: broader_digital_transformation
+    in_paper_scope: true
+    scope_note: "One of the 19 projects in the paper's preliminary findings."
+    ministry_urls: []
+    official_urls: ["https://digitalstate.gov.ua"]
+    aliases:
+      - {text: "Digital State UA", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+  - slug: european-integration
+    name_en: "European Integration"
+    name_uk: "Євроінтеграція"
+    paper_cluster: null
+    in_paper_scope: false
+    scope_note: "Listed on thedigital.gov.ua/projects (checked by the PI on 2026-10-28) but not among the paper's 19 projects; the team decides (decision D-1)."
+    ministry_urls: ["https://thedigital.gov.ua/projects/progress/yevrointegraciya"]
+    official_urls: []
+    aliases:
+      - {text: "European Integration", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Євроінтеграція", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
+organizations:
+  - slug: ministry-of-digital-transformation
+    name_en: "Ministry of Digital Transformation of Ukraine"
+    name_uk: "Мінцифри"
+    org_type: ministry
+    country: UA
+    aliases:
+      - {text: "Ministry of Digital Transformation of Ukraine", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
+      - {text: "Мінцифри", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}

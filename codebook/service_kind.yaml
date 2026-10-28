@@ -1,0 +1,106 @@
+# Vocabulary service_kind. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: service_kind
+label: "Service kind"
+description: "Kind of a service or sub-service (field `kind`), following the list in the assignment (§4). Service granularity rules: docs/CODEBOOK.md §2.2 (team decision D-6)."
+multi: false
+terms:
+  - code: e_service
+    label_en: "E-service"
+    label_uk: null
+    definition: "An administrative procedure that can be completed online (application, registration, notification, payment)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: e_document
+    label_en: "E-document"
+    label_uk: null
+    definition: "A digital document or certificate that can be shown or shared."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: physical_service
+    label_en: "Physical service"
+    label_uk: null
+    definition: "Provided in person (e.g. at a service centre)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: program_grant
+    label_en: "Programme or grant"
+    label_uk: null
+    definition: "Financial or in-kind support with eligibility criteria."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: platform_feature
+    label_en: "Platform feature"
+    label_uk: null
+    definition: "A function of a platform without its own administrative result (e.g. notifications, sharing, signing)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: registry_regulation
+    label_en: "Registry or regulation"
+    label_uk: null
+    definition: "A register, licence or regulatory procedure."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: fundraising_campaign
+    label_en: "Fundraising campaign"
+    label_uk: null
+    definition: "A fundraising direction or campaign."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}
+  - code: course_training
+    label_en: "Course or training"
+    label_uk: null
+    definition: "An educational offering."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {}
+  - code: media
+    label_en: "Media"
+    label_uk: null
+    definition: "Editorial content, an outlet or a series."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Explain in `notes`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 100
+    active: true
+    attributes: {}

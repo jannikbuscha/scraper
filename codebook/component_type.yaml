@@ -1,0 +1,76 @@
+# Vocabulary component_type. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: component_type
+label: "Component type"
+description: "Type of a component: a platform or infrastructure that is not itself a portfolio project. Draft. English labels are derived from the codes."
+multi: false
+terms:
+  - code: data_exchange
+    label_en: "Data exchange"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: identification_trust
+    label_en: "Identification and trust"
+    label_uk: null
+    definition: "Identification, signatures."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: registry
+    label_en: "Registry"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: payment
+    label_en: "Payment"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: cloud_hosting
+    label_en: "Cloud hosting"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: communication
+    label_en: "Communication"
+    label_uk: null
+    definition: "Notifications, messaging."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}

@@ -1,0 +1,46 @@
+# Vocabulary war_trajectory. Source: docs/CODEBOOK.md §3 and §2.7 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: war_trajectory
+label: "War trajectory"
+description: "Derived values (read-only), computed from launch and modification events; modification types are event types with attributes.counts_as_modification = true. Rules: docs/CODEBOOK.md §2.7. `prewar_unchanged` means no modification recorded in the sources up to the release. The reason for `unknown` is given in trajectory_reason (vocabulary `derived_reason`)."
+multi: false
+terms:
+  - code: new_in_war
+    label_en: "New in war"
+    label_uk: null
+    definition: "Launched on or after `FULL_SCALE_INVASION`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: adapted_in_war
+    label_en: "Adapted in war"
+    label_uk: null
+    definition: "Existed before the invasion; at least one modification event on or after it."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: prewar_unchanged
+    label_en: "Pre-war, no recorded change"
+    label_uk: null
+    definition: "Existed before the invasion; no modification recorded on or after it (up to the release date)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: unknown
+    label_en: "Unknown"
+    label_uk: null
+    definition: "Not determinable; the reason is given in `trajectory_reason`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

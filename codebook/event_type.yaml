@@ -1,0 +1,116 @@
+# Vocabulary event_type. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: event_type
+label: "Event type"
+description: "Types of introduction and modification events. attributes.counts_as_modification decides what counts as a modification for the derived war_trajectory value `adapted_in_war` (team decision D-2). English labels are derived from the codes."
+multi: false
+terms:
+  - code: announced
+    label_en: "Announced"
+    label_uk: null
+    definition: "Publicly announced, not yet available."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {counts_as_modification: false}
+  - code: legal_basis_adopted
+    label_en: "Legal basis adopted"
+    label_uk: null
+    definition: "A legal act establishing or changing the basis was adopted."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {counts_as_modification: false}
+  - code: beta_launch
+    label_en: "Beta launch"
+    label_uk: null
+    definition: "Available as beta, test or pilot."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {counts_as_modification: false}
+  - code: launch
+    label_en: "Launch"
+    label_uk: null
+    definition: "Available to the intended users."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {counts_as_modification: false}
+  - code: expansion
+    label_en: "Expansion"
+    label_uk: null
+    definition: "Extended to new user groups, regions, channels or functions."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {counts_as_modification: true}
+  - code: major_update
+    label_en: "Major update"
+    label_uk: null
+    definition: "Substantial functional change."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {counts_as_modification: true}
+  - code: rebrand
+    label_en: "Rebrand"
+    label_uk: null
+    definition: "Renamed or rebranded."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {counts_as_modification: true}
+  - code: governance_change
+    label_en: "Governance change"
+    label_uk: null
+    definition: "Change of owner, operator, coordinating authority or subordination; also institutional context events of the ministry."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {counts_as_modification: true}
+  - code: suspension
+    label_en: "Suspension"
+    label_uk: null
+    definition: "Temporarily halted or closed."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {counts_as_modification: true}
+  - code: discontinuation
+    label_en: "Discontinuation"
+    label_uk: null
+    definition: "Permanently ended."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 100
+    active: true
+    attributes: {counts_as_modification: false}
+  - code: first_archived
+    label_en: "First archived"
+    label_uk: null
+    definition: "Earliest archive capture (upper bound, `archive_upper_bound`)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 110
+    active: true
+    attributes: {counts_as_modification: false}

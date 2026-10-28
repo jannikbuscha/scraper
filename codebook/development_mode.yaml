@@ -1,0 +1,36 @@
+# Vocabulary development_mode. Source: docs/CODEBOOK.md §2.5 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: development_mode
+label: "Development mode"
+description: "Adaptation of existing versus new development, after Yoo et al. (2012), coded from sources. The coded mode complements the derived war_trajectory, which only looks at dates. Combining existing components into something new is recorded separately through `recombines` relations (D4)."
+multi: false
+terms:
+  - code: new_development
+    label_en: "New development"
+    label_uk: null
+    definition: "The sources present the initiative as newly developed, without a predecessor among the ministry's services or platforms."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: adaptation_of_existing
+    label_en: "Adaptation of existing"
+    label_uk: null
+    definition: "The sources present the initiative as a change, extension or re-purposing of an existing service, platform or organisation. Requires a Relation (`extends`, `builds_on`, `successor_of`) or a rationale explaining why none can be recorded."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: unclear
+    label_en: "Unclear"
+    label_uk: null
+    definition: "Not determinable from the sources after review. Not-yet-coded fields stay empty."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}

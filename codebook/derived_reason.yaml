@@ -1,0 +1,46 @@
+# Vocabulary derived_reason. Source: docs/CODEBOOK.md §3 and §2.7 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: derived_reason
+label: "Derived value reason"
+description: "Reason codes of derived values (fields period_reason and trajectory_reason; docs/CODEBOOK.md §2.7). English labels are derived from the codes."
+multi: false
+terms:
+  - code: no_date
+    label_en: "No date"
+    label_uk: null
+    definition: "No dated launch, beta-launch or archive event."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: imprecise_date
+    label_en: "Imprecise date"
+    label_uk: null
+    definition: "The launch date's precision straddles a cut-off date."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: archive_bound_only
+    label_en: "Archive bound only"
+    label_uk: null
+    definition: "Only an archive upper bound is known, which does not determine the period."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: imprecise_modification_date
+    label_en: "Imprecise modification date"
+    label_uk: null
+    definition: "A modification event is undated or straddles `FULL_SCALE_INVASION`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

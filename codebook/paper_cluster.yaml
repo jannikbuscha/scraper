@@ -1,0 +1,76 @@
+# Vocabulary paper_cluster. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: paper_cluster
+label: "Paper cluster"
+description: "Seven thematic clusters used in the paper. Cluster names and assignments as in the paper; the definitions are drafts. European Integration is not assigned in the paper; its cluster is left empty until team decision D-1."
+multi: false
+terms:
+  - code: digital_public_services_infrastructure
+    label_en: "Digital public services & infrastructure"
+    label_uk: null
+    definition: "Primary purpose: delivering public services digitally, or the infrastructure these services run on."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: Diia, Diia.Engine, Diia.Center."
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: business_economic_development
+    label_en: "Business & economic development"
+    label_uk: null
+    definition: "Primary purpose: supporting businesses, entrepreneurship, investment or the IT sector."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: Diia.City, Diia.Business, uResidency, CodeUA."
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: education_digital_capabilities
+    label_en: "Education & digital capabilities"
+    label_uk: null
+    definition: "Primary purpose: digital skills, education or capabilities of citizens and public servants."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: Diia.Education, Mriia, CDTO Campus."
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: defense_technology_innovation
+    label_en: "Defense technology & innovation"
+    label_uk: null
+    definition: "Primary purpose: developing, funding or scaling (defence) technology and innovation."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: Brave1, WINWIN, Ukrainian Startup Fund."
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: fundraising_international_communication
+    label_en: "Fundraising & international communication"
+    label_uk: null
+    definition: "Primary purpose: raising funds or communicating with international audiences."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: UNITED24, UNITED24 Media."
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: digital_regulation
+    label_en: "Digital regulation"
+    label_uk: null
+    definition: "Primary purpose: regulating, licensing or supervising digital markets."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: PlayCity, Virtual Assets."
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: broader_digital_transformation
+    label_en: "Broader digital transformation"
+    label_uk: null
+    definition: "Primary purpose: supporting digital transformation across government or society, beyond single services."
+    include_note: null
+    exclude_note: null
+    examples: "Projects assigned in the paper: Diia.Digital Community, Digital State UA."
+    sort_order: 70
+    active: true
+    attributes: {}

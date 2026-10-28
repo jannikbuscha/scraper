@@ -1,0 +1,66 @@
+# Vocabulary status. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: status
+label: "Status"
+description: "Operational status of a project or service. English labels are derived from the codes."
+multi: false
+terms:
+  - code: active
+    label_en: "Active"
+    label_uk: null
+    definition: "Available or operating according to the most recent source."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: planned
+    label_en: "Planned"
+    label_uk: null
+    definition: "Announced or in preparation, not yet available."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: pilot
+    label_en: "Pilot"
+    label_uk: null
+    definition: "Test, beta or pilot operation."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: suspended
+    label_en: "Suspended"
+    label_uk: null
+    definition: "Temporarily unavailable or halted."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: discontinued
+    label_en: "Discontinued"
+    label_uk: null
+    definition: "Ended or permanently unavailable."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: unknown
+    label_en: "Unknown"
+    label_uk: null
+    definition: "No current evidence."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}

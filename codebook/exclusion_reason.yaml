@@ -1,0 +1,76 @@
+# Vocabulary exclusion_reason. Source: docs/CODEBOOK.md §3 and §2.8 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: exclusion_reason
+label: "Exclusion reason"
+description: "Reason for excluding a document during screening (field `screening_reason`; docs/CODEBOOK.md §2.8). English labels are derived from the codes."
+multi: false
+terms:
+  - code: not_about_portfolio
+    label_en: "Not about portfolio"
+    label_uk: null
+    definition: "Does not concern a project or service of the portfolio."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: insufficient_content
+    label_en: "Insufficient content"
+    label_uk: null
+    definition: "Too little substantive content (e.g. a teaser)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: duplicate
+    label_en: "Duplicate"
+    label_uk: null
+    definition: "Duplicate of another document (linked)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: outside_period
+    label_en: "Outside period"
+    label_uk: null
+    definition: "Outside the observation window."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: not_a_document
+    label_en: "Not a document"
+    label_uk: null
+    definition: "Navigation, list or error page."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: inaccessible
+    label_en: "Inaccessible"
+    label_uk: null
+    definition: "Content not retrievable (also not archived)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Explain in the note."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}

@@ -1,0 +1,56 @@
+# Vocabulary ministry_category. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: ministry_category
+label: "Ministry category"
+description: "Project categories as observed in the URL segment after /projects/ on thedigital.gov.ua (entry URLs in the assignment). They are not the paper's clusters; both are stored. A project can appear under several categories (the assignment notes Дія.City under /projects/business/city and /projects/regions/city), so the field is multi-valued. The code and English label are the URL segment; the category labels shown on the ministry site will be captured by collector C1."
+multi: true
+terms:
+  - code: technologies
+    label_en: "technologies"
+    label_uk: null
+    definition: "Category with the URL segment `technologies` (thedigital.gov.ua/projects/technologies/…), observed in the seed URLs of the assignment. The label shown on the ministry site will be captured by collector C1."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: business
+    label_en: "business"
+    label_uk: null
+    definition: "Category with the URL segment `business` (thedigital.gov.ua/projects/business/…), observed in the seed URLs of the assignment. The label shown on the ministry site will be captured by collector C1."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: regions
+    label_en: "regions"
+    label_uk: null
+    definition: "Category with the URL segment `regions` (thedigital.gov.ua/projects/regions/…), observed in the seed URLs of the assignment. The label shown on the ministry site will be captured by collector C1."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: education
+    label_en: "education"
+    label_uk: null
+    definition: "Category with the URL segment `education` (thedigital.gov.ua/projects/education/…), observed in the seed URLs of the assignment. The label shown on the ministry site will be captured by collector C1."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: progress
+    label_en: "progress"
+    label_uk: null
+    definition: "Category with the URL segment `progress` (thedigital.gov.ua/projects/progress/…), observed in the seed URLs of the assignment. The label shown on the ministry site will be captured by collector C1."
+    include_note: "Unconfirmed: the page title \"Досягнення\" was seen in search results; to be confirmed by collector C1."
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}

@@ -1,0 +1,46 @@
+# Vocabulary language. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: language
+label: "Language"
+description: "Language of a document. ISO 639-1 codes."
+multi: false
+terms:
+  - code: uk
+    label_en: "Ukrainian"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: en
+    label_en: "English"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: ru
+    label_en: "Russian"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Explain in `notes`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

@@ -1,0 +1,66 @@
+# Vocabulary channel. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: channel
+label: "Channel"
+description: "Channels through which a service is offered. If the same service is offered through several channels, it is one service with several channels (docs/CODEBOOK.md §2.2). English labels are derived from the codes."
+multi: true
+terms:
+  - code: app
+    label_en: "App"
+    label_uk: null
+    definition: "Mobile application"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: portal
+    label_en: "Portal"
+    label_uk: null
+    definition: "The central government services portal"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: web
+    label_en: "Web"
+    label_uk: null
+    definition: "Other website or web application"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: physical
+    label_en: "Physical"
+    label_uk: null
+    definition: "In person (office, centre)"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: chatbot
+    label_en: "Chatbot"
+    label_uk: null
+    definition: "Messenger bot or chat assistant"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: api
+    label_en: "API"
+    label_uk: null
+    definition: "Machine interface for other systems"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}

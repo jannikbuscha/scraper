@@ -1,0 +1,46 @@
+# Vocabulary license. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: license
+label: "License"
+description: "License of a document. Draft. English labels are derived from the codes."
+multi: false
+terms:
+  - code: cc_by_4_0
+    label_en: "CC BY 4.0"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: other_open
+    label_en: "Other open"
+    label_uk: null
+    definition: "Link to the license."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: all_rights_reserved
+    label_en: "All rights reserved"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: unknown
+    label_en: "Unknown"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

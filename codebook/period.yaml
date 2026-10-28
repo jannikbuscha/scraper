@@ -1,0 +1,46 @@
+# Vocabulary period. Source: docs/CODEBOOK.md §3 and §2.7 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: period
+label: "Period"
+description: "Derived values (read-only): period of the launch relative to the cut-off dates MINISTRY_FOUNDED and FULL_SCALE_INVASION (codebook/parameters.yaml). Rules: docs/CODEBOOK.md §2.7 (team decision D-3). The reason for `unknown` is given in period_reason (vocabulary `derived_reason`)."
+multi: false
+terms:
+  - code: pre_ministry
+    label_en: "Before the ministry"
+    label_uk: null
+    definition: "Launch ends before `MINISTRY_FOUNDED`, or the archive bound lies before it."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: pre_invasion
+    label_en: "Ministry, before the full-scale invasion"
+    label_uk: null
+    definition: "Launch lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: full_scale_war
+    label_en: "Full-scale war"
+    label_uk: null
+    definition: "Launch starts on or after `FULL_SCALE_INVASION`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: unknown
+    label_en: "Unknown"
+    label_uk: null
+    definition: "No launch date, an imprecise date that straddles a cut-off, or only an archive bound after `MINISTRY_FOUNDED`; the reason is given in `period_reason`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

@@ -1,0 +1,66 @@
+# Vocabulary unit_type. Source: docs/CODEBOOK.md §3 and §2.1 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: unit_type
+label: "Unit type"
+description: "Distinguishes digital products from platforms, programmes, strategies or policy areas and organisations that are all listed as projects. Coding is based on how the sources describe the entry, not on the coder's background knowledge. Draft; team decision D-11."
+multi: false
+terms:
+  - code: digital_product
+    label_en: "Digital product or service"
+    label_uk: null
+    definition: "Used directly by end users (app, portal, e-service, website with its own function)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: platform
+    label_en: "Platform or infrastructure"
+    label_uk: null
+    definition: "Mainly used by other services or organisations to build or deliver their offerings."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: programme
+    label_en: "Programme"
+    label_uk: null
+    definition: "A support, funding, education or regulatory programme with defined participants or recipients."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: strategy_policy_area
+    label_en: "Strategy or policy area"
+    label_uk: null
+    definition: "A strategy, policy workstream or umbrella brand without one specific product."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: organisation
+    label_en: "Organisation"
+    label_uk: null
+    definition: "A separate legal entity or agency (e.g. a fund, an agency, an editorial office)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Explain in `notes`."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}

@@ -1,0 +1,66 @@
+# Vocabulary relation_type. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: relation_type
+label: "Relation type"
+description: "Relations between projects, services and components (for D2 and D4), read as \"from — type — to\". English labels are derived from the codes."
+multi: false
+terms:
+  - code: builds_on
+    label_en: "Builds on"
+    label_uk: null
+    definition: "Technically uses or depends on the target (e.g. a service built on a platform)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: extends
+    label_en: "Extends"
+    label_uk: null
+    definition: "Adds functions, groups or channels to the target."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: recombines
+    label_en: "Recombines"
+    label_uk: null
+    definition: "Combines the target with other components into a new offering (one relation per combined component)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: part_of
+    label_en: "Part of"
+    label_uk: null
+    definition: "Is a component or sub-unit of the target."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: successor_of
+    label_en: "Successor of"
+    label_uk: null
+    definition: "Replaces the target."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: related_to
+    label_en: "Related to"
+    label_uk: null
+    definition: "Other documented relation (explain in `note`)."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}

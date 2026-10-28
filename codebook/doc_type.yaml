@@ -1,0 +1,96 @@
+# Vocabulary doc_type. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: doc_type
+label: "Document type"
+description: "Type of a document in the corpus, following the list in the assignment (§4). English labels are derived from the codes."
+multi: false
+terms:
+  - code: news
+    label_en: "News"
+    label_uk: null
+    definition: "News item of an organisation"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: announcement
+    label_en: "Announcement"
+    label_uk: null
+    definition: "Short announcement or post (e.g. Telegram)"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: project_page
+    label_en: "Project page"
+    label_uk: null
+    definition: "Page describing a project or service"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: legal_act
+    label_en: "Legal act"
+    label_uk: null
+    definition: "Law, resolution, order"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: strategy_policy
+    label_en: "Strategy or policy"
+    label_uk: null
+    definition: "Strategy, concept, policy document, work plan"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: report
+    label_en: "Report"
+    label_uk: null
+    definition: "Annual report, evaluation, study"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: statistics
+    label_en: "Statistics"
+    label_uk: null
+    definition: "Statistics or dataset"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}
+  - code: interview_media
+    label_en: "Interview or media"
+    label_uk: null
+    definition: "Interview or press article"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Other"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {}

@@ -1,0 +1,106 @@
+# Vocabulary policy_domain. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: policy_domain
+label: "Policy domain"
+description: "Proposal (team decision D-7): the divisions of the UN Classification of the Functions of Government (COFOG) as the top level, because it is a citable international standard and makes the results comparable. attributes.cofog holds the COFOG division number. The labels still have to be checked against the official COFOG publication before adoption. Subcodes are proposed from the collected data in Phase 2/3; the team finalises them."
+multi: true
+terms:
+  - code: general_public_services
+    label_en: "General public services"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {cofog: "01"}
+  - code: defence
+    label_en: "Defence"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {cofog: "02"}
+  - code: public_order_safety
+    label_en: "Public order and safety"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {cofog: "03"}
+  - code: economic_affairs
+    label_en: "Economic affairs"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {cofog: "04"}
+  - code: environmental_protection
+    label_en: "Environmental protection"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {cofog: "05"}
+  - code: housing_community
+    label_en: "Housing and community amenities"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {cofog: "06"}
+  - code: health
+    label_en: "Health"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {cofog: "07"}
+  - code: recreation_culture_religion
+    label_en: "Recreation, culture and religion"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {cofog: "08"}
+  - code: education
+    label_en: "Education"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {cofog: "09"}
+  - code: social_protection
+    label_en: "Social protection"
+    label_uk: null
+    definition: null
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 100
+    active: true
+    attributes: {cofog: "10"}

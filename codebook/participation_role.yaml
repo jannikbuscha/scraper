@@ -1,0 +1,86 @@
+# Vocabulary participation_role. Source: docs/CODEBOOK.md §3 and §2.7 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: participation_role
+label: "Participation role"
+description: "Role of an organization in a project, service or component (for D3). The derived portfolio_entry uses participations of the focal organisation in the roles `initiator`, `owner` or `operator` (team decision D-10). `coordinator` is a draft addition (attributes.draft_addition = true). English labels are derived from the codes."
+multi: false
+terms:
+  - code: initiator
+    label_en: "Initiator"
+    label_uk: null
+    definition: "Initiated the project or service."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: owner
+    label_en: "Owner"
+    label_uk: null
+    definition: "Holds formal responsibility or ownership."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: developer
+    label_en: "Developer"
+    label_uk: null
+    definition: "Builds or develops it technically."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: funder
+    label_en: "Funder"
+    label_uk: null
+    definition: "Provides funding."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: partner
+    label_en: "Partner"
+    label_uk: null
+    definition: "Cooperates without one of the other roles."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: operator
+    label_en: "Operator"
+    label_uk: null
+    definition: "Runs it day to day."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: regulator
+    label_en: "Regulator"
+    label_uk: null
+    definition: "Sets rules or policy for it, or supervises it."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}
+  - code: coordinator
+    label_en: "Coordinator"
+    label_uk: null
+    definition: "Coordinates the activities of a body (e.g. coordination of an agency through a minister); suggested by the PlayCity leads [search]."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {draft_addition: true}

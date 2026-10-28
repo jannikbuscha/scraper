@@ -1,0 +1,46 @@
+# Vocabulary wartime_relevance. Source: docs/CODEBOOK.md §2.4 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: wartime_relevance
+label: "Wartime relevance"
+description: "Code the stated purpose and target group according to the sources, relative to needs caused or substantially intensified by the full-scale war (from 2022-02-24). include_note holds the coding rule. Draft; team decision D-4."
+multi: false
+terms:
+  - code: direct
+    label_en: "Direct"
+    label_uk: null
+    definition: "The primary objective, according to the sources, addresses a need caused or substantially intensified by the war (e.g. defence, war damage, displacement, wartime fundraising, services for affected groups)."
+    include_note: "Requires evidence naming the war-related need."
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: indirect
+    label_en: "Indirect"
+    label_uk: null
+    definition: "The primary objective is not war-specific, but sources explicitly link the initiative to wartime needs (e.g. continuity of services, economic resilience, recovery)."
+    include_note: "Requires evidence of the explicit link."
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: none
+    label_en: "None"
+    label_uk: null
+    definition: "The sources state no relation to the war, and none is evident from the stated purpose."
+    include_note: "Absence must be checked in at least the project page and one further source."
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: unclear
+    label_en: "Unclear"
+    label_uk: null
+    definition: "After review, the evidence is insufficient or contradictory."
+    include_note: "A field that has not been coded yet stays empty; `unclear` is a coding decision, not a default."
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}

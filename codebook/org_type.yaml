@@ -1,0 +1,156 @@
+# Vocabulary org_type. Source: docs/CODEBOOK.md §3 (draft of 2026-10-28). See codebook/README.md.
+vocabulary: org_type
+label: "Organization type"
+description: "Type of an organization. English labels are derived from the codes."
+multi: false
+terms:
+  - code: ministry
+    label_en: "Ministry"
+    label_uk: null
+    definition: "Ministry"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 10
+    active: true
+    attributes: {}
+  - code: central_executive_body
+    label_en: "Central executive body"
+    label_uk: null
+    definition: "Agency, service, inspectorate or other central executive body"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 20
+    active: true
+    attributes: {}
+  - code: government_office
+    label_en: "Government office"
+    label_uk: null
+    definition: "Cabinet of Ministers, Office of the President and similar bodies"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 30
+    active: true
+    attributes: {}
+  - code: parliament
+    label_en: "Parliament"
+    label_uk: null
+    definition: "Parliament and its bodies"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 40
+    active: true
+    attributes: {}
+  - code: local_government
+    label_en: "Local government"
+    label_uk: null
+    definition: "Local self-government or regional administration"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
+    active: true
+    attributes: {}
+  - code: state_enterprise
+    label_en: "State enterprise"
+    label_uk: null
+    definition: "State-owned enterprise"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 60
+    active: true
+    attributes: {}
+  - code: state_fund_institution
+    label_en: "State fund or institution"
+    label_uk: null
+    definition: "State fund or state institution"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 70
+    active: true
+    attributes: {}
+  - code: international_organisation
+    label_en: "International organisation"
+    label_uk: null
+    definition: "International organisation"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 80
+    active: true
+    attributes: {}
+  - code: foreign_government_agency
+    label_en: "Foreign government agency"
+    label_uk: null
+    definition: "Foreign government or its agency"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 90
+    active: true
+    attributes: {}
+  - code: ngo_civil_society
+    label_en: "NGO or civil society"
+    label_uk: null
+    definition: "NGO, association, cluster"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 100
+    active: true
+    attributes: {}
+  - code: company
+    label_en: "Company"
+    label_uk: null
+    definition: "Private company"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 110
+    active: true
+    attributes: {}
+  - code: startup
+    label_en: "Startup"
+    label_uk: null
+    definition: "Startup"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 120
+    active: true
+    attributes: {}
+  - code: academic_institution
+    label_en: "Academic institution"
+    label_uk: null
+    definition: "University, research institute"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 130
+    active: true
+    attributes: {}
+  - code: media_outlet
+    label_en: "Media outlet"
+    label_uk: null
+    definition: "Media organisation"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 140
+    active: true
+    attributes: {}
+  - code: other
+    label_en: "Other"
+    label_uk: null
+    definition: "Other"
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 150
+    active: true
+    attributes: {}
