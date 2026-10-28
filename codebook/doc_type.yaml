@@ -3,6 +3,7 @@ vocabulary: doc_type
 label: "Document type"
 description: "Type of a document in the corpus, following the list in the assignment (§4). English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: news
     label_en: "News"

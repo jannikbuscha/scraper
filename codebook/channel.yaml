@@ -3,6 +3,7 @@ vocabulary: channel
 label: "Channel"
 description: "Channels through which a service is offered. If the same service is offered through several channels, it is one service with several channels (docs/CODEBOOK.md §2.2). English labels are derived from the codes."
 multi: true
+fixed_codes: false
 terms:
   - code: app
     label_en: "App"

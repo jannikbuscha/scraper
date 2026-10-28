@@ -1,6 +1,6 @@
 # PLAN: data platform for "Digital Innovation for Governments under Crisis"
 
-> **Status:** Phase 0 draft, 2026-10-28. Waiting for approval before Phase 1.
+> **Status:** Phase 0 plan, 2026-10-28; approved, Phase 1 in progress. For Phase 1 onwards, the contract documents [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), [`docs/API.md`](docs/API.md) and [`docs/UI.md`](docs/UI.md) are binding; where they differ from this plan in detail (e.g. provenance rules, derived-field algorithm, seed matching), they take precedence.
 > **Companion drafts:** [`docs/SOURCES.md`](docs/SOURCES.md) (source register), [`docs/CODEBOOK.md`](docs/CODEBOOK.md) (vocabularies).
 > **Language:** code, UI, docs and codebook in English (language of the paper).
 

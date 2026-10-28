@@ -3,6 +3,7 @@ vocabulary: paper_cluster
 label: "Paper cluster"
 description: "Seven thematic clusters used in the paper. Cluster names and assignments as in the paper; the definitions are drafts. European Integration is not assigned in the paper; its cluster is left empty until team decision D-1."
 multi: false
+fixed_codes: false
 terms:
   - code: digital_public_services_infrastructure
     label_en: "Digital public services & infrastructure"

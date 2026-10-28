@@ -3,6 +3,7 @@ vocabulary: ministry_category
 label: "Ministry category"
 description: "Project categories as observed in the URL segment after /projects/ on thedigital.gov.ua (entry URLs in the assignment). They are not the paper's clusters; both are stored. A project can appear under several categories (the assignment notes Дія.City under /projects/business/city and /projects/regions/city), so the field is multi-valued. The code and English label are the URL segment; the category labels shown on the ministry site will be captured by collector C1."
 multi: true
+fixed_codes: false
 terms:
   - code: technologies
     label_en: "technologies"

@@ -3,6 +3,7 @@ vocabulary: date_precision
 label: "Date precision"
 description: "Precision of a partial date (docs/CODEBOOK.md §2.6). Store what the source says. Never guess: a date without a year stays without a year until a reliable source supplies it. English labels are derived from the codes."
 multi: false
+fixed_codes: true
 terms:
   - code: day
     label_en: "Day"

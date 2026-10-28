@@ -3,6 +3,7 @@ vocabulary: language
 label: "Language"
 description: "Language of a document. ISO 639-1 codes."
 multi: false
+fixed_codes: false
 terms:
   - code: uk
     label_en: "Ukrainian"

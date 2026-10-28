@@ -3,6 +3,7 @@ vocabulary: war_trajectory
 label: "War trajectory"
 description: "Derived values (read-only), computed from launch and modification events; modification types are event types with attributes.counts_as_modification = true. Rules: docs/CODEBOOK.md §2.7. `prewar_unchanged` means no modification recorded in the sources up to the release. The reason for `unknown` is given in trajectory_reason (vocabulary `derived_reason`)."
 multi: false
+fixed_codes: true
 terms:
   - code: new_in_war
     label_en: "New in war"

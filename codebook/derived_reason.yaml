@@ -3,6 +3,7 @@ vocabulary: derived_reason
 label: "Derived value reason"
 description: "Reason codes of derived values (fields period_reason and trajectory_reason; docs/CODEBOOK.md §2.7). English labels are derived from the codes."
 multi: false
+fixed_codes: true
 terms:
   - code: no_date
     label_en: "No date"
@@ -42,5 +43,15 @@ terms:
     exclude_note: null
     examples: null
     sort_order: 40
+    active: true
+    attributes: {}
+  - code: conflicting_dates
+    label_en: "Conflicting dates"
+    label_uk: null
+    definition: "The launch lies on or after `FULL_SCALE_INVASION`, but an archive bound or the launch interval shows the item existed before it."
+    include_note: null
+    exclude_note: null
+    examples: null
+    sort_order: 50
     active: true
     attributes: {}

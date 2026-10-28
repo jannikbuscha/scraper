@@ -3,6 +3,7 @@ vocabulary: unit_type
 label: "Unit type"
 description: "Distinguishes digital products from platforms, programmes, strategies or policy areas and organisations that are all listed as projects. Coding is based on how the sources describe the entry, not on the coder's background knowledge. Draft; team decision D-11."
 multi: false
+fixed_codes: false
 terms:
   - code: digital_product
     label_en: "Digital product or service"

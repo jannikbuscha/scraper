@@ -3,6 +3,7 @@ vocabulary: policy_domain
 label: "Policy domain"
 description: "Proposal (team decision D-7): the divisions of the UN Classification of the Functions of Government (COFOG) as the top level, because it is a citable international standard and makes the results comparable. attributes.cofog holds the COFOG division number. The labels still have to be checked against the official COFOG publication before adoption. Subcodes are proposed from the collected data in Phase 2/3; the team finalises them."
 multi: true
+fixed_codes: false
 terms:
   - code: general_public_services
     label_en: "General public services"

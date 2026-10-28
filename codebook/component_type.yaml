@@ -3,6 +3,7 @@ vocabulary: component_type
 label: "Component type"
 description: "Type of a component: a platform or infrastructure that is not itself a portfolio project. Draft. English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: data_exchange
     label_en: "Data exchange"

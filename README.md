@@ -60,7 +60,7 @@ Settings come from environment variables, usually from a `.env` file in the repo
 | `ALLOWED_HOSTS` | `127.0.0.1,localhost` | Host-header allowlist against DNS rebinding. Add the name the team uses (VPN address, proxy host name). Keep `127.0.0.1`: the container health check uses it |
 | `TEAM_MEMBERS` | empty | Names offered by the "Who are you?" author picker, comma-separated |
 | `CONTACT_EMAIL` | placeholder | Contact address in the collectors' User-Agent (Phase 2). Replace the placeholder before running collectors |
-| `MAX_COMMENT_CHARS`, `FOCAL_ORG_SLUG`, `LOG_LEVEL` | `10000`, `ministry-of-digital-transformation`, `INFO` | Comment length limit, slug of the ministry in the seed, log level |
+| `MAX_COMMENT_CHARS`, `FOCAL_ORG_SEED_KEY`, `LOG_LEVEL` | `10000`, `ministry-of-digital-transformation`, `INFO` | Comment length limit, seed key of the ministry, log level |
 | `DATA_DIR`, `DATABASE_URL`, `CODEBOOK_DIR`, `SEED_DIR`, `FRONTEND_DIST` | `data/`, `data/app.db`, `codebook/`, `seed/`, `frontend/dist` | Paths for local development. Inside the container they are fixed |
 | `APP_UID`, `APP_GID` | `1000` | Docker build: user and group that run the app and own `./data` |
 

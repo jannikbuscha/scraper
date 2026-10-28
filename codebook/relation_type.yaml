@@ -3,6 +3,7 @@ vocabulary: relation_type
 label: "Relation type"
 description: "Relations between projects, services and components (for D2 and D4), read as \"from — type — to\". English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: builds_on
     label_en: "Builds on"

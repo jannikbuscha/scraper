@@ -3,6 +3,7 @@ vocabulary: org_type
 label: "Organization type"
 description: "Type of an organization. English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: ministry
     label_en: "Ministry"

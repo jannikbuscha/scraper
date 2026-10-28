@@ -20,7 +20,7 @@
 ### 2.1 Unit of analysis
 
 - **Project:** everything that sources identify as a project of the ministry is captured. The primary source is the project list on thedigital.gov.ua [user].
-- **Scope is a separate decision:** whether a project enters the analysis is recorded in `in_paper_scope` with a mandatory `scope_note` ⚑ D-1.
+- **Scope is a separate decision:** whether a project enters the analysis is recorded in `in_paper_scope`. Every time it is set or changed, a non-empty `scope_note` with the reason must be given in the same change (the app enforces this) ⚑ D-1.
 - **`unit_type`** distinguishes digital products from platforms, programmes, strategies or policy areas and organisations ⚑ D-11. Coding is based on how the sources describe the entry, not on the coder's background knowledge.
 
 ### 2.2 Service granularity ⚑ D-6
@@ -32,9 +32,14 @@
 
 ### 2.3 Classification fields and evidence
 
-- `policy_domains`, `beneficiaries`, `wartime_relevance`, `development_mode`, the primary objectives and D1–D4 are coded **from sources**. A field can only be marked `verified` if at least one Evidence record (document + verbatim quote) supports it.
-- Without evidence the field stays `unverified`, and the rationale field explains the coder's reasoning.
-- Multi-valued fields (`policy_domains`, `beneficiaries`, `channels`) list all values that the sources support, with the main one first.
+- `policy_domains`, `beneficiaries`, `wartime_relevance`, `development_mode`, the primary objectives and D1–D4 are coded **from sources**.
+- **Field verification** (`docs/DATA_MODEL.md` §6.4):
+  - a field can be marked `verified` only with an evidence record that targets that field (document or URL with retrieval time, plus a verbatim quote);
+  - `disputed` requires a note;
+  - any later change of the value resets it to `unverified`.
+  - Without evidence the field stays `unverified`, and the rationale field explains the coder's reasoning.
+- **Record-level `verification_status`** is the reviewer's judgement of the whole record, independent of the field statuses. Setting it to `verified` or `disputed` requires a note.
+- **Multi-valued fields** (`policy_domains`, `beneficiaries`, `channels`) list all values that the sources support, with the main one first. The first value is used for sorting.
 
 ### 2.4 Wartime relevance (`wartime_relevance`) ⚑ D-4
 
@@ -62,22 +67,23 @@ The coded mode complements the derived `war_trajectory` (§2.7), which only look
 - Store what the source says, with **precision** (`day`, `month`, `quarter`, `year`) and **basis** (`stated_in_source`, `inferred`, `archive_upper_bound`); keep the verbatim date text.
 - **Never guess.** A date without a year stays without a year until a reliable source supplies it. Inference rules must be documented and are marked `inferred`.
 - **The date of an announcement is not automatically the date of the event.** If only the announcement date is known, code `inferred` and quote the announcement.
-- **Archive captures** (Wayback Machine) only show that something existed *by* that date (`first_archived`, `archive_upper_bound`). They are never a start date.
+- **Archive captures** (Wayback Machine) only show that something existed *by* that date. They are recorded only as `first_archived` events with basis `archive_upper_bound` (the app rejects any other combination) and are never a start date.
+- A dated event needs a date basis.
 
 ### 2.7 Derived fields (read-only, marked `derived_` in exports)
 
-Cut-off dates as in §1. Events marked `disputed` are ignored.
+Cut-off dates as in §1. Disputed events and participations are ignored. The exact algorithm is in `docs/DATA_MODEL.md` §8; in short:
 
 | Field | Definition |
 |---|---|
-| `launch` | Earliest `launch` event; if there is none, the earliest `beta_launch`. Keeps the interval, precision, basis and event. |
-| `existed_by` | Earliest `first_archived` event. An upper bound, displayed as "≤ date (archive)". |
+| `launch` | **Launch interval** = [earliest start, earliest end] over the dated `launch` events (or, if there are none, the dated `beta_launch` events); the earliest launch provably lies in it. **Displayed:** the candidate with the earliest end, with precision, basis and event. |
+| `existed_by` | Earliest **end** of the `first_archived` events: an upper bound, displayed as "≤ date (archive)". |
 | `period` | From the launch interval [start, end]: end < `MINISTRY_FOUNDED` → `pre_ministry`; start ≥ `MINISTRY_FOUNDED` and end < `FULL_SCALE_INVASION` → `pre_invasion`; start ≥ `FULL_SCALE_INVASION` → `full_scale_war`; otherwise `unknown`. Without a launch: `existed_by` < `MINISTRY_FOUNDED` → `pre_ministry`, otherwise `unknown`. ⚑ D-3 |
 | `period_reason` | `no_date`, `imprecise_date` (the interval straddles a cut-off), `archive_bound_only` |
-| `existed_before_invasion` | true if the launch ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION` |
-| `war_trajectory` | `new_in_war` (launch start ≥ invasion) · `adapted_in_war` (existed before the invasion and at least one modification event starting ≥ invasion) · `prewar_unchanged` (existed before the invasion and every modification event ends before it, or there is none: "no modification recorded up to release X") · `unknown` |
-| `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date` |
-| `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) as `initiator`, `owner` or `operator` ⚑ D-10 |
+| `existed_before_invasion` | true if the launch interval ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION` |
+| `war_trajectory` | Rules in this order: (1) launch start ≥ invasion but existed before it → `unknown` (`conflicting_dates`); (2) launch start ≥ invasion → `new_in_war`; (3) existed before the invasion and a modification event starts on or after it → `adapted_in_war`; (4) existed before the invasion and every modification event ends before it, or there is none → `prewar_unchanged` ("no modification recorded up to release X"); (5) otherwise `unknown`. The deciding event is linked. |
+| `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date`, `conflicting_dates` |
+| `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) as `initiator`, `owner` or `operator`, with the participation linked ⚑ D-10 |
 
 ### 2.8 Screening of documents
 
@@ -350,6 +356,9 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 | `imprecise_date` | The launch date's precision straddles a cut-off date. |
 | `archive_bound_only` | Only an archive upper bound is known, which does not determine the period. |
 | `imprecise_modification_date` | A modification event is undated or straddles `FULL_SCALE_INVASION`. |
+| `conflicting_dates` | The launch lies on or after `FULL_SCALE_INVASION`, but an archive bound or the launch interval shows the item existed before it. |
+
+**Fixed codes:** the system vocabularies `verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory` and `derived_reason`, as well as the event types `launch`, `beta_launch` and `first_archived`, are used by program logic. Their codes cannot be added to or deactivated; labels and definitions remain editable.
 
 ### `license` (draft)
 

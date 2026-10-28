@@ -3,6 +3,7 @@ vocabulary: wartime_relevance
 label: "Wartime relevance"
 description: "Code the stated purpose and target group according to the sources, relative to needs caused or substantially intensified by the full-scale war (from 2022-02-24). include_note holds the coding rule. Draft; team decision D-4."
 multi: false
+fixed_codes: false
 terms:
   - code: direct
     label_en: "Direct"

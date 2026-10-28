@@ -13,8 +13,6 @@ projects:
     aliases:
       - {text: "Diia", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
       - {text: "Дія", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}
-      - {text: "Дії", lang: uk, case_sensitive: true, kind: inflection, exclude_patterns: []}
-      - {text: "Дію", lang: uk, case_sensitive: true, kind: inflection, exclude_patterns: []}
   - slug: diia-engine
     name_en: "Diia.Engine"
     name_uk: "Дія.Engine"
@@ -219,8 +217,6 @@ organizations:
   - slug: ministry-of-digital-transformation
     name_en: "Ministry of Digital Transformation of Ukraine"
     name_uk: "Мінцифри"
-    org_type: ministry
-    country: UA
     aliases:
       - {text: "Ministry of Digital Transformation of Ukraine", lang: en, case_sensitive: true, kind: name, exclude_patterns: []}
       - {text: "Мінцифри", lang: uk, case_sensitive: true, kind: name, exclude_patterns: []}

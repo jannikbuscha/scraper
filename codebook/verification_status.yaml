@@ -3,6 +3,7 @@ vocabulary: verification_status
 label: "Verification status"
 description: "Verification by a person against evidence, per entity and per field. A field can only be marked `verified` if at least one Evidence record (document + verbatim quote) supports it (docs/CODEBOOK.md §2.3). English labels are derived from the codes."
 multi: false
+fixed_codes: true
 terms:
   - code: unverified
     label_en: "Unverified"

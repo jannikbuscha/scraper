@@ -3,6 +3,7 @@ vocabulary: event_type
 label: "Event type"
 description: "Types of introduction and modification events. attributes.counts_as_modification decides what counts as a modification for the derived war_trajectory value `adapted_in_war` (team decision D-2). English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: announced
     label_en: "Announced"
@@ -33,7 +34,7 @@ terms:
     examples: null
     sort_order: 30
     active: true
-    attributes: {counts_as_modification: false}
+    attributes: {counts_as_modification: false, fixed: true}
   - code: launch
     label_en: "Launch"
     label_uk: null
@@ -43,7 +44,7 @@ terms:
     examples: null
     sort_order: 40
     active: true
-    attributes: {counts_as_modification: false}
+    attributes: {counts_as_modification: false, fixed: true}
   - code: expansion
     label_en: "Expansion"
     label_uk: null
@@ -113,4 +114,4 @@ terms:
     examples: null
     sort_order: 110
     active: true
-    attributes: {counts_as_modification: false}
+    attributes: {counts_as_modification: false, fixed: true}

@@ -10,8 +10,8 @@
 - **`paper_cluster`:** the cluster names of the table, mapped to the codes in `codebook/paper_cluster.yaml`.
 - **URLs:** entry URLs on thedigital.gov.ua go into `ministry_urls`, external entry URLs into `official_urls`; the other list is empty.
 - **`in_paper_scope` and `scope_note`:** `true` for the 19 projects of the paper; `false` for European Integration, with the reason in `scope_note`.
-- **`aliases`:** one alias of kind `name` per given name (`lang` `en` or `uk`, case-sensitive, no exclude patterns). For Diia also the inflected forms Дії and Дію (kind `inflection`), which the assignment names (§5, source 4). Further aliases and exclude patterns are curated in the app.
-- **Focal organisation:** "Ministry of Digital Transformation of Ukraine (Мінцифри)" from assignment §1, with `org_type: ministry`, `country: UA` and one `name` alias per name. Its slug `ministry-of-digital-transformation` is the default of `FOCAL_ORG_SLUG`.
+- **`aliases`:** exactly one alias of kind `name` per given name (`lang` `en` or `uk`, case-sensitive, no exclude patterns). Inflected forms (e.g. Дії, Дію for Diia), spellings and exclude patterns are added later by a person in the app (`PLAN.md` §5.3); the assignment mentions those forms only as an example of the inflection problem (§5), not as seed data.
+- **Focal organisation:** "Ministry of Digital Transformation of Ukraine (Мінцифри)" from assignment §1: only `name_en`, `name_uk` and one `name` alias per name; `org_type` and `country` stay empty until a source or a person sets them. Its seed key `ministry-of-digital-transformation` is the default of `FOCAL_ORG_SEED_KEY`.
 
 ## Not in the seed
 
@@ -19,5 +19,5 @@ Descriptions, ministry categories, statuses, dates and all classification fields
 
 ## Working copy
 
-- `mdt seed` loads this file after the vocabularies. It is idempotent: rows are matched by `slug` (including deleted rows), new rows get provenance `seed`, deleted rows are skipped, and a field that a person has changed is never overwritten. A second run creates no revisions.
+- `mdt seed` loads this file after the vocabularies. It is idempotent: rows are matched by their immutable `seed_key` (the slug in this file, set once at creation; renaming the slug in the app does not create duplicates), deleted rows are skipped, empty values are "not provided" (no provenance entry, no lock), and a field that a person has set, cleared, restored or verified is never overwritten (`docs/DATA_MODEL.md` §9). A second run creates no revisions. The container runs `mdt seed` on every start.
 - From then on **the database holds the working copy**. Releases regenerate `codebook/` but not this file; the curated dataset of each release is in `releases/`.

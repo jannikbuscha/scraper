@@ -3,6 +3,7 @@ vocabulary: development_mode
 label: "Development mode"
 description: "Adaptation of existing versus new development, after Yoo et al. (2012), coded from sources. The coded mode complements the derived war_trajectory, which only looks at dates. Combining existing components into something new is recorded separately through `recombines` relations (D4)."
 multi: false
+fixed_codes: false
 terms:
   - code: new_development
     label_en: "New development"

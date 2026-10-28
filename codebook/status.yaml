@@ -3,6 +3,7 @@ vocabulary: status
 label: "Status"
 description: "Operational status of a project or service. English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: active
     label_en: "Active"

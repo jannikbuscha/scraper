@@ -3,6 +3,7 @@ vocabulary: beneficiary
 label: "Beneficiary"
 description: "Intended beneficiaries (team decision D-7). Codes grounded in the paper carry attributes.paper_basis (the basis in the paper). Candidate codes carry attributes.candidate = true; they are to be confirmed or rejected with data, and their English labels are derived from the codes. Multi-valued fields list all values that the sources support, with the main one first."
 multi: true
+fixed_codes: false
 terms:
   - code: citizens
     label_en: "Citizens / general population"

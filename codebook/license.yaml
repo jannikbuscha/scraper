@@ -3,6 +3,7 @@ vocabulary: license
 label: "License"
 description: "License of a document. Draft. English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: cc_by_4_0
     label_en: "CC BY 4.0"

@@ -3,6 +3,7 @@ vocabulary: service_kind
 label: "Service kind"
 description: "Kind of a service or sub-service (field `kind`), following the list in the assignment (§4). Service granularity rules: docs/CODEBOOK.md §2.2 (team decision D-6)."
 multi: false
+fixed_codes: false
 terms:
   - code: e_service
     label_en: "E-service"

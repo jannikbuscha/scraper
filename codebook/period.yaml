@@ -3,6 +3,7 @@ vocabulary: period
 label: "Period"
 description: "Derived values (read-only): period of the launch relative to the cut-off dates MINISTRY_FOUNDED and FULL_SCALE_INVASION (codebook/parameters.yaml). Rules: docs/CODEBOOK.md §2.7 (team decision D-3). The reason for `unknown` is given in period_reason (vocabulary `derived_reason`)."
 multi: false
+fixed_codes: true
 terms:
   - code: pre_ministry
     label_en: "Before the ministry"

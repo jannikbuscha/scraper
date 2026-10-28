@@ -3,6 +3,7 @@ vocabulary: date_basis
 label: "Date basis"
 description: "Basis of a date (docs/CODEBOOK.md §2.6). Never guess: inference rules must be documented and are marked `inferred`; if only the announcement date is known, code `inferred` and quote the announcement. Archive captures (Wayback Machine) only show that something existed by that date (`archive_upper_bound`); they are never a start date. English labels are derived from the codes."
 multi: false
+fixed_codes: true
 terms:
   - code: stated_in_source
     label_en: "Stated in source"

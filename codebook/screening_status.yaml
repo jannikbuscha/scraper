@@ -3,6 +3,7 @@ vocabulary: screening_status
 label: "Screening status"
 description: "Screening of documents (docs/CODEBOOK.md §2.8): `unscreened` → `included` / `excluded`, with an exclusion reason (vocabulary `exclusion_reason`) and an optional note. Only `included` documents go into the QDA export. Counts per status and reason are reported (PRISMA-style flow). English labels are derived from the codes."
 multi: false
+fixed_codes: true
 terms:
   - code: unscreened
     label_en: "Unscreened"

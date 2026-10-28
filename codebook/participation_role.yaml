@@ -3,6 +3,7 @@ vocabulary: participation_role
 label: "Participation role"
 description: "Role of an organization in a project, service or component (for D3). The derived portfolio_entry uses participations of the focal organisation in the roles `initiator`, `owner` or `operator` (team decision D-10). `coordinator` is a draft addition (attributes.draft_addition = true). English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: initiator
     label_en: "Initiator"

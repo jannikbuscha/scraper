@@ -3,6 +3,7 @@ vocabulary: exclusion_reason
 label: "Exclusion reason"
 description: "Reason for excluding a document during screening (field `screening_reason`; docs/CODEBOOK.md §2.8). English labels are derived from the codes."
 multi: false
+fixed_codes: false
 terms:
   - code: not_about_portfolio
     label_en: "Not about portfolio"
