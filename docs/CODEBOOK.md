@@ -45,7 +45,7 @@ Code the **stated purpose and target group** according to the sources, relative 
 | `direct` | Direct | The primary objective, according to the sources, addresses a need caused or substantially intensified by the war (e.g. defence, war damage, displacement, wartime fundraising, services for affected groups). | Requires evidence naming the war-related need. |
 | `indirect` | Indirect | The primary objective is not war-specific, but sources explicitly link the initiative to wartime needs (e.g. continuity of services, economic resilience, recovery). | Requires evidence of the explicit link. |
 | `none` | None | The sources state no relation to the war, and none is evident from the stated purpose. | Absence must be checked in at least the project page and one further source. |
-| `unclear` | Unclear | The evidence is insufficient or contradictory. | Default until coded. |
+| `unclear` | Unclear | After review, the evidence is insufficient or contradictory. | A field that has not been coded yet stays **empty**; `unclear` is a coding decision, not a default. |
 
 ### 2.5 Development mode (`development_mode`), after Yoo et al. (2012) [paper]
 
@@ -53,7 +53,7 @@ Code the **stated purpose and target group** according to the sources, relative 
 |---|---|---|
 | `new_development` | New development | The sources present the initiative as newly developed, without a predecessor among the ministry's services or platforms. |
 | `adaptation_of_existing` | Adaptation of existing | The sources present the initiative as a change, extension or re-purposing of an existing service, platform or organisation. Requires a Relation (`extends`, `builds_on`, `successor_of`) or a rationale explaining why none can be recorded. |
-| `unclear` | Unclear | Not determinable from the sources (default). |
+| `unclear` | Unclear | Not determinable from the sources after review. Not-yet-coded fields stay empty. |
 
 The coded mode complements the derived `war_trajectory` (§2.7), which only looks at dates. Combining existing components into something new is recorded separately through `recombines` relations (D4).
 
@@ -320,9 +320,40 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 
 `seed` (from the assignment's seed table), `collector:<name>@<run>`, `manual:<name>`, `import:<file>`. A restore keeps the original source and records the restoring person in `by`.
 
-### `licence` (draft)
+### `language`
 
-`cc_by_4_0`, `other_open` (link to licence), `all_rights_reserved`, `unknown`.
+`uk` (Ukrainian), `en` (English), `ru` (Russian), `other` (explain in `notes`). ISO 639-1 codes.
+
+### `period` (derived values, §2.7)
+
+| Code | Label | Definition |
+|---|---|---|
+| `pre_ministry` | Before the ministry | Launch ends before `MINISTRY_FOUNDED`, or the archive bound lies before it. |
+| `pre_invasion` | Ministry, before the full-scale invasion | Launch lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day. |
+| `full_scale_war` | Full-scale war | Launch starts on or after `FULL_SCALE_INVASION`. |
+| `unknown` | Unknown | No launch date, an imprecise date that straddles a cut-off, or only an archive bound after `MINISTRY_FOUNDED`; the reason is given in `period_reason`. |
+
+### `war_trajectory` (derived values, §2.7)
+
+| Code | Label | Definition |
+|---|---|---|
+| `new_in_war` | New in war | Launched on or after `FULL_SCALE_INVASION`. |
+| `adapted_in_war` | Adapted in war | Existed before the invasion; at least one modification event on or after it. |
+| `prewar_unchanged` | Pre-war, no recorded change | Existed before the invasion; no modification recorded on or after it (up to the release date). |
+| `unknown` | Unknown | Not determinable; the reason is given in `trajectory_reason`. |
+
+### `derived_reason` (reason codes of derived values)
+
+| Code | Definition |
+|---|---|
+| `no_date` | No dated launch, beta-launch or archive event. |
+| `imprecise_date` | The launch date's precision straddles a cut-off date. |
+| `archive_bound_only` | Only an archive upper bound is known, which does not determine the period. |
+| `imprecise_modification_date` | A modification event is undated or straddles `FULL_SCALE_INVASION`. |
+
+### `license` (draft)
+
+`cc_by_4_0`, `other_open` (link to the license), `all_rights_reserved`, `unknown`.
 
 ---
 
