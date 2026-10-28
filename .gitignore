@@ -1,0 +1,40 @@
+# Runtime data: SQLite database, later raw snapshots, backups, imports, logs.
+# Anchored to the repository root, so source directories named "data" elsewhere
+# are not ignored.
+/data/
+
+# Local configuration and secrets (template: .env.example)
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# Node and frontend
+node_modules/
+frontend/dist/
+*.tsbuildinfo
+npm-debug.log*
+coverage/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp

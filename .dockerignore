@@ -1,0 +1,32 @@
+# Build context allowlist: exclude everything, then re-include only what the
+# Dockerfile needs. This keeps .git, data/, releases/, .env and paper.docx out of
+# the image. New runtime inputs (e.g. sources.yaml in Phase 2) must be added
+# here and copied in the Dockerfile.
+*
+!backend/
+!frontend/
+!codebook/
+!seed/
+!docker/
+
+# Never send secrets, local environments, caches, reports or build output.
+**/.env
+**/.env.*
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.py[cod]
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.coverage
+**/htmlcov
+**/coverage
+**/playwright-report
+**/test-results
+**/blob-report
+**/.DS_Store
+frontend/dist
+
+# Not needed at runtime.
+backend/tests

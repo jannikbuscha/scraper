@@ -1,0 +1,73 @@
+# MDT Portfolio: a single service. One container runs one process that serves
+# the API (/api) and the built frontend (/).
+#
+#   docker compose up -d          build (first time) and start: http://127.0.0.1:8080
+#   docker compose logs -f app    follow the logs
+#   docker compose down           stop and remove the container (./data is kept)
+#   make up                       the same as `up -d --build`, plus the git commit label
+#
+# Ports: inside the container the app ALWAYS listens on 0.0.0.0:8080. HOST and
+# PORT (from the shell or from .env, which Compose reads for ${...} substitution)
+# only choose the host interface and port that 8080 is published on. The default
+# 127.0.0.1:8080 makes the app reachable from the server itself only. There is no
+# login: read "Team access" in README.md before changing HOST.
+#
+# Requires Docker Compose v2.24 or newer (env_file with "required: false").
+
+name: mdt-portfolio
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        # Recorded as the OCI label org.opencontainers.image.revision.
+        GIT_COMMIT: ${GIT_COMMIT:-unknown}
+        # Owner of the files in ./data. Set both in .env to your host user's
+        # `id -u` / `id -g` before building if they are not 1000.
+        APP_UID: ${APP_UID:-1000}
+        APP_GID: ${APP_GID:-1000}
+    image: mdt-portfolio:local
+    init: true
+    restart: unless-stopped
+    ports:
+      - "${HOST:-127.0.0.1}:${PORT:-8080}:8080"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # These override env_file. Inside the container the bind address and the
+      # paths are fixed, whatever .env says (it may hold local development values).
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      DATA_DIR: /app/data
+      DATABASE_URL: "sqlite:////app/data/app.db"
+      CODEBOOK_DIR: /app/codebook
+      SEED_DIR: /app/seed
+      FRONTEND_DIST: /app/frontend/dist
+      # Host-header allowlist (protection against DNS rebinding), comma-separated.
+      # Add the host name the team uses (e.g. behind a reverse proxy) in .env.
+      # Keep 127.0.0.1: the health check below uses it.
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
+    volumes:
+      # All runtime data (SQLite database; later raw snapshots, backups, imports).
+      - ./data:/app/data
+      # Dataset releases (written from Phase 4 on, committed and tagged on the host).
+      - ./releases:/app/releases
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/api/health', timeout=4).status == 200 else 1)"
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
