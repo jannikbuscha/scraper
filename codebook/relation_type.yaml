@@ -57,7 +57,7 @@ terms:
   - code: related_to
     label_en: "Related to"
     label_uk: null
-    definition: "Other documented relation (explain in `note`)."
+    definition: "Other documented relation (explain in `description`)."
     include_note: null
     exclude_note: null
     examples: null

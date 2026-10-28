@@ -336,7 +336,7 @@ terms:
 **`seed/projects.yaml`**: the 19 projects of the paper plus European Integration (assignment §3), and the focal organisation:
 
 ```yaml
-provenance: "Assignment §3; entry URLs checked by the PI on 2026-10-28"
+provenance: "Assignment §3; entry URLs checked by the data lead on 2026-10-28"
 projects:
   - slug: diia
     name_en: Diia

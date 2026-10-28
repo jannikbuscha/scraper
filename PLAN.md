@@ -18,7 +18,7 @@
 
 | Label | Meaning |
 |---|---|
-| **[user]** | Stated in the assignment (checked by the PI on 2026-10-28). |
+| **[user]** | Stated in the assignment (checked by the data lead on 2026-10-28). |
 | **[paper]** | Stated in `paper.docx` (read in full on 2026-10-28; file unchanged). |
 | **[local]** | Verified by running code in the development environment. |
 | **[doc]** | Read in official documentation retrieved on 2026-10-28 (e.g. the Wayback CDX server README on GitHub). |

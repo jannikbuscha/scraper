@@ -67,7 +67,7 @@ terms:
   - code: other
     label_en: "Other"
     label_uk: null
-    definition: "Explain in the note."
+    definition: "Explain in `screening_note`."
     include_note: null
     exclude_note: null
     examples: null

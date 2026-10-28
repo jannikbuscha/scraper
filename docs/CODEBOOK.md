@@ -11,7 +11,7 @@
 | Parameter | Value | Source |
 |---|---|---|
 | `MINISTRY_FOUNDED` | 2019-08-29 | [paper], [user] |
-| `FULL_SCALE_INVASION` | 2022-02-24 | [paper], [user] |
+| `FULL_SCALE_INVASION` | 2022-02-24 | [user] (the paper gives the month, February 2022) |
 | Time zone for publication dates | Europe/Kyiv | [user] |
 | Storage time zone for timestamps | UTC | [user] |
 
@@ -258,7 +258,7 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 | `outside_period` | Outside the observation window. |
 | `not_a_document` | Navigation, list or error page. |
 | `inaccessible` | Content not retrievable (also not archived). |
-| `other` | Explain in the note. |
+| `other` | Explain in `screening_note`. |
 
 ### `org_type`
 
@@ -302,7 +302,7 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 | `recombines` | Combines the target with other components into a new offering (one relation per combined component). |
 | `part_of` | Is a component or sub-unit of the target. |
 | `successor_of` | Replaces the target. |
-| `related_to` | Other documented relation (explain in `note`). |
+| `related_to` | Other documented relation (explain in `description`). |
 
 ### `component_type` (draft)
 

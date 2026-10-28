@@ -1,6 +1,6 @@
 # Seed data: the 19 projects of the paper plus European Integration, and the focal organisation.
 # Only values from the assignment (§1, §3, §5). Format: docs/DATA_MODEL.md §9. See seed/README.md.
-provenance: "Assignment §3; entry URLs checked by the PI on 2026-10-28; focal organisation from assignment §1"
+provenance: "Assignment §3; entry URLs checked by the data lead on 2026-10-28; focal organisation from assignment §1"
 projects:
   - slug: diia
     name_en: "Diia"
@@ -209,7 +209,7 @@ projects:
     name_uk: "Євроінтеграція"
     paper_cluster: null
     in_paper_scope: false
-    scope_note: "Listed on thedigital.gov.ua/projects (checked by the PI on 2026-10-28) but not among the paper's 19 projects; the team decides (decision D-1)."
+    scope_note: "Listed on thedigital.gov.ua/projects (checked by the data lead on 2026-10-28) but not among the paper's 19 projects; the team decides (decision D-1)."
     ministry_urls: ["https://thedigital.gov.ua/projects/progress/yevrointegraciya"]
     official_urls: []
     aliases:

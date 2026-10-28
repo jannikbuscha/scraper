@@ -2,7 +2,7 @@
 
 > **Status:** Phase 0 draft, 2026-10-28.
 > **No source has been accessed directly yet:** the development environment blocks all source hosts (see `PLAN.md` §2.2). Everything below comes from the assignment, the paper, the official Wayback CDX documentation or web-search results, labelled as follows.
-> **Labels:** **[user]** assignment (PI, 2026-10-28) · **[paper]** paper.docx · **[doc]** official documentation retrieved 2026-10-28 · **[search]** URL/title in search results 2026-10-28 (content not retrieved) · **[search-summary]** only in the search tool's model summary · **[hypothesis]** to be verified.
+> **Labels:** **[user]** assignment (data lead, 2026-10-28) · **[paper]** paper.docx · **[doc]** official documentation retrieved 2026-10-28 · **[search]** URL/title in search results 2026-10-28 (content not retrieved) · **[search-summary]** only in the search tool's model summary · **[hypothesis]** to be verified.
 > **Status values:** `planned` (not yet checked) · `partially verified` · `verified` (Phase 0b done) · `blocked` · `deprecated`.
 
 ## 1. Register
@@ -46,7 +46,7 @@
   - Beta relaunch [user].
   - Categories are inconsistent: Diia.City appears under `/projects/business/city` and `/projects/regions/city` [user].
   - Several projects link directly to external domains (WINWIN, USF, CodeUA, UNITED24, UNITED24 Media, Digital State UA) [user].
-  - The search index holds `https://thedigital.gov.ua/projects/yevrointegraciya` [search], while the seed URL (checked by the PI) is `https://thedigital.gov.ua/projects/progress/yevrointegraciya` [user]. Possibly a redirect or an older route [hypothesis].
+  - The search index holds `https://thedigital.gov.ua/projects/yevrointegraciya` [search], while the seed URL (checked by the data lead) is `https://thedigital.gov.ua/projects/progress/yevrointegraciya` [user]. Possibly a redirect or an older route [hypothesis].
 - **Licence:** CC BY 4.0 per footer unless stated otherwise [user]; the exact footer wording is to be captured.
 - **Phase 0b checklist:**
   - robots.txt; sitemap(s); RSS.
@@ -69,7 +69,7 @@
   - `https://digitalstate.gov.ua/projects/govtech/diia`: Digital State UA has its own project catalogue with `/projects/<category>/<slug>` [search] (see C-1)
   - `https://e-pidpryemets.diia.gov.ua/` ("е-Підприємець") [search]
   - `https://se.diia.gov.ua/en/unified-state-web-portal-of-electronic-services-diia` [search]; that it belongs to the state enterprise "Дія" is [hypothesis]
-- **Not seen in search results:** `winwin.gov.ua`, `usf.com.ua`, any Brave1 domain [search]. The seed entry URLs for WINWIN and USF come from the PI [user].
+- **Not seen in search results:** `winwin.gov.ua`, `usf.com.ua`, any Brave1 domain [search]. The seed entry URLs for WINWIN and USF come from the data lead [user].
 - **Known limits:** heterogeneous sites; licences unknown; some pages may be outdated (e.g. PlayCity's site reportedly still names the old coordination [search-summary]).
 - **Phase 0b checklist:**
   - For every domain: robots.txt, sitemap, about page, footer (operator, licence), structured offers (JSON/XHR).
