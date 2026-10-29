@@ -199,6 +199,30 @@ def test_verification_rules(client: ApiClient) -> None:
     assert body["item"]["field_meta"]["name_en"]["verified"] == "disputed"
 
 
+def test_evidence_of_a_verified_field_cannot_be_deleted(client: ApiClient) -> None:
+    project = client.create_project()
+    evidence = _evidence(client, project["id"], "name_en")
+    verify = f"/api/entities/project/{project['id']}/verify-field"
+    base = {"expected_version": 1, "field": "name_en", "evidence_id": evidence["id"]}
+    client.ok(client.post(verify, base | {"status": "verified"}))
+    delete = f"/api/entities/evidence/{evidence['id']}/delete"
+    for cascade in (False, True):
+        response = client.post(
+            delete, {"expected_version": 1, "note": "Wrong source", "cascade": cascade}
+        )
+        assert response.status_code == 409
+        error = error_of(response)
+        assert (error["code"], error["details"]) == ("has_dependents", {"field_verification": 1})
+    assert client.item("evidence", evidence["id"])["deleted_at"] is None
+    meta = client.item("project", project["id"])["field_meta"]["name_en"]
+    assert (meta["verified"], meta["evidence_id"]) == ("verified", evidence["id"])
+    client.ok(
+        client.post(verify, {"expected_version": 2, "field": "name_en", "status": "unverified"})
+    )
+    deleted = client.ok(client.post(delete, {"expected_version": 1, "note": "Wrong source"}))
+    assert deleted["item"]["deleted_at"] is not None
+
+
 # --------------------------------------------------------------------------------------
 # Bulk edit
 # --------------------------------------------------------------------------------------
@@ -298,3 +322,45 @@ def test_bulk_scope_change_with_a_note(client: ApiClient) -> None:
     )
     assert body["results"][0]["status"] == "updated"
     assert client.item("project", project["id"])["fields"]["in_paper_scope"] is True
+
+
+def test_verified_fields_need_quoted_evidence(client: ApiClient) -> None:
+    project = client.create_project()
+    unquoted = client.create(
+        "evidence",
+        {"subject_id": project["id"], "target": "field:name_en", "url": "https://example.org/a"},
+    )
+    url = f"/api/entities/project/{project['id']}/verify-field"
+    body = {"expected_version": 1, "field": "name_en", "status": "verified"}
+    response = client.post(url, body | {"evidence_id": unquoted["id"]})
+    assert (response.status_code, error_of(response)["code"]) == (400, "evidence_required")
+    assert "quote" in error_of(response)["message"]
+    quoted = client.update("evidence", unquoted, {"quote": "Example quote."})["item"]
+    client.ok(client.post(url, body | {"evidence_id": quoted["id"]}))
+    response = client.patch(
+        f"/api/entities/evidence/{quoted['id']}",
+        {"expected_version": quoted["version"], "changes": {"quote": None}},
+    )
+    assert error_of(response)["details"] == {
+        "quote": ["A field is verified with this evidence; its verbatim quote cannot be removed"]
+    }
+
+
+def test_excluded_documents_need_an_exclusion_reason(client: ApiClient) -> None:
+    document = client.create("document", {"title": "Example document"})
+    url = f"/api/entities/document/{document['id']}"
+    response = client.patch(
+        url, {"expected_version": 1, "changes": {"screening_status": "excluded"}}
+    )
+    assert error_of(response)["details"] == {
+        "screening_reason": ["is required when the document is excluded"]
+    }
+    changes = {"screening_status": "excluded", "screening_reason": "duplicate"}
+    excluded = client.ok(client.patch(url, {"expected_version": 1, "changes": changes}))["item"]
+    assert excluded["fields"]["screening_reason"] == "duplicate"
+    response = client.patch(
+        url, {"expected_version": 2, "changes": {"screening_status": "included"}}
+    )
+    assert error_of(response)["details"] == {
+        "screening_reason": ["is allowed only for excluded documents"]
+    }

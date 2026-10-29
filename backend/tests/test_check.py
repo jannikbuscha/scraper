@@ -5,9 +5,9 @@ from __future__ import annotations
 from sqlalchemy import text
 
 from mdt.domain.check import run_check
-from mdt.domain.revisions import apply_change
+from mdt.domain.revisions import apply_change, set_field_verification
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_project, revision_count
+from tests.helpers import ALICE, create_event, create_evidence, create_project, revision_count
 
 
 def problems(db: Db) -> list[str]:
@@ -118,3 +118,72 @@ def test_many_problems_of_one_kind_are_summarised(db: Db) -> None:
     fts = [line for line in found if line.startswith("fts:")]
     assert len(fts) == 51
     assert fts[-1] == "fts: … more problems of this kind"
+
+
+def test_verified_fields_whose_evidence_is_missing_deleted_or_elsewhere(db: Db) -> None:
+    # The domain refuses to delete evidence that a verification rests on; the check
+    # reports databases where the state arose anyway (older versions, manual edits).
+    with db.session() as session:
+        project_id = create_project(session).entity_id
+        other_id = create_project(session).entity_id
+        evidence_id = create_evidence(session, project_id, "name_en").entity_id
+        slug_evidence = create_evidence(session, project_id, "slug").entity_id
+        set_field_verification(
+            session,
+            "project",
+            project_id,
+            "name_en",
+            "verified",
+            ALICE,
+            evidence_id=evidence_id,
+            expected_version=1,
+        )
+        set_field_verification(
+            session,
+            "project",
+            project_id,
+            "slug",
+            "verified",
+            ALICE,
+            evidence_id=slug_evidence,
+            expected_version=2,
+        )
+        assert run_check(session, db.settings).ok
+    tamper(
+        db,
+        "UPDATE evidence SET deleted_at = '2026-10-29T00:00:00.000000Z', deleted_by = 'x'"
+        " WHERE id = :id",
+        id=evidence_id,
+    )
+    found = problems(db)
+    assert (
+        f"verification: {project_id}.name_en is verified with deleted evidence {evidence_id}"
+        in found
+    )
+    tamper(
+        db,
+        "UPDATE evidence SET subject_id = :other WHERE id = :id",
+        other=other_id,
+        id=slug_evidence,
+    )
+    tamper(db, "DELETE FROM evidence WHERE id = :id", id=evidence_id)
+    found = problems(db)
+    assert (
+        f"verification: {project_id}.name_en is verified with missing evidence {evidence_id}"
+        in found
+    )
+    assert (
+        f"verification: {project_id}.slug is verified with evidence {slug_evidence} of another"
+        " record or field" in found
+    )
+    tamper(
+        db,
+        "UPDATE evidence SET subject_id = :project, quote = NULL WHERE id = :id",
+        project=project_id,
+        id=slug_evidence,
+    )
+    found = problems(db)
+    assert (
+        f"verification: {project_id}.slug is verified with evidence {slug_evidence} without a"
+        " quote" in found
+    )

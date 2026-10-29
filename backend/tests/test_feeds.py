@@ -173,11 +173,31 @@ def test_recent_changes_time_bounds_are_inclusive(db: Db, history: dict[str, Any
         {"action": "edit"},
         {"entity_type": "unknown"},
         {"page_size": "501"},
+        # instants outside the datetime range once converted to UTC
+        {"since": "0001-01-01T00:00:00+14:00"},
+        {"until": "9999-12-31T23:59:59-01:00"},
     ],
 )
 def test_recent_changes_rejects_invalid_parameters(db: Db, params: dict[str, str]) -> None:
     with pytest.raises(ValidationError):
         feed(db, **params)
+
+
+@pytest.mark.parametrize(
+    ("params", "everything"),
+    [
+        ({"until": "0001-01-01T00:00:00Z"}, False),
+        ({"since": "0999-01-01T00:00:00+00:30"}, True),
+        ({"since": "0100-06-01T12:00:00+00:00"}, True),
+        ({"until": "9999-12-31T22:59:59+01:00"}, True),
+    ],
+)
+def test_recent_changes_accepts_early_and_late_years(
+    db: Db, history: dict[str, Any], params: dict[str, str], everything: bool
+) -> None:
+    # Years before 1000 used to produce "999-…" bounds that the timestamp column refused.
+    expected = feed(db)["total"] if everything else 0
+    assert feed(db, **params)["total"] == expected
 
 
 def test_revision_authors(db: Db, history: dict[str, Any]) -> None:

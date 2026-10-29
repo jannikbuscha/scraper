@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from pathlib import Path
 
@@ -129,3 +130,67 @@ def test_is_fixed_term() -> None:
     assert is_fixed_term(None, {"fixed": True})
     assert not is_fixed_term(None, {"fixed": "yes"})
     assert not is_fixed_term(None, None)
+
+
+#: docs/CODEBOOK.md marks a draft addition in the definition; the YAML file marks it with
+#: ``attributes.draft_addition`` instead (codebook/README.md).
+DRAFT_MARKER = "➕ Draft addition: "
+
+
+def documented_definitions(names: set[str]) -> dict[tuple[str, str], str]:
+    """The definitions in the tables of docs/CODEBOOK.md, by (vocabulary, code).
+
+    A table belongs to the vocabulary named in its first header cell, otherwise to the first
+    vocabulary named in the heading above it; only tables with a definition column count.
+    """
+    result: dict[tuple[str, str], str] = {}
+    heading: str | None = None
+    header: list[str] | None = None
+    text = (REPO_ROOT / "docs" / "CODEBOOK.md").read_text(encoding="utf-8")
+    for line in text.splitlines():
+        if line.startswith("#"):
+            named = [name for name in re.findall(r"`([a-z_]+)`", line) if name in names]
+            heading = named[0] if named else None
+            header = None
+            continue
+        if not line.startswith("|"):
+            header = None
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if header is None:
+            header = cells
+            continue
+        if all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+            continue
+        first = header[0].strip("`")
+        vocabulary = first if first in names else heading
+        column = next((i for i, cell in enumerate(header) if "definition" in cell.lower()), None)
+        code = re.fullmatch(r"`([a-z0-9_]+)`", cells[0])
+        if vocabulary is not None and column is not None and code is not None:
+            result[(vocabulary, code.group(1))] = cells[column]
+    return result
+
+
+def test_definitions_are_those_of_docs_codebook() -> None:
+    # codebook/*.yaml copies its definitions from docs/CODEBOOK.md (codebook/README.md), so a
+    # definition is corrected in both places together.
+    vocabularies = {v.name: v for v in load_vocabulary_files(REPO_ROOT / "codebook")}
+    documented = documented_definitions(set(vocabularies))
+    # The derived values are documented completely (CODEBOOK §3).
+    for name in ("period", "war_trajectory", "derived_reason"):
+        assert {code for vocabulary, code in documented if vocabulary == name} == {
+            term["code"] for term in vocabularies[name].terms
+        }
+    mismatches = []
+    for (name, code), text in documented.items():
+        term = next((t for t in vocabularies[name].terms if t["code"] == code), None)
+        expected = text.replace("**", "")
+        if expected.startswith(DRAFT_MARKER):
+            expected = expected[len(DRAFT_MARKER) :]
+            expected = expected[:1].upper() + expected[1:]
+            if term is not None and term["attributes"].get("draft_addition") is not True:
+                mismatches.append(f"{name}.{code}: draft addition without the attribute")
+        if term is None or term["definition"] != expected:
+            found = None if term is None else term["definition"]
+            mismatches.append(f"{name}.{code}: CODEBOOK.md {expected!r}, YAML {found!r}")
+    assert not mismatches, mismatches

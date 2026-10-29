@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from mdt.config import Settings
 from mdt.db.ddl import REVISION_TRIGGER_NAMES, existing_revision_triggers
-from mdt.db.models import Derived, DocumentLink, Revision, SearchKey
+from mdt.db.models import Derived, DocumentLink, Evidence, Revision, SearchKey
 from mdt.db.session import read_transaction, session_settings
 from mdt.domain import derived
 from mdt.domain.normalize import canonical_json
@@ -61,6 +61,7 @@ def run_check(session: Session, settings: Settings | None = None) -> CheckReport
         _check_fts(session, existing, collector)
         _check_derived(session, settings, collector)
         _check_revisions(session, collector)
+        _check_verifications(session, collector)
     return report
 
 
@@ -207,6 +208,48 @@ def _check_revisions(session: Session, collector: _Collector) -> None:
                 collector.add("revision", f"{row['id']} field_meta differs from its snapshot")
             if canonical_json(state_of(spec, row)) != canonical_json(snapshot.get("state") or {}):
                 collector.add("revision", f"{row['id']} state differs from its snapshot")
+
+
+def _check_verifications(session: Session, collector: _Collector) -> None:
+    """Every field marked ``verified`` rests on a live evidence row of the same record
+    that targets the field and quotes the source (DATA_MODEL §5, §6.4), whatever the
+    record's deletion state."""
+    evidence = {
+        row.id: row
+        for row in session.execute(
+            select(
+                Evidence.id,
+                Evidence.subject_id,
+                Evidence.target,
+                Evidence.deleted_at,
+                Evidence.quote,
+            )
+        )
+    }
+    for spec in ENTITY_TYPES.values():
+        if not spec.curated:
+            continue
+        table = table_of(spec)
+        for entity_id, field_meta in session.execute(select(table.c.id, table.c.field_meta)):
+            for name, entry in sorted((field_meta or {}).items()):
+                if not isinstance(entry, dict) or entry.get("verified") != "verified":
+                    continue
+                evidence_id = entry.get("evidence_id")
+                found = evidence.get(evidence_id) if isinstance(evidence_id, str) else None
+                where = f"{entity_id}.{name} is verified"
+                if found is None:
+                    collector.add("verification", f"{where} with missing evidence {evidence_id}")
+                elif found.deleted_at is not None:
+                    collector.add("verification", f"{where} with deleted evidence {evidence_id}")
+                elif found.subject_id != entity_id or found.target != f"field:{name}":
+                    collector.add(
+                        "verification",
+                        f"{where} with evidence {evidence_id} of another record or field",
+                    )
+                elif not found.quote:
+                    collector.add(
+                        "verification", f"{where} with evidence {evidence_id} without a quote"
+                    )
 
 
 def _names(names: Iterable[str]) -> str:

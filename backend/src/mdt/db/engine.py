@@ -6,7 +6,9 @@
   :data:`BEGIN_MODE_OPTION` (set by :func:`mdt.db.session.write_transaction`).
 * Every connection gets ``foreign_keys=ON``, ``busy_timeout=10000``,
   ``synchronous=NORMAL`` and the SQL functions ``mdt_fold`` and ``mdt_sortkey``.
-  File databases are switched to WAL (persistent; ``mdt db upgrade`` sets it as well).
+  File databases are switched to WAL (persistent; ``mdt db upgrade`` sets it as well)
+  and use a connection pool that can open as many connections as there are handler
+  threads.
 * JSON is serialised with ``ensure_ascii=False``.
 """
 
@@ -25,6 +27,13 @@ from mdt.domain.text import sql_fold, sql_sortkey
 #: Execution option naming the BEGIN mode of a connection's next transaction.
 BEGIN_MODE_OPTION = "mdt_begin"
 _BEGIN_MODES = ("DEFERRED", "IMMEDIATE")
+#: How long a connection waits for another writer's lock before SQLite gives up with
+#: SQLITE_BUSY (the API then answers 503 database_busy).
+BUSY_TIMEOUT_MS = 10_000
+#: Connections beyond the 5 that the pool keeps open. AnyIO runs at most 40 handler
+#: threads at once and every request holds at most one connection (an export holds one
+#: more), so a burst of requests waits for the database, never for a free connection.
+FILE_POOL_MAX_OVERFLOW = 40
 
 
 def dumps_json(value: Any) -> str:
@@ -40,7 +49,7 @@ def _is_memory_database(url: str) -> bool:
 def configure_dbapi_connection(dbapi_connection: sqlite3.Connection, *, wal: bool) -> None:
     """Apply the per-connection settings to a raw sqlite3 connection."""
     dbapi_connection.isolation_level = None
-    dbapi_connection.execute("PRAGMA busy_timeout=10000")
+    dbapi_connection.execute(f"PRAGMA busy_timeout={int(BUSY_TIMEOUT_MS)}")
     dbapi_connection.execute("PRAGMA foreign_keys=ON")
     dbapi_connection.execute("PRAGMA synchronous=NORMAL")
     if wal:
@@ -51,8 +60,10 @@ def configure_dbapi_connection(dbapi_connection: sqlite3.Connection, *, wal: boo
 
 def create_db_engine(url: str, **kwargs: Any) -> Engine:
     """Create an engine for a SQLite URL (file or in-memory) with the MDT setup."""
-    engine = create_engine(url, json_serializer=dumps_json, json_deserializer=json.loads, **kwargs)
     wal = not _is_memory_database(url)
+    if wal and "poolclass" not in kwargs:
+        kwargs.setdefault("max_overflow", FILE_POOL_MAX_OVERFLOW)
+    engine = create_engine(url, json_serializer=dumps_json, json_deserializer=json.loads, **kwargs)
 
     @event.listens_for(engine, "connect")
     def _on_connect(dbapi_connection: sqlite3.Connection, _record: ConnectionPoolEntry) -> None:

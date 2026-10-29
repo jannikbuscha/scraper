@@ -57,6 +57,7 @@ META_KEYS = {
     "in_create",
     "default",
     "bulk_editable",
+    "exportable",
     "help",
 }
 

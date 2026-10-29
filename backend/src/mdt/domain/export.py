@@ -27,7 +27,7 @@ from typing import IO, Any, Final, Literal
 
 from openpyxl import Workbook
 from openpyxl.cell import WriteOnlyCell
-from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE, Cell
+from openpyxl.cell.cell import ERROR_CODES, ILLEGAL_CHARACTERS_RE, Cell
 from openpyxl.styles import Font
 from openpyxl.worksheet._write_only import WriteOnlyWorksheet
 from sqlalchemy import select
@@ -36,8 +36,7 @@ from sqlalchemy.orm import Session
 from mdt.db.models import VocabularyTerm
 from mdt.domain.dates import parse_partial_date
 from mdt.domain.errors import BusyError, ExportTooLargeError, ValidationError
-from mdt.domain.fieldsql import VALUE_VIRTUALS
-from mdt.domain.labels import format_number
+from mdt.domain.labels import format_number, ref_infos
 from mdt.domain.listquery import (
     QueryParams,
     SortKey,
@@ -47,9 +46,10 @@ from mdt.domain.listquery import (
     parse_sort_param,
     split_list,
 )
-from mdt.domain.query import Selection, iter_row_chunks, select_scope
+from mdt.domain.query import Selection, iter_id_chunks, select_scope
+from mdt.domain.records import api_value, load_links, table_of
 from mdt.domain.registry import EntityTypeSpec, FieldSpec
-from mdt.domain.serialize import generic_spec, serialize_items
+from mdt.domain.serialize import derived_payload, derived_rows, generic_spec, virtual_values
 
 MAX_EXPORT_ROWS: Final = 200_000
 FORMATS: Final = ("csv", "xlsx")
@@ -59,6 +59,8 @@ MEDIA_TYPES: Final = {
 }
 XLSX_MAX_CHARS: Final = 32_767
 TRUNCATION_SUFFIX: Final = " [truncated]"
+#: Texts that openpyxl would store as an error value instead of a string.
+XLSX_ERROR_VALUES: Final = frozenset(ERROR_CODES)
 #: First characters that spreadsheet programs read as a formula (CSV only).
 FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r", "\n")
 LIST_SEPARATOR: Final = "; "
@@ -96,10 +98,9 @@ _DERIVED_EXTRAS: Final[Mapping[str, tuple[tuple[str, str], ...]]] = {
 
 
 def exportable(field: FieldSpec) -> bool:
-    """Fields that have a value per row (filter-only and detail-only fields do not)."""
-    if field.internal:
-        return False
-    return not field.virtual or field.name in VALUE_VIRTUALS
+    """Fields that have a value per row (filter-only and detail-only fields do not);
+    ``/api/meta`` exposes the same flag, so the UI offers only these columns."""
+    return field.exportable
 
 
 def _join(values: Iterable[Any]) -> str:
@@ -305,6 +306,99 @@ def build_columns(spec: EntityTypeSpec, names: Sequence[str], labels: _Labels) -
     return columns
 
 
+@dataclass(frozen=True)
+class ExportNeeds:
+    """What the selected columns read. An export loads only this: the table columns of
+    the selected stored and system fields, document links, derived rows, the selected
+    virtual counts and the labels of the selected references. It never builds
+    ``field_meta`` or anything else of a full API item."""
+
+    columns: tuple[str, ...] = ()
+    system: tuple[str, ...] = ()
+    fields: tuple[FieldSpec, ...] = ()
+    virtual: tuple[str, ...] = ()
+    derived: bool = False
+    ref_fields: tuple[str, ...] = ()
+    links: bool = False
+
+
+def export_needs(spec: EntityTypeSpec, names: Sequence[str]) -> ExportNeeds:
+    """The needs of the selected column names (``id`` and registry names)."""
+    columns: list[str] = []
+    system: list[str] = []
+    fields: list[FieldSpec] = []
+    virtual: list[str] = []
+    ref_fields: list[str] = []
+    derived = links = False
+    for name in names:
+        if name == ID_COLUMN:
+            continue
+        field = spec.field(name)
+        if field.derived:
+            derived = True
+        elif field.virtual:
+            virtual.append(name)
+        elif field.system_column:
+            system.append(name)
+            columns.extend(field.columns)
+        else:
+            fields.append(field)
+            columns.extend(field.columns)
+            links = links or field.type == "doc_links"
+            if field.type == "ref":
+                ref_fields.append(name)
+    return ExportNeeds(
+        columns=tuple(dict.fromkeys(columns)),
+        system=tuple(system),
+        fields=tuple(fields),
+        virtual=tuple(virtual),
+        derived=derived,
+        ref_fields=tuple(ref_fields),
+        links=links,
+    )
+
+
+def export_items(
+    session: Session, spec: EntityTypeSpec, ids: Sequence[str], needs: ExportNeeds
+) -> list[dict[str, Any]]:
+    """Light items for one chunk of IDs, in the given order: the keys of API items
+    (``id``, system columns, ``fields``, ``virtual``, ``derived``, ``refs``) holding
+    only what :class:`ExportNeeds` names. The column readers of :func:`build_columns`
+    read them like full items."""
+    table = table_of(spec)
+    statement = select(table.c.id, *(table.c[name] for name in needs.columns))
+    found = {
+        row["id"]: dict(row)
+        for row in session.execute(statement.where(table.c.id.in_(list(ids)))).mappings()
+    }
+    rows = [found[entity_id] for entity_id in ids if entity_id in found]
+    row_ids = [row["id"] for row in rows]
+    links = load_links(session, row_ids) if needs.links else {}
+    derived = derived_rows(session, row_ids) if needs.derived else {}
+    virtual = virtual_values(session, spec, row_ids, needs.virtual) if needs.virtual else {}
+    wanted = [row[name] for row in rows for name in needs.ref_fields if row[name]]
+    wanted.extend(link["subject_id"] for row_links in links.values() for link in row_links)
+    infos = ref_infos(session, wanted) if wanted else {}
+    items = []
+    for row in rows:
+        entity_id = row["id"]
+        row_links = links.get(entity_id, [])
+        refs = {name: infos[row[name]].as_dict() for name in needs.ref_fields if row[name] in infos}
+        refs.update(
+            (f"links.{link['subject_id']}", infos[link["subject_id"]].as_dict())
+            for link in row_links
+            if link["subject_id"] in infos
+        )
+        item: dict[str, Any] = {"id": entity_id, **{name: row[name] for name in needs.system}}
+        item["fields"] = {field.name: api_value(field, row, row_links) for field in needs.fields}
+        item["virtual"] = virtual.get(entity_id, {})
+        if needs.derived:
+            item["derived"] = derived_payload(derived.get(entity_id))
+        item["refs"] = refs
+        items.append(item)
+    return items
+
+
 def _vocabularies(spec: EntityTypeSpec, names: Sequence[str]) -> set[str]:
     return {
         field.vocabulary
@@ -342,18 +436,27 @@ def xlsx_text(text: str) -> str:
     return text
 
 
-def xlsx_cell(sheet: WriteOnlyWorksheet, kind: ColumnKind, value: Any) -> Cell:
-    """A write-only cell: numbers and booleans as such, everything else a string cell
-    (``data_type = "s"``), never a formula or an error value."""
+def xlsx_cell(sheet: WriteOnlyWorksheet, kind: ColumnKind, value: Any) -> Cell | Any:
+    """What to append for one cell: numbers and booleans as such, everything else as
+    text that is stored as a string cell, never a formula or an error value.
+
+    Text that openpyxl would store as a formula (``=…``) or an error value (``#N/A``)
+    becomes an explicit cell with ``data_type = "s"``. Any other text is appended as a
+    plain string, which openpyxl stores as a string cell as well, through one reused
+    cell object: creating a cell per value made XLSX exports twice as slow.
+    """
     if value is None:
-        return WriteOnlyCell(sheet, value=None)
+        return None
     if kind == "bool":
-        return WriteOnlyCell(sheet, value=bool(value))
+        return bool(value)
     if kind == "number":
-        return WriteOnlyCell(sheet, value=value)
-    cell = WriteOnlyCell(sheet, value=xlsx_text(str(value)))
-    cell.data_type = "s"
-    return cell
+        return value
+    text = xlsx_text(str(value))
+    if text.startswith("=") or text in XLSX_ERROR_VALUES:
+        cell = WriteOnlyCell(sheet, value=text)
+        cell.data_type = "s"
+        return cell
+    return text
 
 
 def export_filename(entity_type: str, file_format: str, now: datetime) -> str:
@@ -381,12 +484,14 @@ class ExportJob:
         file_format: str,
         total: int,
         started_at: datetime,
+        needs: ExportNeeds,
     ) -> None:
         self._session = session
         self.spec = spec
         self._selection = selection
         self._sort = tuple(sort)
         self.columns = tuple(columns)
+        self._needs = needs
         self.format = file_format
         self.total = total
         self.filename = export_filename(spec.name, file_format, started_at)
@@ -411,11 +516,12 @@ class ExportJob:
         self._used = True
 
     def _value_rows(self) -> Iterator[list[list[Any]]]:
-        """The column values of every row, in chunks."""
+        """The column values of every row, in chunks; only what the columns read is
+        loaded (:class:`ExportNeeds`)."""
         if self._selection is None:
             return
-        for rows in iter_row_chunks(self._session, self._selection, self._sort, CHUNK_SIZE):
-            items = serialize_items(self._session, self.spec, rows)
+        for ids in iter_id_chunks(self._session, self._selection, self._sort, CHUNK_SIZE):
+            items = export_items(self._session, self.spec, ids, self._needs)
             yield [[column.value(item) for column in self.columns] for item in items]
 
     def iter_csv(self) -> Iterator[bytes]:
@@ -510,6 +616,7 @@ def start_export(session: Session, entity_type: str, params: QueryParams) -> Exp
             file_format,
             total,
             datetime.now(UTC),
+            export_needs(spec, names),
         )
     except BaseException:
         job_session.rollback()

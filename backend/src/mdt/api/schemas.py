@@ -5,6 +5,11 @@ The models check the shape of a request (keys and JSON types; unknown keys are r
 the domain functions validate the values themselves (field names, codes, references,
 lengths). Integers and booleans are strict: ``"3"`` or ``1.0`` is not a version and
 ``1`` is not ``true``. Versions and revision IDs must fit SQLite's 64-bit integers.
+
+Before any of that, every string and object key of a body must be valid Unicode text:
+JSON can encode unpaired UTF-16 surrogates (``"\\ud800"``), which are not characters and
+cannot be stored. Such a body is a ``400 validation_error`` with the dotted path of each
+bad value (API §1.2), whatever field or parameter the string was meant for.
 """
 
 from __future__ import annotations
@@ -12,7 +17,10 @@ from __future__ import annotations
 from typing import Annotated, Any, Final
 
 from fastapi import Path, Query
-from pydantic import BaseModel, ConfigDict, Field, StrictBool
+from pydantic import BaseModel, ConfigDict, Field, StrictBool, model_validator
+
+from mdt.domain.errors import ValidationError
+from mdt.domain.normalize import unpaired_surrogate_problems
 
 MAX_SQL_INT: Final = 2**63 - 1
 
@@ -28,9 +36,20 @@ ToVersion = Annotated[int, Query(alias="to", ge=0, le=MAX_SQL_INT)]
 
 
 class Body(BaseModel):
-    """Base of every request body: unknown keys are a validation error."""
+    """Base of every request body: unknown keys are a validation error, and so is text
+    that is not valid Unicode (checked first, on the parsed JSON)."""
 
     model_config = ConfigDict(extra="forbid")
+
+    @model_validator(mode="before")
+    @classmethod
+    def _valid_unicode(cls, data: Any) -> Any:
+        # A domain ValidationError is not one of Pydantic's error types, so it leaves
+        # validation unchanged and reaches the error handler with its field paths.
+        problems = unpaired_surrogate_problems(data)
+        if problems:
+            raise ValidationError(problems)
+        return data
 
 
 class CreateBody(Body):

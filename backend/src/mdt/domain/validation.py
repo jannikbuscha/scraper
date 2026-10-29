@@ -34,6 +34,31 @@ from mdt.domain.vocab import TermIndex, is_fixed_term
 _DIMENSION_RE = re.compile(r"^dimension:D[1-4]$")
 #: Reference fields that may point to deleted rows.
 DELETED_REFS_ALLOWED = frozenset({("comment", "subject_id"), ("comment", "parent_id")})
+#: CODEBOOK §2.3: the evidence of a verified field quotes the source verbatim.
+EVIDENCE_QUOTE_MESSAGE = (
+    "Verification needs evidence that quotes the source verbatim; add the quote to the "
+    "evidence first"
+)
+#: CODEBOOK §2.8: excluded documents carry an exclusion reason, and only they do.
+SCREENING_REASON_REQUIRED = "is required when the document is excluded"
+SCREENING_REASON_ONLY_EXCLUDED = "is allowed only for excluded documents"
+
+
+def verification_rests_on(session: Session, evidence: Mapping[str, Any]) -> bool:
+    """True if the subject of an evidence row has the evidence's target field verified
+    with exactly this evidence (``field_meta[<field>]``: ``verified`` and its ID),
+    whatever the subject's deletion state."""
+    target, subject_id = evidence.get("target"), evidence.get("subject_id")
+    if not isinstance(target, str) or not target.startswith("field:") or not subject_id:
+        return False
+    subject_type = type_of_id(subject_id)
+    if subject_type is None or not ENTITY_TYPES[subject_type].curated:
+        return False
+    subject = load_row(session, ENTITY_TYPES[subject_type], subject_id)
+    if subject is None:
+        return False
+    entry = (subject.get("field_meta") or {}).get(target.removeprefix("field:")) or {}
+    return entry.get("verified") == "verified" and entry.get("evidence_id") == evidence["id"]
 
 
 @dataclass(frozen=True)
@@ -323,6 +348,12 @@ def _document_rules(check: RecordCheck, problems: Problems) -> None:
         and not check.new.get("published_basis")
     ):
         problems.add("published_basis", "is required when a publication date is set")
+    if check.touches("screening_status", "screening_reason"):
+        excluded = check.new.get("screening_status") == "excluded"
+        if excluded and not check.new.get("screening_reason"):
+            problems.add("screening_reason", SCREENING_REASON_REQUIRED)
+        elif not excluded and check.new.get("screening_reason"):
+            problems.add("screening_reason", SCREENING_REASON_ONLY_EXCLUDED)
     if (
         check.actor.channel == "ui"
         and check.touches("url", "retrieved_at")
@@ -361,6 +392,16 @@ def _evidence_rules(check: RecordCheck, problems: Problems) -> None:
             problems.add(name, "must not be negative")
     if char_start is not None and char_end is not None and char_end < char_start:
         problems.add("char_end", "must not be before char_start")
+    if (
+        not check.creating
+        and "quote" in check.assigned
+        and not check.new.get("quote")
+        and verification_rests_on(check.session, {**check.new, "id": check.entity_id})
+    ):
+        problems.add(
+            "quote",
+            "A field is verified with this evidence; its verbatim quote cannot be removed",
+        )
 
 
 def _check_evidence_target(check: RecordCheck, target: str, problems: Problems) -> None:

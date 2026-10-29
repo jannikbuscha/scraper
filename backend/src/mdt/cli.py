@@ -114,10 +114,10 @@ def check() -> None:
 
 @app.command()
 def reindex() -> None:
-    """Rebuild both full-text search tables."""
+    """Rebuild both full-text search tables (in batches; the app stays usable)."""
     settings = get_settings()
     _setup(settings)
-    with _session(settings) as session, write_transaction(session):
+    with _session(settings) as session:
         count = fts.reindex_all(session)
     typer.echo(f"records indexed: {count}")
 

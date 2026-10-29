@@ -2,7 +2,8 @@
 
 * ``/assets/*``: Starlette ``StaticFiles`` on ``FRONTEND_DIST/assets`` (symlinks are
   resolved and must stay inside), with ``Cache-Control: public, max-age=31536000,
-  immutable``; a missing asset is 404, never ``index.html``.
+  immutable``; a missing asset is 404, never ``index.html``. ``Range`` headers are
+  ignored (``Accept-Ranges: none``): assets are always sent whole.
 * Root files: the regular files directly in ``FRONTEND_DIST`` (no symlinks, no
   subdirectories) are read once at startup and served by exact name.
 * SPA fallback: every other GET/HEAD outside ``/api/`` returns the bytes of
@@ -26,8 +27,9 @@ from pathlib import Path
 from typing import Final
 
 from fastapi import FastAPI
-from starlette.responses import JSONResponse, Response
-from starlette.staticfiles import PathLike, StaticFiles
+from starlette.datastructures import Headers
+from starlette.responses import FileResponse, JSONResponse, Response
+from starlette.staticfiles import NotModifiedResponse, PathLike, StaticFiles
 from starlette.types import Receive, Scope, Send
 
 from mdt.api.errors import envelope, error_response
@@ -94,8 +96,25 @@ def load_build(dist: Path) -> FrontendBuild:
     return FrontendBuild(root_files, assets_dir)
 
 
+class WholeFileResponse(FileResponse):
+    """A ``FileResponse`` that ignores ``Range`` (RFC 9110 lets a server do so) and says
+    ``Accept-Ranges: none``. Content-hashed assets are small and always sent whole, so a
+    malformed or unsatisfiable range never produces Starlette's plain-text 400/416, which
+    would bypass the error envelope (API §1.2)."""
+
+    def __init__(self, path: PathLike, status_code: int, stat_result: os.stat_result) -> None:
+        super().__init__(path, status_code=status_code, stat_result=stat_result)
+        self.headers["accept-ranges"] = "none"
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        headers = scope.get("headers") or []
+        if any(name.lower() == b"range" for name, _ in headers):
+            scope = {**scope, "headers": [(n, v) for n, v in headers if n.lower() != b"range"]}
+        await super().__call__(scope, receive, send)
+
+
 class ImmutableAssets(StaticFiles):
-    """``StaticFiles`` for content-hashed assets: cacheable for a year."""
+    """``StaticFiles`` for content-hashed assets: cacheable for a year, sent whole."""
 
     def file_response(
         self,
@@ -104,7 +123,9 @@ class ImmutableAssets(StaticFiles):
         scope: Scope,
         status_code: int = 200,
     ) -> Response:
-        response = super().file_response(full_path, stat_result, scope, status_code)
+        response: Response = WholeFileResponse(full_path, status_code, stat_result)
+        if self.is_not_modified(response.headers, Headers(scope=scope)):
+            response = NotModifiedResponse(response.headers)
         response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
         return response
 

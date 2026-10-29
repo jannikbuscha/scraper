@@ -21,9 +21,19 @@ _INPUT_TIMESTAMP_RE = re.compile(
 )
 
 
+def _storage_format(value: datetime) -> str:
+    """The storage format of a UTC datetime. The year is always written with four digits:
+    ``strftime("%Y")`` does not pad years before 1000 on every platform (glibc writes
+    ``999``), which would produce a string outside the storage format."""
+    return (
+        f"{value.year:04d}-{value.month:02d}-{value.day:02d}T"
+        f"{value.hour:02d}:{value.minute:02d}:{value.second:02d}.{value.microsecond:06d}Z"
+    )
+
+
 def utc_now() -> str:
     """Return the current UTC time in the storage format."""
-    return datetime.now(UTC).strftime(TIMESTAMP_FORMAT)
+    return _storage_format(datetime.now(UTC))
 
 
 def format_timestamp(value: datetime) -> str:
@@ -36,7 +46,7 @@ def format_timestamp(value: datetime) -> str:
         raise ValueError("naive datetimes are not allowed")
     if offset != timedelta(0):
         raise ValueError("only UTC datetimes are allowed")
-    return value.astimezone(UTC).strftime(TIMESTAMP_FORMAT)
+    return _storage_format(value.astimezone(UTC))
 
 
 def is_timestamp(value: str) -> bool:
@@ -60,7 +70,9 @@ def parse_timestamp(value: str) -> datetime:
 def normalize_timestamp_input(value: str) -> str:
     """Normalise an ISO 8601 timestamp with an explicit offset to the storage format.
 
-    Raises ``ValueError`` for anything else (including naive timestamps).
+    Raises ``ValueError`` for anything else: naive timestamps, impossible dates and
+    instants that lie outside the years 1-9999 once converted to UTC (e.g.
+    ``0001-01-01T00:00:00+14:00``).
     """
     if is_timestamp(value):
         return value
@@ -74,7 +86,11 @@ def normalize_timestamp_input(value: str) -> str:
         f"{match.group('s') or '00'}.{fraction}{'+00:00' if tz == 'Z' else tz}"
     )
     parsed = datetime.fromisoformat(text)
-    return parsed.astimezone(UTC).strftime(TIMESTAMP_FORMAT)
+    try:
+        converted = parsed.astimezone(UTC)
+    except OverflowError as exc:
+        raise ValueError("the timestamp is outside the supported range") from exc
+    return _storage_format(converted)
 
 
 def timestamp_date(value: str) -> date:

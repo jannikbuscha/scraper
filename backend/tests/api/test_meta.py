@@ -91,6 +91,18 @@ def test_meta_entity_types(client: ApiClient) -> None:
     assert "seed_key" not in fields
     assert fields["paper_cluster"]["bulk_editable"] is True
     assert fields["period"]["derived"] is True and fields["open_comments"]["virtual"] is True
+    # The tooltip of the derived launch names the interval that sorting and filters use.
+    assert "interval over all candidates" in fields["launch"]["help"]
+    # The tooltips of period and war trajectory name every input of their rules (CODEBOOK
+    # §2.7): without a launch, an archive bound before the founding day gives pre_ministry,
+    # and an archive bound before the invasion shows that the item existed before it.
+    for name in ("period", "war_trajectory"):
+        assert "launch interval" in fields[name]["help"], name
+        assert "archive bound" in fields[name]["help"], name
+    assert "modification events" in fields["war_trajectory"]["help"]
+    documents = {field["name"]: field for field in types["document"]["fields"]}
+    assert documents["text"]["exportable"] is False
+    assert fields["open_comments"]["exportable"] is True
     assert set(fields["slug"]) >= {"name", "type", "group", "filter", "sortable", "help"}
     assert {name for name, spec in types.items() if spec["table_view"]} == set(TABLE_TYPES)
     parameters = load_parameters(REAL_CODEBOOK)

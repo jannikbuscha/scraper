@@ -64,6 +64,18 @@ LIST_TYPES: frozenset[str] = frozenset(
 FTS_TYPES: frozenset[str] = frozenset({"string", "text", "slug", "string_list", "url_list"})
 #: Field types that are bulk-editable when editable and not create-only (API §3.1).
 BULK_TYPES: frozenset[str] = frozenset({"vocab", "vocab_list", "bool"})
+#: Virtual fields with a value per row (counts and scope flags). The other virtual
+#: fields have none: the relation ``endpoint`` is filter-only, the document ``text``
+#: is detail-only (API §2, §5).
+ROW_VIRTUALS: frozenset[str] = frozenset(
+    {
+        "open_comments",
+        "comment_count",
+        "project_in_paper_scope",
+        "subject_in_paper_scope",
+        "linked_in_paper_scope",
+    }
+)
 
 SLUG_PATTERN = r"^[a-z0-9]+(-[a-z0-9]+)*$"
 CODE_PATTERN = r"^[a-z0-9_]+$"
@@ -163,6 +175,12 @@ class FieldSpec:
         return self.editable and not self.create_only and self.type in BULK_TYPES
 
     @property
+    def exportable(self) -> bool:
+        """Has a value per list row, so it can be a table column and an export column
+        (API §5): every exposed field except the virtual fields outside ROW_VIRTUALS."""
+        return not self.internal and (not self.virtual or self.name in ROW_VIRTUALS)
+
+    @property
     def restorable(self) -> bool:
         """Applied by restore: tracked, editable and not create-only (DATA_MODEL §6.4)."""
         return self.tracked and self.editable and not self.create_only
@@ -202,6 +220,7 @@ class FieldSpec:
             "in_create": self.in_create,
             "default": self.default,
             "bulk_editable": self.bulk_editable,
+            "exportable": self.exportable,
             "help": self.help,
         }
 
@@ -544,8 +563,10 @@ def _derived_fields(launch_in_list: bool, period_in_list: bool) -> tuple[FieldSp
             "Launch",
             in_list=launch_in_list,
             help=(
-                "Derived: the earliest launch event, otherwise the earliest beta launch; "
-                "shown with its precision and basis (CODEBOOK §2.7)."
+                "Derived from the launch events, otherwise the beta launches: shown is the "
+                "candidate that ends first, with its precision and basis; the interval over "
+                "all candidates (earliest start to earliest end) decides the period, sorting, "
+                "filters and exports (CODEBOOK §2.7)."
             ),
         ),
         _derived(
@@ -560,14 +581,20 @@ def _derived_fields(launch_in_list: bool, period_in_list: bool) -> tuple[FieldSp
             "Period",
             vocabulary="period",
             in_list=period_in_list,
-            help="Derived from the launch interval and the cut-off dates (CODEBOOK §2.7).",
+            help=(
+                "Derived from the launch interval (without one, from the archive bound) and "
+                "the cut-off dates (CODEBOOK §2.7)."
+            ),
         ),
         _derived(
             "war_trajectory",
             "vocab",
             "War trajectory",
             vocabulary="war_trajectory",
-            help="Derived from the launch and modification events (CODEBOOK §2.7).",
+            help=(
+                "Derived from the launch interval, the archive bound and the modification "
+                "events (CODEBOOK §2.7)."
+            ),
         ),
         _derived(
             "portfolio_entry",

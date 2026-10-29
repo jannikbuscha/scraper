@@ -162,6 +162,11 @@ def test_invalid_item_lists(db: Db) -> None:
             ([{"id": project_id}], "items[0].expected_version"),
             ([{"expected_version": 1}], "items[0].id"),
             ([item] * 501, "items"),
+            # expected_version is an integer in [0, 2^63 - 1] like in every other body
+            ([{"id": project_id, "expected_version": -5}], "items[0].expected_version"),
+            ([{"id": project_id, "expected_version": 2**63}], "items[0].expected_version"),
+            ([{"id": project_id, "expected_version": 2**80}], "items[0].expected_version"),
+            ([{"id": f"{project_id}\ud800", "expected_version": 1}], "items[0].id"),
         ):
             with pytest.raises(ValidationError) as caught:
                 bulk_apply(session, "project", items, ALICE, set_values={"status": "active"})
@@ -186,3 +191,53 @@ def test_bulk_verification_status_with_note(db: Db) -> None:
         )
         assert result.results[0].status == "updated"
         assert fields_of(session, "project", project_id)["verification_status"] == "verified"
+
+
+def test_bulk_exclusion_needs_a_reason_in_the_same_set(db: Db) -> None:
+    with db.session() as session:
+        unscreened = apply_change(session, "document", None, {"title": "Example A"}, ALICE)
+        excluded = apply_change(
+            session,
+            "document",
+            None,
+            {"title": "Example B", "screening_status": "excluded", "screening_reason": "reason_a"},
+            ALICE,
+        )
+        items = [
+            {"id": unscreened.entity_id, "expected_version": 1},
+            {"id": excluded.entity_id, "expected_version": 1},
+        ]
+        with pytest.raises(ValidationError) as caught:
+            bulk_apply(
+                session, "document", items, ALICE, set_values={"screening_status": "excluded"}
+            )
+        assert list(caught.value.details or {}) == ["set.screening_reason"]
+        result = bulk_apply(
+            session,
+            "document",
+            items,
+            ALICE,
+            set_values={"screening_status": "excluded", "screening_reason": "reason_b"},
+        )
+        assert [item.status for item in result.results] == ["updated", "updated"]
+        # Including keeps the per-record rule: the reason has to go in the same change.
+        items = [
+            {"id": entity, "expected_version": 2}
+            for entity in (unscreened.entity_id, excluded.entity_id)
+        ]
+        result = bulk_apply(
+            session, "document", items, ALICE, set_values={"screening_status": "included"}
+        )
+        assert [item.status for item in result.results] == ["error", "error"]
+        assert result.results[0].error is not None
+        assert result.results[0].error["details"] == {
+            "screening_reason": ["is allowed only for excluded documents"]
+        }
+        result = bulk_apply(
+            session,
+            "document",
+            items,
+            ALICE,
+            set_values={"screening_status": "included", "screening_reason": None},
+        )
+        assert [item.status for item in result.results] == ["updated", "updated"]

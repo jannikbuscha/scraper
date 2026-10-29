@@ -2,8 +2,11 @@
 
 from __future__ import annotations
 
+from typing import Any
+from unittest.mock import patch
+
 import pytest
-from sqlalchemy import insert, text
+from sqlalchemy import insert, select, text
 from sqlalchemy.orm import Session
 
 from mdt.db.models import DocumentText, SearchKey
@@ -146,8 +149,7 @@ def test_reindex_rebuilds_both_tables(db: Db) -> None:
             session.execute(text("DELETE FROM fts_entity"))
             session.execute(insert(SearchKey).values(entity_id="prj_gone", entity_type="project"))
         assert search(session, "Reindexed") == set()
-        with write_transaction(session):
-            count = fts.reindex_all(session)
+        count = fts.reindex_all(session)
         assert count > 0
         assert search(session, "Reindexed") == {project_id}
         with read_transaction(session):
@@ -157,6 +159,70 @@ def test_reindex_rebuilds_both_tables(db: Db) -> None:
                 ).scalar()
                 == 0
             )
+
+
+def _fts_rowids(session: Session, table: str) -> set[int]:
+    with read_transaction(session):
+        return {int(r[0]) for r in session.execute(text(f"SELECT rowid FROM {table}"))}
+
+
+def test_reindex_runs_in_batches_and_removes_orphaned_rows(db: Db) -> None:
+    with db.session() as session:
+        names = [f"Batched example {index}" for index in range(7)]
+        ids = {create_project(session, name_en=name).entity_id for name in names}
+        with write_transaction(session):
+            # stale content, an orphaned fts_entity row and a document row of a project
+            session.execute(text("UPDATE fts_entity SET body = 'stale' WHERE rowid > 0"))
+            session.execute(text("INSERT INTO fts_entity(rowid, body) VALUES (999999, 'gone')"))
+            project_rowid = session.execute(
+                select(SearchKey.rowid).where(SearchKey.entity_id == next(iter(ids)))
+            ).scalar_one()
+            session.execute(
+                text("INSERT INTO fts_document(rowid, title, body) VALUES (:r, 'x', 'y')"),
+                {"r": project_rowid},
+            )
+        units: list[bool] = []
+        original = fts.write_transaction
+
+        def counting(session_: Session) -> Any:
+            units.append(True)
+            return original(session_)
+
+        with patch.object(fts, "write_transaction", counting):
+            count = fts.reindex_all(session, batch_size=3)
+        assert count >= len(ids)
+        # one unit per batch of at most 3 records per type, plus the orphan clean-up
+        assert len(units) > count // 3
+        assert search(session, "Batched example") == ids
+        assert search(session, "stale") == set()
+        assert 999999 not in _fts_rowids(session, "fts_entity")
+        assert project_rowid not in _fts_rowids(session, "fts_document")
+
+
+def test_reindex_releases_the_write_lock_between_batches(db: Db) -> None:
+    # `mdt reindex` used to hold one write transaction for the whole rebuild, so UI
+    # writes failed after the busy timeout. Now another connection can write between
+    # any two batches without waiting (it would block for 10 s and fail otherwise).
+    with db.session() as session:
+        for index in range(5):
+            create_project(session, name_en=f"Concurrent example {index}")
+        other = db.session()
+        written: list[str] = []
+        original = fts.write_transaction
+
+        def between_batches(session_: Session) -> Any:
+            assert not session_.in_transaction()
+            name = f"Written during reindex {len(written)}"
+            written.append(create_project(other, name_en=name).entity_id)
+            return original(session_)
+
+        try:
+            with patch.object(fts, "write_transaction", between_batches):
+                fts.reindex_all(session, batch_size=2)
+        finally:
+            other.close()
+        assert len(written) > 3
+        assert search(session, "Written during reindex") == set(written)
 
 
 # --------------------------------------------------------------------------------------
@@ -178,10 +244,25 @@ def test_reindex_rebuilds_both_tables(db: Db) -> None:
         ("AND OR NOT", '"AND"* AND "OR"* AND "NOT"*'),
         ("title:secret", '"title:secret"*'),
         (f"з{RIGHT_QUOTE}явився", f'"з{MODIFIER}явився"*'),
+        # control characters separate tokens (FTS5 stops reading a query at U+0000)
+        ("a\x00b", '"a"* AND "b"*'),
+        ("synth\x00", '"synth"*'),
+        ('"a\x00b"', '"a b"'),
+        ("a\x01b\x7fc", '"a"* AND "b"* AND "c"*'),
+        ("\x00", None),
     ],
 )
 def test_build_match_query(q: str, expected: str | None) -> None:
     assert fts.build_match_query(q) == expected
+
+
+@pytest.mark.parametrize(
+    "q", ["zqxj\x00wvut", "zqxj\x00", '"zqxj\x00wvut"', "zqx\x00wvu kplm", "\x00zqxj"]
+)
+def test_queries_with_control_characters_run(db: Db, q: str) -> None:
+    with db.session() as session:
+        project_id = create_project(session, name_en="Zqxj Wvut Kplm").entity_id
+        assert search(session, q) == {project_id}
 
 
 def test_query_limits() -> None:

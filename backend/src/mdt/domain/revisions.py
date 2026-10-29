@@ -32,7 +32,14 @@ from mdt.domain.fieldmeta import entry_diff, verification_entry
 from mdt.domain.history import get_revision, latest_revision
 from mdt.domain.ids import new_batch_id
 from mdt.domain.labels import ref_info
-from mdt.domain.normalize import INVALID, is_empty, normalize_value, values_equal
+from mdt.domain.normalize import (
+    INVALID,
+    UNPAIRED_SURROGATE_MESSAGE,
+    has_unpaired_surrogate,
+    is_empty,
+    normalize_value,
+    values_equal,
+)
 from mdt.domain.records import (
     Row,
     api_value,
@@ -44,7 +51,13 @@ from mdt.domain.records import (
 )
 from mdt.domain.registry import ENTITY_TYPES, EntityTypeSpec, type_of_id
 from mdt.domain.snapshots import make_snapshot
-from mdt.domain.validation import DELETED_REFS_ALLOWED, check_unique, ref_row
+from mdt.domain.validation import (
+    DELETED_REFS_ALLOWED,
+    EVIDENCE_QUOTE_MESSAGE,
+    check_unique,
+    ref_row,
+    verification_rests_on,
+)
 from mdt.domain.writes import (
     ChangeResult,
     RestoreMeta,
@@ -67,6 +80,8 @@ from mdt.domain.writes import (
 
 VERIFICATION_STATUSES = ("unverified", "verified", "disputed")
 MAX_BULK_ITEMS = 500
+#: ``expected_version`` is a JSON integer in [0, 2^63 - 1] in every body (API §3.2).
+MAX_VERSION = 2**63 - 1
 
 
 @dataclass
@@ -270,18 +285,22 @@ def _check_verifiable(
 
 
 def _require_evidence(session: Session, entity_id: str, name: str, evidence_id: str | None) -> None:
+    """``verified`` needs a live evidence row of this record that targets the field and
+    quotes the source verbatim (CODEBOOK §2.3, DATA_MODEL §6.4)."""
     if not evidence_id:
         raise EvidenceRequiredError()
-    found = session.execute(
-        select(Evidence.id).where(
+    quote = session.execute(
+        select(Evidence.quote).where(
             Evidence.id == evidence_id,
             Evidence.subject_id == entity_id,
             Evidence.target == f"field:{name}",
             Evidence.deleted_at.is_(None),
         )
-    ).scalar()
-    if found is None:
+    ).one_or_none()
+    if quote is None:
         raise EvidenceRequiredError()
+    if not quote[0]:
+        raise EvidenceRequiredError(EVIDENCE_QUOTE_MESSAGE)
 
 
 # --------------------------------------------------------------------------------------
@@ -332,7 +351,11 @@ def soft_delete(
     cascade: bool = False,
 ) -> ChangeResult:
     """Soft-delete a record (and with ``cascade`` its dependent services, in the same
-    transaction and batch). Events, comments and evidence are never deleted with it."""
+    transaction and batch). Events, comments and evidence are never deleted with it.
+
+    Evidence that a field verification rests on cannot be deleted, not even with
+    ``cascade``: the field would claim a verification whose evidence is in the trash.
+    The verification has to be withdrawn (or moved to other evidence) first."""
     spec = entity_spec(entity_type)
     clean = clean_note(note)
     with write_transaction(session):
@@ -343,6 +366,12 @@ def soft_delete(
         if row["deleted_at"] is not None:
             raise InvalidStateError("deleted", "The record is already deleted")
         check_version(unit, row, expected_version, action="delete", your_changes={})
+        if spec.name == "evidence" and verification_rests_on(session, row):
+            raise HasDependentsError(
+                {"field_verification": 1},
+                "A field is verified with this evidence. Withdraw the verification (or "
+                "verify the field with other evidence) before deleting the evidence.",
+            )
         dependents = _live_dependents(session, spec, entity_id)
         if dependents and not cascade:
             raise HasDependentsError({"service": len(dependents)})
@@ -590,8 +619,16 @@ def _parse_bulk_items(items: Any, problems: Problems) -> list[tuple[str, int]]:
         if not isinstance(entity_id, str) or not entity_id:
             problems.add(f"items[{index}].id", "is required")
             continue
+        if has_unpaired_surrogate(entity_id):
+            problems.add(f"items[{index}].id", UNPAIRED_SURROGATE_MESSAGE)
+            continue
         if isinstance(version, bool) or not isinstance(version, int):
             problems.add(f"items[{index}].expected_version", "must be an integer")
+            continue
+        if not 0 <= version <= MAX_VERSION:
+            problems.add(
+                f"items[{index}].expected_version", f"must be an integer from 0 to {MAX_VERSION}"
+            )
             continue
         if entity_id in seen:
             problems.add(f"items[{index}].id", "is duplicated")
@@ -636,6 +673,10 @@ def _parse_bulk_operations(
     set_values = normalized["set"]
     if "in_paper_scope" in set_values and is_empty(set_values.get("scope_note")):
         problems.add("set.scope_note", "A scope note is required when the scope is changed")
+    if set_values.get("screening_status") == "excluded" and is_empty(
+        set_values.get("screening_reason")
+    ):
+        problems.add("set.screening_reason", "An exclusion reason is required in the same set")
     if set_values.get("verification_status") in ("verified", "disputed") and not note:
         problems.add(
             "note", "A note is required when the verification status is verified or disputed"

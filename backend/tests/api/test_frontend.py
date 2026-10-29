@@ -97,6 +97,30 @@ def test_assets_are_cached_for_a_year(web: TestClient) -> None:
 
 
 @pytest.mark.parametrize(
+    "range_header",
+    ["bytes=999999-1000000", "bytes=abc", "items=0-1", "bytes=5-2", "bytes=0-3", "bytes=0-1,4-6"],
+)
+def test_assets_ignore_range_requests(web: TestClient, range_header: str) -> None:
+    # Malformed or unsatisfiable ranges used to get Starlette's plain-text 400/416, which
+    # bypassed the error envelope; assets are now always sent whole.
+    for method in ("GET", "HEAD"):
+        response = web.request(method, "/assets/app-0a1b2c.js", headers={"Range": range_header})
+        assert response.status_code == 200, (method, range_header)
+        assert response.content == (SCRIPT if method == "GET" else b"")
+        assert response.headers["accept-ranges"] == "none"
+        assert response.headers["content-length"] == str(len(SCRIPT))
+        assert "content-range" not in response.headers
+        assert response.headers["cache-control"] == ASSET_CACHE
+
+
+def test_assets_answer_conditional_requests(web: TestClient) -> None:
+    etag = web.get("/assets/app-0a1b2c.js").headers["etag"]
+    response = web.get("/assets/app-0a1b2c.js", headers={"If-None-Match": etag, "Range": "x"})
+    assert (response.status_code, response.content) == (304, b"")
+    assert response.headers["cache-control"] == ASSET_CACHE
+
+
+@pytest.mark.parametrize(
     "path", ["/assets/missing.js", "/assets", "/assets/", "/assets/escape.js", "/assets/nested"]
 )
 def test_missing_assets_are_404_never_index_html(web: TestClient, path: str) -> None:

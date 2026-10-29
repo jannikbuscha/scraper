@@ -23,10 +23,17 @@ from mdt.domain.export import (
     start_export,
     xlsx_text,
 )
+from mdt.domain.registry import ENTITY_TYPES
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.conftest import Db
 from tests.helpers import ALICE, create_event, create_project, create_service
-from tests.read_helpers import assert_consistent, create, create_document, open_copy
+from tests.read_helpers import (
+    assert_consistent,
+    count_statements,
+    create,
+    create_document,
+    open_copy,
+)
 
 LONG_NOTE = "x" * 40_000
 
@@ -352,6 +359,26 @@ def test_invalid_export_requests(
         start_export(session, entity_type, params)
 
 
+def test_the_meta_flag_exportable_names_exactly_the_exportable_columns(catalog: Catalog) -> None:
+    # The UI offers as table and export columns only the fields that /api/meta marks
+    # ``exportable`` (UI §3); an export of any other column is refused.
+    for spec in ENTITY_TYPES.values():
+        if spec.name == "comment":
+            continue
+        for field in spec.fields:
+            if field.internal:
+                continue
+            with catalog.db.session() as session:
+                if field.meta()["exportable"]:
+                    start_export(session, spec.name, {"cols": f"id,{field.name}"}).close()
+                else:
+                    with pytest.raises(ValidationError):
+                        start_export(session, spec.name, {"cols": f"id,{field.name}"})
+    assert not ENTITY_TYPES["document"].field("text").exportable
+    assert not ENTITY_TYPES["relation"].field("endpoint").exportable
+    assert ENTITY_TYPES["project"].field("open_comments").exportable
+
+
 def test_unknown_types_cannot_be_exported(catalog: Catalog) -> None:
     with catalog.db.session() as session, pytest.raises(NotFoundError):
         start_export(session, "comment", {})
@@ -387,3 +414,81 @@ def test_exports_over_the_row_limit_are_refused(
             start_export(session, "project", {})
         # the slot is free again, and a smaller selection passes
         start_export(session, "project", {"f.status": "in:active"}).close()
+
+
+# --------------------------------------------------------------------------------------
+# Cost: exports load only what the selected columns need
+# --------------------------------------------------------------------------------------
+
+
+def test_exports_load_only_what_the_columns_need(
+    catalog: Catalog, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Exports used to serialise every row as a full API item (links, virtual counts,
+    # labels and a deep copy of field_meta) whatever ``cols`` asked for.
+    def not_needed(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("loaded although no selected column reads it")
+
+    for name in ("load_links", "derived_rows", "virtual_values", "ref_infos"):
+        monkeypatch.setattr(export, name, not_needed)
+    with count_statements(catalog.db.engine) as statements:
+        rows = catalog.csv_rows("project", cols="id,slug,name_en,status,created_by")
+    assert rows[0] == ["id", "slug", "name_en", "status", "status_label", "created_by"]
+    assert any(row[1] == "exp-alpha" for row in rows[1:])
+    assert not any("field_meta" in statement for statement in statements)
+
+
+def test_export_needs_follow_the_columns() -> None:
+    spec = ENTITY_TYPES["document"]
+    assert export.export_needs(spec, ["id"]) == export.ExportNeeds()
+    needs = export.export_needs(
+        spec, ["id", "title", "published", "links", "publisher_org_id", "open_comments", "version"]
+    )
+    assert needs.columns == (
+        "title",
+        "published_start",
+        "published_end",
+        "published_precision",
+        "publisher_org_id",
+        "version",
+    )
+    assert [field.name for field in needs.fields] == [
+        "title",
+        "published",
+        "links",
+        "publisher_org_id",
+    ]
+    assert (needs.virtual, needs.system, needs.ref_fields) == (
+        ("open_comments",),
+        ("version",),
+        ("publisher_org_id",),
+    )
+    assert needs.links and not needs.derived
+    assert export.export_needs(ENTITY_TYPES["project"], ["launch"]).derived
+
+
+def test_export_queries_do_not_grow_with_the_rows(db: Db) -> None:
+    def statement_count(**params: str) -> int:
+        with db.session() as session, count_statements(db.engine) as statements:
+            job = start_export(session, "document", {"format": "csv", **params})
+            b"".join(job.iter_csv())
+        return len(statements)
+
+    columns = "id,title,published,links,publisher_org_id,open_comments,linked_in_paper_scope"
+    with db.session() as session:
+        project_id = create_project(session, name_en="Export scaling project").entity_id
+        for index in range(2):
+            create_document(
+                session,
+                f"Scaling {index}",
+                links=[{"subject_id": project_id, "state": "confirmed"}],
+            )
+    few = statement_count(cols=columns)
+    with db.session() as session:
+        for index in range(2, 30):
+            create_document(
+                session,
+                f"Scaling {index}",
+                links=[{"subject_id": project_id, "state": "confirmed"}],
+            )
+    assert statement_count(cols=columns) == few

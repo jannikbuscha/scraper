@@ -171,8 +171,8 @@ class HasDependentsError(DomainError):
     status = 409
     default_message = "The record has dependent records"
 
-    def __init__(self, counts: Mapping[str, int]):
-        super().__init__(details=dict(counts))
+    def __init__(self, counts: Mapping[str, int], message: str | None = None):
+        super().__init__(message, details=dict(counts))
 
 
 class UniqueViolationError(DomainError):
@@ -255,6 +255,17 @@ class BusyError(DomainError):
     code = "busy"
     status = 429
     default_message = "Another export is running"
+
+
+class DatabaseBusyError(DomainError):
+    """503: the database stayed locked by another writer for longer than the busy
+    timeout (e.g. during a long maintenance command), or every connection was in use.
+    Nothing was written; the request can be repeated (the response has Retry-After)."""
+
+    code = "database_busy"
+    status = 503
+    default_message = "The database is busy. Nothing was changed; please try again in a moment."
+    retry_after_seconds: ClassVar[int] = 5
 
 
 class InternalError(DomainError):

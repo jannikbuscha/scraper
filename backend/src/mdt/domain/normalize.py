@@ -41,6 +41,13 @@ _SOURCE_CATEGORY_KEYS: Final = frozenset({"source", "label", "url"})
 
 _C0 = re.compile(r"[\x00-\x1f]")
 _C0_EXCEPT_TAB_LF = re.compile(r"[\x00-\x08\x0b-\x1f]")
+#: Unpaired UTF-16 surrogates (category Cs). JSON escapes such as ``"\ud800"`` (and
+#: raw surrogate bytes, which ``json.loads`` decodes with ``surrogatepass``) produce
+#: them, but they are not Unicode characters: they cannot be encoded as UTF-8, so
+#: SQLite refuses them.
+_SURROGATE = re.compile(r"[\ud800-\udfff]")
+UNPAIRED_SURROGATE_MESSAGE: Final = "must be valid Unicode text (it contains an unpaired surrogate)"
+_SURROGATE_KEY_MESSAGE: Final = "has a key that is not valid Unicode text (an unpaired surrogate)"
 
 
 class _Invalid:
@@ -61,10 +68,49 @@ def _nfc(value: str) -> str:
     return unicodedata.normalize("NFC", value)
 
 
+def has_unpaired_surrogate(value: str) -> bool:
+    """True if ``value`` contains a lone UTF-16 surrogate (not valid Unicode text)."""
+    return _SURROGATE.search(value) is not None
+
+
+def unpaired_surrogate_problems(value: Any, path: str = "") -> dict[str, list[str]]:
+    """``{path: [message]}`` for every string, and every object key, in a parsed JSON
+    value that contains an unpaired surrogate. Paths are dotted (``data.name_en``,
+    ``items[0].id``); a bad key is reported at the object that holds it, so no path
+    repeats the invalid text. An empty result means the value is valid Unicode text."""
+    problems: dict[str, list[str]] = {}
+
+    def visit(item: Any, where: str) -> None:
+        if isinstance(item, str):
+            if has_unpaired_surrogate(item):
+                problems.setdefault(where or "body", []).append(UNPAIRED_SURROGATE_MESSAGE)
+        elif isinstance(item, dict):
+            for key, child in item.items():
+                if isinstance(key, str) and has_unpaired_surrogate(key):
+                    messages = problems.setdefault(where or "body", [])
+                    if _SURROGATE_KEY_MESSAGE not in messages:
+                        messages.append(_SURROGATE_KEY_MESSAGE)
+                    continue
+                visit(child, f"{where}.{key}" if where else str(key))
+        elif isinstance(item, list):
+            for index, child in enumerate(item):
+                visit(child, f"{where}[{index}]")
+
+    visit(value, path)
+    return problems
+
+
+def _check_text(value: str) -> None:
+    if has_unpaired_surrogate(value):
+        raise ValueProblem(UNPAIRED_SURROGATE_MESSAGE)
+
+
 def normalize_string(value: Any, max_length: int = 500) -> str | None:
-    """Single-line string: NFC, trimmed, ``''`` → None, no C0 control characters."""
+    """Single-line string: NFC, trimmed, ``''`` → None, no C0 control characters and no
+    unpaired surrogates."""
     if not isinstance(value, str):
         raise ValueProblem("must be a string")
+    _check_text(value)
     result = _nfc(value).strip()
     if not result:
         return None
@@ -77,9 +123,10 @@ def normalize_string(value: Any, max_length: int = 500) -> str | None:
 
 def normalize_text(value: Any, max_length: int = 20_000) -> str | None:
     """Multi-line text: NFC, CRLF/CR → LF, trimmed, ``''`` → None; C0 controls other
-    than tab and newline are refused."""
+    than tab and newline, and unpaired surrogates, are refused."""
     if not isinstance(value, str):
         raise ValueProblem("must be a string")
+    _check_text(value)
     result = _nfc(value).replace("\r\n", "\n").replace("\r", "\n").strip()
     if not result:
         return None
@@ -150,7 +197,10 @@ def _normalize_number(spec: FieldSpec, value: Any) -> float | None:
         return None
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueProblem("must be a number")
-    result = float(value)
+    try:
+        result = float(value)
+    except OverflowError as exc:  # a JSON integer beyond the float range (about 1.8e308)
+        raise ValueProblem("must be a finite number") from exc
     if not math.isfinite(result):
         raise ValueProblem("must be a finite number")
     return result
@@ -403,7 +453,9 @@ def _normalize_link(item: Any, path: str, problems: Problems) -> dict[str, Any] 
     # Read-only keys: validated here; the write path ignores them on channel ui.
     if "matched_aliases" in item:
         aliases = item["matched_aliases"]
-        if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
+        if not isinstance(aliases, list) or not all(
+            isinstance(a, str) and not has_unpaired_surrogate(a) for a in aliases
+        ):
             problems.add(f"{path}.matched_aliases", "must be a list of strings")
             failed = True
         else:
@@ -463,7 +515,10 @@ def _json_depth(value: Any) -> int:
 
 
 def _check_json_types(value: Any) -> None:
-    if value is None or isinstance(value, bool | str | int):
+    if isinstance(value, str):
+        _check_text(value)
+        return
+    if value is None or isinstance(value, bool | int):
         return
     if isinstance(value, float):
         if not math.isfinite(value):
@@ -477,6 +532,8 @@ def _check_json_types(value: Any) -> None:
         for key, item in value.items():
             if not isinstance(key, str):
                 raise ValueProblem("object keys must be strings")
+            if has_unpaired_surrogate(key):
+                raise ValueProblem(_SURROGATE_KEY_MESSAGE)
             _check_json_types(item)
         return
     raise ValueProblem("must be JSON")

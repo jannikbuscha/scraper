@@ -288,6 +288,73 @@ def test_vocabulary_metadata_is_updated_without_revisions(db: Db, tmp_path: Path
         database.engine.dispose()
 
 
+def rewrite_definitions(codebook: Path, definitions: dict[tuple[str, str], str]) -> None:
+    """Change term definitions, by (vocabulary, code), in the files of ``codebook``."""
+    for (name, code), definition in definitions.items():
+        path = codebook / f"{name}.yaml"
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        next(term for term in data["terms"] if term["code"] == code)["definition"] = definition
+        path.write_text(yaml.safe_dump(data, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+
+def test_corrected_definitions_reach_an_existing_database(db: Db, tmp_path: Path) -> None:
+    # A definition corrected in codebook/*.yaml reaches a seeded database on the next run as a
+    # term revision; a definition that a person edited in the app is kept and reported as drift.
+    with db.session() as session:
+        index = TermIndex(session)
+        unknown = index.term("period", "unknown")
+        conflicting = index.term("derived_reason", "conflicting_dates")
+        session.rollback()
+        assert unknown is not None and conflicting is not None
+        apply_change(
+            session,
+            "vocabulary_term",
+            conflicting.id,
+            {"definition": "Edited by a person."},
+            ALICE,
+            expected_version=1,
+        )
+    codebook = tmp_path / "codebook"
+    shutil.copytree(db.settings.codebook_path, codebook)
+    rewrite_definitions(
+        codebook,
+        {
+            ("period", "unknown"): "Corrected in the file.",
+            ("derived_reason", "conflicting_dates"): "Also corrected in the file.",
+        },
+    )
+    database = open_db(db.root, make_settings(db.root, codebook, db.settings.seed_path))
+    try:
+        with database.session() as session:
+            report = run_seed(session, database.settings)
+            assert not report.errors, report.errors
+            assert (report.updated["vocabulary_term"], report.revisions) == (1, 1)
+            assert report.vocabularies_updated == 0
+            assert [(line.key, line.field, line.current, line.seed) for line in report.drift] == [
+                (
+                    "derived_reason:conflicting_dates",
+                    "definition",
+                    "Edited by a person.",
+                    "Also corrected in the file.",
+                )
+            ]
+            row = load(session, "vocabulary_term", unknown.id)
+            assert (row["definition"], row["version"]) == ("Corrected in the file.", 2)
+            assert row["field_meta"]["definition"]["src"] == "seed"
+            revision = revisions_of(session, unknown.id)[-1]
+            assert (revision.channel, revision.author, revision.note) == (
+                "seed",
+                "seed",
+                "Loaded from codebook/period.yaml",
+            )
+            edited = load(session, "vocabulary_term", conflicting.id)
+            assert (edited["definition"], edited["version"]) == ("Edited by a person.", 2)
+            again = run_seed(session, database.settings)
+            assert again.revisions == 0 and len(again.drift) == 1
+    finally:
+        database.engine.dispose()
+
+
 def test_invalid_entries_are_reported(db: Db, tmp_path: Path) -> None:
     database = seeded_db(db, tmp_path, [{**SEED_PROJECTS[0], "ministry_urls": ["ftp://x"]}])
     try:

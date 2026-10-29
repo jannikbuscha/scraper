@@ -136,6 +136,18 @@ def test_period_from_the_launch_interval(value: str, expected: tuple[str, str | 
     assert period_of(ev("evt_1", "launch", value)) == expected
 
 
+def test_imprecise_date_refers_to_the_launch_interval() -> None:
+    # The displayed launch (2011-08) lies after the founding day, but the earliest launch may
+    # be the one known only as 2011: the interval [2011-01-01, 2011-08-31] straddles the day.
+    values = compute(ev("evt_year", "launch", "2011"), ev("evt_month", "launch", "2011-08"))
+    assert (values.launch_value, values.launch_start, values.launch_end) == (
+        "2011-08",
+        "2011-01-01",
+        "2011-08-31",
+    )
+    assert (values.period, values.period_reason) == ("unknown", "imprecise_date")
+
+
 def test_period_without_launch() -> None:
     assert period_of(ev("evt_1", "first_archived", "2011-07-14")) == ("pre_ministry", None)
     assert period_of(ev("evt_1", "first_archived", "2011-07-15")) == (

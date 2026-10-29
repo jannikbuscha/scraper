@@ -30,8 +30,13 @@ def _is_forbidden_char(char: str) -> bool:
     if char.isspace():
         return True
     code_point = ord(char)
-    # C0 controls, DEL and C1 controls.
-    return code_point < 0x20 or 0x7F <= code_point <= 0x9F or unicodedata.category(char) == "Cc"
+    # C0 controls, DEL and C1 controls; unpaired surrogates (category Cs) are not text.
+    return (
+        code_point < 0x20
+        or 0x7F <= code_point <= 0x9F
+        or 0xD800 <= code_point <= 0xDFFF
+        or unicodedata.category(char) == "Cc"
+    )
 
 
 def _split(value: str) -> _Parts:
@@ -90,7 +95,9 @@ def normalize_url(value: str) -> str:
     if not value:
         raise UrlError("the URL is empty")
     if any(_is_forbidden_char(char) for char in value):
-        raise UrlError("URLs must not contain whitespace or control characters")
+        raise UrlError(
+            "URLs must not contain whitespace, control characters or unpaired surrogates"
+        )
     parts = _split(value)
     host = _encode_host(parts.host)
     netloc = host if parts.port is None else f"{host}:{parts.port}"

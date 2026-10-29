@@ -349,6 +349,65 @@ def test_document_rules(db: Db) -> None:
         assert collected.changed
 
 
+def test_screening_reason_belongs_to_excluded_documents(db: Db) -> None:
+    # CODEBOOK §2.8: excluded "with an exclusion reason"; the PRISMA-style counts per
+    # status and reason need both rules.
+    with db.session() as session:
+        for data, problem in (
+            ({"screening_status": "excluded"}, "is required when the document is excluded"),
+            (
+                {"screening_status": "included", "screening_reason": "reason_a"},
+                "is allowed only for excluded documents",
+            ),
+            ({"screening_reason": "reason_a"}, "is allowed only for excluded documents"),
+        ):
+            with pytest.raises(ValidationError) as caught:
+                apply_change(session, "document", None, {"title": "Example", **data}, ALICE)
+            assert details_of(caught) == {"screening_reason": [problem]}
+        document_id = apply_change(
+            session,
+            "document",
+            None,
+            {"title": "Example", "screening_status": "excluded", "screening_reason": "reason_a"},
+            ALICE,
+        ).entity_id
+        # Including it again needs the reason cleared in the same change.
+        with pytest.raises(ValidationError) as caught:
+            apply_change(
+                session,
+                "document",
+                document_id,
+                {"screening_status": "included"},
+                ALICE,
+                expected_version=1,
+            )
+        assert details_of(caught) == {
+            "screening_reason": ["is allowed only for excluded documents"]
+        }
+        with pytest.raises(ValidationError):
+            apply_change(
+                session,
+                "document",
+                document_id,
+                {"screening_reason": None},
+                ALICE,
+                expected_version=1,
+            )
+        apply_change(
+            session,
+            "document",
+            document_id,
+            {"screening_status": "included", "screening_reason": None},
+            ALICE,
+            expected_version=1,
+        )
+        # Other changes do not touch the screening fields and are not checked against them.
+        apply_change(
+            session, "document", document_id, {"title": "Renamed"}, ALICE, expected_version=2
+        )
+        assert fields_of(session, "document", document_id)["screening_status"] == "included"
+
+
 def test_participation_end_not_before_start(db: Db) -> None:
     with db.session() as session:
         project = create_project(session)

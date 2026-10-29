@@ -28,10 +28,10 @@ from mdt.domain.listquery import (
     parse_list_query,
     parse_scope,
 )
-from mdt.domain.records import Row, table_of
+from mdt.domain.records import table_of
 from mdt.domain.registry import VOCABULARY_TERM, EntityTypeSpec, FieldSpec, generic_types
 from mdt.domain.search import match_subquery
-from mdt.domain.serialize import generic_spec, load_rows, serialize_items, virtual_values
+from mdt.domain.serialize import generic_spec, serialize_items, virtual_values
 from mdt.domain.text import sortkey
 from mdt.domain.vocab import load_terms
 
@@ -97,17 +97,17 @@ def select_scope(spec: EntityTypeSpec, scope: Scope) -> Selection | None:
     return Selection(source, from_clause, tuple(conditions), rank)
 
 
-def iter_row_chunks(
+def iter_id_chunks(
     session: Session,
     selection: Selection,
     sort: Sequence[SortKey],
     chunk_size: int,
-) -> Iterator[list[Row]]:
-    """Every selected row in sort order, in chunks (used by exports). The ordered IDs
-    are read first, so no cursor stays open while a chunk is serialised."""
+) -> Iterator[list[str]]:
+    """The IDs of every selected row in sort order, in chunks (used by exports). All IDs
+    are read first, so no cursor stays open while a chunk is loaded and written."""
     ids = [str(entity_id) for entity_id in session.execute(selection.ids(sort)).scalars()]
     for start in range(0, len(ids), chunk_size):
-        yield load_rows(session, selection.source.spec, ids[start : start + chunk_size])
+        yield ids[start : start + chunk_size]
 
 
 # --------------------------------------------------------------------------------------

@@ -43,7 +43,7 @@ from sqlalchemy import (
 from mdt.db.models import Comment, Derived, DocumentLink, Project, Service, VocabularyTerm
 from mdt.domain.listquery import FieldFilter, SortKey
 from mdt.domain.records import table_of
-from mdt.domain.registry import ENTITY_TYPES, EntityTypeSpec, FieldSpec
+from mdt.domain.registry import ENTITY_TYPES, ROW_VIRTUALS, EntityTypeSpec, FieldSpec
 
 #: Link states that ``in:`` matches on document links (``confirmed:`` only confirmed).
 LINK_MATCH_STATES: Final = ("suggested", "confirmed")
@@ -51,16 +51,8 @@ LINK_MATCH_STATES: Final = ("suggested", "confirmed")
 DERIVED_UNKNOWN: Final = "unknown"
 #: Virtual reference fields used as filters only: the columns they match.
 VIRTUAL_REF_COLUMNS: Final = {"endpoint": ("from_id", "to_id")}
-#: Virtual fields that can be evaluated per row.
-VALUE_VIRTUALS: Final = frozenset(
-    {
-        "open_comments",
-        "comment_count",
-        "project_in_paper_scope",
-        "subject_in_paper_scope",
-        "linked_in_paper_scope",
-    }
-)
+#: Virtual fields that can be evaluated per row (the registry's ROW_VIRTUALS).
+VALUE_VIRTUALS: Final = ROW_VIRTUALS
 _DERIVED_VOCABS: Final = frozenset({"period", "war_trajectory"})
 
 Join = tuple[FromClause, ColumnElement[bool]]

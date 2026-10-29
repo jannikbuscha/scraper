@@ -53,7 +53,7 @@ All errors use one envelope:
 | 409 | `conflict` | the payload from DATA_MODEL §6.5 |
 | 409 | `entity_deleted` | `{deleted_at, deleted_by}` |
 | 409 | `invalid_state` | `{state}` (e.g. deleting a deleted row) |
-| 409 | `has_dependents` | `{"service": 12}` |
+| 409 | `has_dependents` | counts per kind of dependent: `{"service": 12}` (deleting a project or service without `cascade`), `{"field_verification": 1}` (deleting evidence that a field verification rests on; `cascade` does not apply, DATA_MODEL §6.4) |
 | 409 | `unique_violation` | `{field, existing: {id, label, deleted}}` |
 | 409 | `reference_deleted` | `{field, id, type, label}` |
 | 409 | `not_deletable` | — (vocabulary terms) |
@@ -63,11 +63,13 @@ All errors use one envelope:
 | 415 | `unsupported_media_type` | — |
 | 429 | `busy` | — (another export is running) |
 | 500 | `internal_error` | `{request_id}` |
+| 503 | `database_busy` | — (the database stayed locked by another writer for longer than the busy timeout of 10 s, e.g. during a long maintenance command, or no database connection became free; nothing was written and the request can be repeated; the response has `Retry-After: 5`) |
 | 503 | `frontend_not_built` | — (`GET`/`HEAD` on non-API paths when `FRONTEND_DIST` has no build, §6; the message points to `make build`) |
 
-- `debug` is always off. Handlers for `HTTPException`, `RequestValidationError`, `IntegrityError` and `Exception` produce the envelope. An HTTP error raised by the framework with a status that has no code above (a fallback, not expected in Phase 1) uses the code `http_error` with the standard reason phrase as message.
+- `debug` is always off. Handlers for `HTTPException`, `RequestValidationError`, `IntegrityError`, `OperationalError` (SQLite `BUSY`/`LOCKED` → `503 database_busy`, anything else → `500`), SQLAlchemy's pool `TimeoutError` (→ `503 database_busy`) and `Exception` produce the envelope. An HTTP error raised by the framework with a status that has no code above (a fallback, not expected in Phase 1) uses the code `http_error` with the standard reason phrase as message.
 - Messages never contain exception text, SQL, parameter values, file paths or stack traces. These go to the log together with the `request_id`.
 - **Validation details:** request-body errors are always `400` (never 422). Field paths are the registry field names for domain errors (e.g. `name_en`) and dotted paths for body errors (e.g. `items[0].id`); an unparsable JSON body is reported under `body`. Invalid query parameters that are not filters (`q`, `page`, `page_size`, `deleted`, `cols`, `format`, `limit`, `types`, `ids`, `status`, `since`, `until`, `channel`, `action`, the feed's `entity_type`, and the diff's `from`/`to`) give `400 validation_error` with `{param: [message]}`. The UI maps a path to a form field by its last dot-separated segment; other paths are shown as a general form error.
+- **Valid Unicode text:** every string and object key of a JSON body must be valid Unicode text. An unpaired UTF-16 surrogate (an escape such as `"\ud800"`, or raw surrogate bytes) is checked before anything else and gives `400 validation_error` with the dotted path of each such string (e.g. `data.name_en`, `items[0].id`); a bad object key is reported at the object that holds it (e.g. `set`), so no path repeats the invalid text.
 
 ### 1.3 Other conventions
 
@@ -83,7 +85,9 @@ These are in addition to the field limits of DATA_MODEL §1.3:
 - **Exports:**
   - at most `MAX_EXPORT_ROWS` = 200 000 rows (`400 export_too_large`);
   - one export at a time (`429 busy`);
-  - exports stream (CSV via a streaming response, XLSX written in write-only mode to a temporary file).
+  - exports stream (CSV via a streaming response, XLSX written in write-only mode to a temporary file);
+  - rows are read in chunks of 500, and only what the selected columns need is loaded: their table columns, document links, derived rows, the selected virtual counts and the labels of the selected references, never `field_meta` (so `cols=id` costs a fraction of the default columns). Measured on 20 000 documents: CSV with the default columns about 0.8 s, XLSX about 3 s;
+  - an XLSX file is complete before its first byte is sent (openpyxl writes the zip at the end), at roughly 1.5 s per 10 000 rows of the default document columns, so the largest XLSX exports take about half a minute; a reverse proxy in front of the app should allow that read timeout. CSV starts at once.
 
 ## 2. Entity types and item representation
 
@@ -122,7 +126,8 @@ An unknown type returns `404 not_found`. Comments have their own endpoints (§3.
 
 - **`fields`** holds every registry field that is neither derived nor virtual nor a system column, including system-set fields such as `canonical_url`. It never contains `seed_key`.
 - **System columns** (`created_at` … `version`) are top-level properties; as registry fields they can also be sorted, filtered and exported (DATA_MODEL §2.3).
-- **`derived`** is present for project and service. The `portfolio_entry_*` keys mirror the `launch_*` keys. A missing derived row gives the initial values (DATA_MODEL §8.1: period and war trajectory `unknown`, reason `no_date`) with `computed_at: null`.
+- **`derived`** is present for project and service. The `portfolio_entry_*` keys mirror the `launch_*` keys.
+  - **Launch interval vs. displayed launch** (DATA_MODEL §8.3): `launch_start` and `launch_end` are the **launch interval** over all launch candidates, [earliest start, earliest end]; `launch`, `launch_precision`, `launch_basis` and `launch_event_id` describe the **displayed candidate** (the one that ends first). With one candidate the interval is that candidate's own bounds; candidates of different precision can widen it, e.g. launch events `2022` and `2022-03` give `launch: "2022-03"` with the interval 2022-01-01 – 2022-03-31. The period, the trajectory and their `imprecise_date` reason, the `launch` filter and sort (§4) and the export's `derived_launch_start`/`derived_launch_end` (§5) all use the interval; the UI shows it next to the displayed value whenever the two differ. A missing derived row gives the initial values (DATA_MODEL §8.1: period and war trajectory `unknown`, reason `no_date`) with `computed_at: null`.
 - **Document `links`:** `origin` is provenance and read-only for clients; `matched_aliases`, `match_count` and `snippet` are read-only too (DATA_MODEL §1.2).
 - **`virtual`:**
   - `open_comments` and `comment_count` for every type;
@@ -179,7 +184,7 @@ An unknown type returns `404 not_found`. Comments have their own endpoints (§3.
       "label": "Project", "label_plural": "Projects", "prefix": "prj", "table_view": true,
       "default_sort": "paper_cluster,name_en",
       "constraints": [{"one_of_required": ["name_en", "name_uk"]}],
-      "fields": [{"name": "slug", "label": "Slug", "type": "slug", "vocabulary": null, "ref_types": null, "group": "basics", "required": true, "editable": true, "create_only": false, "system": false, "tracked": true, "derived": false, "virtual": false, "filter": "text", "sortable": true, "in_list": true, "in_create": true, "default": null, "bulk_editable": false, "help": "…"}],
+      "fields": [{"name": "slug", "label": "Slug", "type": "slug", "vocabulary": null, "ref_types": null, "group": "basics", "required": true, "editable": true, "create_only": false, "system": false, "tracked": true, "derived": false, "virtual": false, "filter": "text", "sortable": true, "in_list": true, "in_create": true, "default": null, "bulk_editable": false, "exportable": true, "help": "…"}],
       "quick_filters": [
         {"key": "unverified", "label": "Unverified", "kind": "toggle", "query": "f.verification_status=in:unverified"},
         {"key": "open_comments", "label": "Open comments", "kind": "toggle", "query": "f.open_comments=range:1.."},
@@ -226,6 +231,8 @@ A toggle is active only if the URL contains exactly its key/value pair. Activati
 
 **`bulk_editable`** is true for editable, non-create-only fields of type `vocab`, `vocab_list` and `bool`, including `verification_status`.
 
+**`exportable`** is true for fields that have a value per list row: every field except the virtual fields without one (the detail-only document `text`, which list responses omit, and the filter-only relation `endpoint`). Exactly these fields are accepted in `cols` (§5); the UI offers only them as table columns.
+
 ### 3.2 Generic entity endpoints
 
 | Method and path | Body | Response |
@@ -256,9 +263,10 @@ Notes:
 - **Strict bodies:** a body accepts only the keys listed in the tables; an unknown top-level key → `400 validation_error` (e.g. resolve/reopen take only `expected_version`). `expected_version` and `version` are JSON integers in [0, 2^63−1]; `cascade` and `dry_run` are JSON booleans. Integers in paths and queries are bounded too (`version` ≥ 0, `revision_id` ≥ 1, diff `from`/`to` ≥ 0), else 400. In a restore, `fields` may be omitted (all restorable fields).
 - **Optimistic locking:** `expected_version` is required for `PATCH`, `delete`, `undelete`, `verify-field`, `restore` and per bulk item. A mismatch → `409 conflict` with the `action` set. Writes to a deleted row (`PATCH`, `verify-field`, `restore`, comment edits, resolve and reopen) → `409 entity_deleted`, reported before a version mismatch; deleting a deleted row or undeleting a live one → `409 invalid_state`.
 - **Bulk:**
-  - the whole request → 400 if `items` is empty or has more than 500 entries, an item lacks a string `id` or an integer `expected_version`, an ID is duplicated, all of `set`/`add`/`remove` are empty, a field is not `bulk_editable`, appears in more than one of them, or `add`/`remove` targets a non-list field;
+  - the whole request → 400 if `items` is empty or has more than 500 entries, an item lacks a string `id` or an integer `expected_version` in [0, 2^63−1] (like every other body), an ID is duplicated, all of `set`/`add`/`remove` are empty, a field is not `bulk_editable`, appears in more than one of them, or `add`/`remove` targets a non-list field;
   - `conflict` results carry `current_version` and `current_values` (the targeted fields); `entity_deleted` results carry `current_version`; `error` results carry the §1.2 error object (e.g. `not_found` for an unknown ID);
   - changing `in_paper_scope` requires `scope_note` in `set` (accepted there although `scope_note` is not `bulk_editable`);
+  - setting `screening_status` to `excluded` requires `screening_reason` in the same `set` (DATA_MODEL §7, screening);
   - setting `verification_status` to `verified`/`disputed` requires `note`.
 - **`note`** is optional (≤ 2 000 characters) unless a rule above requires it, and is stored on the revision.
 
@@ -284,7 +292,8 @@ Notes:
 `Comment` = `{id, subject_id, subject_type, subject_label, field, parent_id, body_md, body_html, status, resolved_by, resolved_at, created_at, created_by, updated_at, updated_by, version, edited, deleted_at, deleted_by}`. The rules (allowed subjects, threads, deletion, `edited`) are those of DATA_MODEL §6.6.
 
 **`body_html`** is computed on read; it is never stored in the row or in snapshots and never accepted from clients.
-- **Renderer:** markdown-it-py `MarkdownIt('commonmark', {'html': False, 'linkify': True}).enable(['linkify', 'table', 'strikethrough'])`. The dependency is `markdown-it-py[linkify]`.
+- **Renderer:** markdown-it-py `MarkdownIt('commonmark', {'html': False, 'linkify': True}).enable(['linkify', 'table', 'strikethrough'])`. The dependency is `markdown-it-py[linkify]`. The inline `linkify` rule is replaced by a copy that looks for the scheme before `://` in the last 64 characters of the pending text instead of all of it: the output is identical (linkify-it only accepts schemes of a few characters), but the cost is linear; upstream it is quadratic, and a crafted 10 000-character body took 0.5 s per render.
+- **Render cache:** the rendered HTML depends only on `body_md`, so the server keeps it in an in-memory LRU cache keyed by `body_md` and bounded to 8 million characters (keys and values); every comment is rendered once per process, however often threads, the feed or the trash are read. A changed sanitiser applies after a restart. Crafted bodies that stay within `MAX_COMMENT_CHARS` still cost markdown-it's own worst case (about 0.15 s for 5 000 unclosed `![`), once.
 - **Sanitiser:** `nh3.clean(html, …)` with:
   - `tags = {p, br, strong, em, code, pre, blockquote, ul, ol, li, a, h1, h2, h3, h4, hr, table, thead, tbody, tr, th, td, s, del}`;
   - `attributes = {a: {href}, th: {align, colspan, rowspan}, td: {align, colspan, rowspan}, ol: {start}, "*": set()}`; the empty `"*"` entry is required, otherwise nh3 keeps its default generic attributes (`title`, `lang`) on every tag;
@@ -302,7 +311,7 @@ Notes:
 
 Notes on `GET /api/revisions`:
 - **Order:** newest first (`ORDER BY id DESC`).
-- **`since`/`until`:** inclusive; each accepts a date (a UTC day: from its first or to its last microsecond) or an ISO 8601 timestamp with an explicit offset (`Z` or `±HH:MM`; seconds and up to 9 fractional digits optional; naive timestamps → `400 validation_error`). The UI sends local-day boundaries as timestamps such as `2026-09-30T21:00:00.000000Z`.
+- **`since`/`until`:** inclusive; each accepts a date (a UTC day: from its first or to its last microsecond) or an ISO 8601 timestamp with an explicit offset (`Z` or `±HH:MM`; seconds and up to 9 fractional digits optional; naive timestamps and instants outside the years 1–9999 in UTC → `400 validation_error`), normalised like a `datetime` value (DATA_MODEL §1.2). The UI sends local-day boundaries as timestamps such as `2026-09-30T21:00:00.000000Z`.
 - **Lists:** `author`, `entity_type`, `channel` and `action` accept comma-separated lists; `entity_type`, `channel` and `action` take only known values (DATA_MODEL §4). `entity_id` and `batch_id` match exactly.
 - **Scope:** comment, vocabulary-term and saved-view revisions are included.
 - **`context`:** comment → `{subject_id, subject_type, field, parent_id}` (`parent_id` is the root of a reply, so links can open the thread); vocabulary term → `{vocabulary}`; saved view → `{entity_type}`; other types `null`.
@@ -326,14 +335,14 @@ These parameters apply to list, facets and export endpoints. The frontend keeps 
 | `multiselect` (vocab_list) | `any:<a,b>`; `all:<a,b>`; `none:<a,b>` (**includes** empty lists); `empty:true\|false` (empty = `[]`) |
 | `bool` | `eq:true\|false` |
 | `date_range` | `overlaps:<from>..<to>` (the interval [start, end] intersects [from, to]); `within:<from>..<to>` (start ≥ from and end ≤ to); `empty:true\|false`. Either bound may be omitted; bounds are `YYYY-MM-DD`. A `date` field is the interval [d, d]; a `datetime` field uses its UTC calendar date. |
-| `number_range` | `range:<min>..<max>` (either bound optional), `eq:<n>` |
+| `number_range` | `range:<min>..<max>` (either bound optional), `eq:<n>`. Bounds of `number` fields are finite numbers (compared as REAL). Integer bounds of `int` fields and virtual counts must fit the signed 64-bit range (decimal bounds such as `1.5` are allowed); anything larger is a malformed value. |
 | `ref` | `in:<id,…>`, `empty:true\|false`. For document `links`: `in:` matches links in state `suggested` or `confirmed`, `confirmed:` only confirmed ones. Relation `endpoint`: `in:` matches `from_id` or `to_id`. |
 
 **Empty** means NULL for scalars and `[]` for lists.
 
-**Derived, virtual and system fields** are filterable like stored fields; a missing derived row counts as `unknown`. These are `launch`, `existed_by`, `period`, `war_trajectory`, `portfolio_entry`, `open_comments`, `comment_count`, the `*_in_paper_scope` fields, `created_at`, `updated_at`, `deleted_at`, `created_by`, `updated_by` and `deleted_by`.
+**Derived, virtual and system fields** are filterable like stored fields; a missing derived row counts as `unknown`. A derived date filter uses the derived row's `_start`/`_end`; for `launch` that is the launch interval over all candidates (§2), not the bounds of the displayed candidate. These are `launch`, `existed_by`, `period`, `war_trajectory`, `portfolio_entry`, `open_comments`, `comment_count`, the `*_in_paper_scope` fields, `created_at`, `updated_at`, `deleted_at`, `created_by`, `updated_by` and `deleted_by`.
 
-A malformed filter, a repeated field, an unknown field, a field without `filter`, an operator not valid for the field, a malformed value (e.g. a date that is not `YYYY-MM-DD`, a non-number, a flag other than `true`/`false`), a malformed range (start after end, min > max), more than 200 list values or `~empty` with `all` → `400 bad_filter`. Invalid values of the other parameters (§4.3) → `400 validation_error` (§1.2).
+A malformed filter, a repeated field, an unknown field, a field without `filter`, an operator not valid for the field, a malformed value (e.g. a date that is not `YYYY-MM-DD`, a non-number, a number out of range, a flag other than `true`/`false`), a malformed range (start after end, min > max), more than 200 list values or `~empty` with `all` → `400 bad_filter`. Invalid values of the other parameters (§4.3) → `400 validation_error` (§1.2).
 
 ### 4.2 Sorting
 
@@ -354,16 +363,16 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 | `vocab` | the term's `sort_order`, then `code` (the same order as in facets) |
 | `vocab_list` | the key of the **first** element (the main value), like `vocab` |
 | `ref` | the target's label computed in SQL: `mdt_sortkey` of name_en → name_uk → slug → id for named types, the title for documents, the name for saved views, `vocabulary:code` for terms; polymorphic refs use one LEFT JOIN per allowed type. Targets whose labels are composed from other records (event, participation, relation, indicator, evidence; only `evidence.subject_id` can point at them) sort by ID. |
-| `partial_date` and derived dates | ascending (`_start`, `_end`); descending (`_start` DESC, `_end` DESC) |
+| `partial_date` and derived dates | ascending (`_start`, `_end`); descending (`_start` DESC, `_end` DESC); for the derived `launch` these are the launch interval (§2), so a project whose candidates `2020` and `2020-06` show `2020-06` sorts before one that shows `2020-02` |
 | derived vocab (`period`, `war_trajectory`) | as `vocab`; a missing row counts as `unknown` |
 | virtual counts | numeric |
 
 ### 4.3 Other parameters
 
-- **`q`:** full-text search, combined with filters by AND. For documents it matches the metadata and the full text (DATA_MODEL §10); for all other types it matches the entity text. Deleted entities stay searchable (with `deleted=only|include`). A blank `q` is ignored; a `q` without any searchable token matches nothing; more than 200 characters or 16 search terms → `400 validation_error`. Search snippets of documents matched only through their metadata come from `fts_entity`; snippets show the normalised index text (e.g. unified apostrophes).
+- **`q`:** full-text search, combined with filters by AND. For documents it matches the metadata and the full text (DATA_MODEL §10); for all other types it matches the entity text. Deleted entities stay searchable (with `deleted=only|include`). Control characters in `q` (e.g. `%00`) separate tokens like spaces (DATA_MODEL §10). A blank `q` is ignored; a `q` without any searchable token matches nothing; more than 200 characters or 16 search terms → `400 validation_error`. Search snippets of documents matched only through their metadata come from `fts_entity`; snippets show the normalised index text (e.g. unified apostrophes).
 - **`page`** (1–1 000 000, default 1), **`page_size`** (1–500, default 50).
 - **`deleted`:** `exclude` (default) | `only` | `include`.
-- **`cols`:** used by export only; the UI also keeps it in the URL.
+- **`cols`:** used by export only; the UI also keeps its column choice in the URL (and builds the export's `cols` from the visible columns, §5).
 - Other unknown parameters are ignored.
 
 ## 5. Exports
@@ -371,10 +380,10 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 `GET /api/entities/{type}/export?format=csv|xlsx&cols=…&<filters>&sort=…` exports all rows matching the filters (no paging, limits §1.4), in the requested sort order.
 
 **Columns:**
-- **Selection:** `cols` takes registry field names (and `id`), exported in the given order; the default is `id` + the type's `in_list` fields. Headers are the registry names. Unknown names, the document `text` and the relation `endpoint` are not exportable (`400 validation_error`).
+- **Selection:** `cols` takes registry field names (and `id`), exported in the given order; the default is `id` + the type's `in_list` fields. Headers are the registry names. Unknown names and fields that are not `exportable` in meta (the document `text`, the relation `endpoint`) are refused (`400 validation_error`). The UI always sends `cols` = `id` followed by the table's visible columns, so an export of the current view keeps the record ID.
 - **Vocab fields:** the code plus `<field>_label` (the term's `label_en`, else the code); `vocab_list` fields: the joined codes plus the joined labels.
 - **`partial_date` fields:** `<name>` (canonical), `<name>_start`, `<name>_end`, `<name>_precision`.
-- **Derived fields:** prefixed `derived_`; derived partial dates and vocabularies get the same extra columns as stored ones (e.g. `derived_launch_start`, `derived_period_label`), plus `derived_<name>_basis`, `derived_<name>_reason` and `derived_<name>_event_id` where they exist; the portfolio entry has `derived_portfolio_entry_participation_id` instead of an event ID.
+- **Derived fields:** prefixed `derived_`; derived partial dates and vocabularies get the same extra columns as stored ones (e.g. `derived_launch_start`, `derived_period_label`), plus `derived_<name>_basis`, `derived_<name>_reason` and `derived_<name>_event_id` where they exist; the portfolio entry has `derived_portfolio_entry_participation_id` instead of an event ID. For `launch`, `derived_launch` and `derived_launch_precision` are the displayed candidate, while `derived_launch_start` and `derived_launch_end` are the launch interval over all candidates (§2), which can be wider than the displayed value's own bounds.
 - **Virtual fields:** their values (`open_comments`, `comment_count`, the `*_in_paper_scope` booleans). **System columns:** as stored (timestamps as text).
 - **`ref` fields:** the ID plus `<field>_label`.
 - **Document `links`:** compact JSON `[{subject_id, origin, state}]` (match details omitted) plus `links_label` = `<label> (<state>)` joined with `"; "`.
@@ -409,8 +418,9 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 
 **App and routing:**
 - **App options:** `FastAPI(debug=False, docs_url=None, redoc_url=None, openapi_url="/api/openapi.json", redirect_slashes=False)`, so the app never redirects (`/api/entities/project/` is a 404); FastAPI's telemetry integration is switched off. API routes come first.
+- **OpenAPI document** (`GET /api/openapi.json`, subject to the request guard like every `/api` path): generated from the route signatures, then aligned with §1.1 and §1.2: no `422`/`HTTPValidationError` anywhere; every operation lists `400`, `500` and (except `/api/health`) `403` and `503` with the shared `ErrorEnvelope` schema, plus `404` on paths with parameters, `409`/`413`/`415` on writes and `429` on exports; the `X-Requested-With` header (all but `/api/health`) and `X-Author` (writes) are declared. **This document (docs/API.md) is authoritative**: the query parameters of the list, facet, export, lookup and feed endpoints (§4) are read from the raw query string and are not listed in the OpenAPI document.
 - **Middleware order, outermost first:** the security-header middleware, then the request guard (§1.1), then FastAPI's own stack. Both sit outside Starlette's error middleware, so even 500 responses carry the security headers.
-- **`/assets/*`:** served by Starlette `StaticFiles(directory=FRONTEND_DIST/"assets", follow_symlink=False)` with `Cache-Control: public, max-age=31536000, immutable`; a missing or unreadable asset is 404, never `index.html`.
+- **`/assets/*`:** served by Starlette `StaticFiles(directory=FRONTEND_DIST/"assets", follow_symlink=False)` with `Cache-Control: public, max-age=31536000, immutable`; a missing or unreadable asset is 404, never `index.html`. `Range` headers are ignored (RFC 9110 allows it): assets are small, content-hashed files that are always sent whole with `200` and `Accept-Ranges: none`, so no malformed or unsatisfiable range produces a plain-text 400/416 outside the error envelope. Conditional requests (`If-None-Match`, `If-Modified-Since`) still get `304`.
 - **Root files:** the regular files at the root of `FRONTEND_DIST` (e.g. `favicon.svg`) and `index.html` are read once at startup, without symlinks (a symlinked root file or `index.html` is ignored) or subdirectories, and served by exact name. A rebuilt frontend is served after a restart.
 - **SPA fallback:** every other `GET`/`HEAD` outside `/api/` returns the bytes of `index.html` with `Cache-Control: no-cache`. **The request path is never joined to a filesystem path.**
 - **Other methods** on non-API paths → 405. Unknown `/api` paths → 404. `HEAD` requests to API routes get 405 once they pass the guard (FastAPI adds no `HEAD` routes); the UI never sends them.

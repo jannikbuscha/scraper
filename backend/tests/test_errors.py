@@ -43,6 +43,7 @@ API_CODES = {
     "unsupported_media_type": 415,
     "busy": 429,
     "internal_error": 500,
+    "database_busy": 503,
 }
 
 

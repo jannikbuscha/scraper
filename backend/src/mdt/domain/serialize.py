@@ -21,7 +21,13 @@ from mdt.domain.derived import INITIAL
 from mdt.domain.errors import NotFoundError
 from mdt.domain.fieldsql import Source
 from mdt.domain.labels import RefInfo, ref_infos, refs_payload
-from mdt.domain.records import Row, field_meta_of, item_field_values, load_links, table_of
+from mdt.domain.records import (
+    Row,
+    field_meta_for_reading,
+    item_field_values,
+    load_links,
+    table_of,
+)
 from mdt.domain.registry import COMMENT, ENTITY_TYPES, EntityTypeSpec, type_of_id
 from mdt.domain.search import document_snippets
 
@@ -111,12 +117,18 @@ def derived_rows(session: Session, ids: Sequence[str]) -> dict[str, dict[str, An
 
 
 def virtual_values(
-    session: Session, spec: EntityTypeSpec, ids: Sequence[str]
+    session: Session,
+    spec: EntityTypeSpec,
+    ids: Sequence[str],
+    names: Iterable[str] | None = None,
 ) -> dict[str, dict[str, Any]]:
-    """Every per-row virtual field of the given entities, evaluated with the same
-    expressions that filters and sorting use (one query per 500 IDs)."""
+    """Every per-row virtual field of the given entities (or only ``names``), evaluated
+    with the same expressions that filters and sorting use (one query per 500 IDs)."""
     source = Source(spec)
     columns = source.virtual_columns()
+    if names is not None:
+        wanted = set(names)
+        columns = [(name, expr) for name, expr in columns if name in wanted]
     result: dict[str, dict[str, Any]] = {entity_id: {} for entity_id in ids}
     if not columns:
         return result
@@ -239,7 +251,7 @@ def serialize_items(
             if spec.name == "document":
                 fields["text"] = document_text(session, row["text_hash"])
         item["fields"] = fields
-        item["field_meta"] = field_meta_of(spec, row)
+        item["field_meta"] = field_meta_for_reading(spec, row)
         if spec.has_derived:
             item["derived"] = derived_payload(derived_row)
         item["virtual"] = values

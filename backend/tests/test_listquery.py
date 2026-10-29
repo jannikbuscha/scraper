@@ -275,6 +275,45 @@ def test_malformed_numbers(raw: str) -> None:
         flt("indicator", "value", raw)
 
 
+def test_number_fields_take_any_finite_bound_as_a_float() -> None:
+    # REAL column: an integer beyond 64 bits is compared as a float, never bound as int.
+    parsed = flt("indicator", "value", "range:..1" + "0" * 30)
+    assert parsed.number_max == 1e30 and isinstance(parsed.number_max, float)
+    for raw in ("eq:1e999", "eq:" + "9" * 5000):  # beyond the float range: infinite
+        with pytest.raises(BadFilterError):
+            flt("indicator", "value", raw)
+
+
+@pytest.mark.parametrize(
+    ("field", "raw", "expected"),
+    [
+        ("open_comments", "eq:9223372036854775807", (2**63 - 1, 2**63 - 1)),
+        ("open_comments", "range:-9223372036854775808..", (-(2**63), None)),
+        ("open_comments", "range:..000000000000000000000000000001", (None, 1)),
+        ("comment_count", "range:1.5..1e30", (1.5, 1e30)),
+    ],
+)
+def test_integer_field_bounds_within_64_bits(
+    field: str, raw: str, expected: tuple[Any, Any]
+) -> None:
+    parsed = flt("project", field, raw)
+    assert (parsed.number_min, parsed.number_max) == expected
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "eq:9223372036854775808",
+        "range:-9223372036854775809..",
+        "range:..99999999999999999999",
+        "eq:" + "9" * 5000,  # more digits than int() converts
+    ],
+)
+def test_integer_field_bounds_beyond_64_bits_are_bad_filters(raw: str) -> None:
+    with pytest.raises(BadFilterError):
+        flt("project", "open_comments", raw)
+
+
 # --------------------------------------------------------------------------------------
 # Sorting
 # --------------------------------------------------------------------------------------

@@ -151,5 +151,37 @@ def test_timestamp_input_needs_a_zone_and_a_real_time(value: str) -> None:
         clock.normalize_timestamp_input(value)
 
 
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("0999-06-01T00:00:00Z", "0999-06-01T00:00:00.000000Z"),
+        ("0001-01-01T00:00:00Z", "0001-01-01T00:00:00.000000Z"),
+        ("0100-06-01T12:00:00+00:00", "0100-06-01T12:00:00.000000Z"),
+        ("1000-01-01T00:10:00+00:30", "0999-12-31T23:40:00.000000Z"),
+        ("0202-06-01T10:00:00+03:00", "0202-06-01T07:00:00.000000Z"),
+    ],
+)
+def test_timestamps_before_the_year_1000_keep_four_year_digits(value: str, expected: str) -> None:
+    # strftime("%Y") writes "999" on glibc; the storage format needs "0999".
+    result = clock.normalize_timestamp_input(value)
+    assert result == expected
+    assert clock.is_timestamp(result)
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-01:00", "0000-01-01T00:00:00Z"],
+)
+def test_timestamps_outside_the_datetime_range_are_invalid(value: str) -> None:
+    with pytest.raises(ValueError):
+        clock.normalize_timestamp_input(value)
+
+
+def test_format_timestamp_pads_early_years() -> None:
+    assert clock.format_timestamp(datetime(999, 1, 2, 3, 4, 5, 6, tzinfo=UTC)) == (
+        "0999-01-02T03:04:05.000006Z"
+    )
+
+
 def test_timestamp_date_is_the_utc_calendar_date() -> None:
     assert clock.timestamp_date("2026-10-28T23:59:59.999999Z") == date(2026, 10, 28)

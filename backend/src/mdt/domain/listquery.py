@@ -12,6 +12,7 @@ repeated ``f.<field>`` parameter is detected.
 
 from __future__ import annotations
 
+import math
 import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -52,6 +53,8 @@ _EMPTY_TOKEN_OPERATORS: Final = frozenset({"in", "nin", "any", "none", "confirme
 _NUMBER_RE = re.compile(r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
 _INT_RE = re.compile(r"^[+-]?[0-9]+$")
 _PAGE_RE = re.compile(r"^[0-9]{1,9}$")
+#: Digits of the largest signed 64-bit integer (9 223 372 036 854 775 807).
+_MAX_INT_DIGITS: Final = 19
 
 
 def param_pairs(params: QueryParams) -> list[tuple[str, str]]:
@@ -223,12 +226,24 @@ def _date_bound(spec: FieldSpec, raw: str) -> date | None:
 
 
 def _number(spec: FieldSpec, raw: str) -> int | float:
+    """A number bound of a ``number_range`` filter.
+
+    ``number`` fields are REAL columns: every bound becomes a finite float. Integer
+    fields (stored ``int`` fields and the virtual counts) take integers within SQLite's
+    signed 64-bit range; the digits are counted before ``int()`` runs, so a huge value
+    is refused without converting it. Decimal bounds on integer fields stay floats.
+    """
     if not _NUMBER_RE.fullmatch(raw):
         raise _bad(spec, "the value must be a number")
-    if _INT_RE.fullmatch(raw):
-        return int(raw)
+    if spec.type != "number" and _INT_RE.fullmatch(raw):
+        if len(raw.lstrip("+-").lstrip("0")) > _MAX_INT_DIGITS:
+            raise _bad(spec, "the value is out of range")
+        integer = int(raw)
+        if not -(2**63) <= integer < 2**63:
+            raise _bad(spec, "the value is out of range")
+        return integer
     value = float(raw)
-    if value in (float("inf"), float("-inf")):
+    if not math.isfinite(value):
         raise _bad(spec, "the value must be a finite number")
     return value
 

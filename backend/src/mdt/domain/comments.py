@@ -2,16 +2,21 @@
 
 Comments go through the same write path as entities (``entity_type = comment``); every
 change creates a revision. ``body_html`` is rendered on read by :func:`render_markdown`
-and never stored.
+and never stored; rendered bodies are kept in a bounded in-memory cache, so a comment is
+rendered once per process however often it is read.
 """
 
 from __future__ import annotations
 
+import re
+import threading
+from collections import OrderedDict
 from collections.abc import Iterable, Mapping
-from typing import Any
+from typing import Any, Final
 
 import nh3
 from markdown_it import MarkdownIt
+from markdown_it.rules_inline import StateInline
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -38,9 +43,70 @@ from mdt.domain.writes import (
 # Markdown rendering (API §3.3)
 # --------------------------------------------------------------------------------------
 
-_MARKDOWN = MarkdownIt("commonmark", {"html": False, "linkify": True}).enable(
-    ["linkify", "table", "strikethrough"]
-)
+#: The scheme before ``://`` (markdown-it-py's ``SCHEME_RE``).
+_SCHEME_RE: Final = re.compile(r"(?:^|[^a-z0-9.+-])([a-z][a-z0-9.+-]*)$", re.IGNORECASE)
+#: How much of the pending text is searched for that scheme. linkify-it only accepts
+#: the schemes ``http:``, ``https:``, ``ftp:``, ``mailto:`` and ``//`` right at the
+#: start of the text it is given, so a longer run of scheme characters never matches
+#: and searching a bounded tail finds exactly what searching the whole text finds.
+_SCHEME_TAIL: Final = 64
+
+
+def _linkify_inline(state: StateInline, silent: bool) -> bool:
+    """markdown-it-py's inline ``linkify`` rule (``rules_inline/linkify.py``, MIT
+    licence) with one change: the scheme is looked for in the last
+    :data:`_SCHEME_TAIL` characters of the pending text instead of in all of it.
+
+    Upstream runs ``SCHEME_RE.search(state.pending)`` before every ``://``; the regex is
+    anchored at the end, but ``search`` still tries every start position, and the
+    pending text grows with the body. That is quadratic: a comment of 10 000 characters
+    of ``://`` took half a second to render, on every read. The output is identical
+    (tests compare it with the upstream rule)."""
+    if not state.md.options.linkify or state.linkLevel > 0:
+        return False
+    if not state.md.linkify:
+        raise ModuleNotFoundError("Linkify enabled but not installed.")
+    pos = state.pos
+    if (
+        pos + 3 > state.posMax
+        or state.src[pos] != ":"
+        or state.src[pos + 1] != "/"
+        or state.src[pos + 2] != "/"
+    ):
+        return False
+    if not (match := _SCHEME_RE.search(state.pending[-_SCHEME_TAIL:])):
+        return False
+    proto = match.group(1)
+    if not (link := state.md.linkify.match_at_start(state.src[pos - len(proto) :])):
+        return False
+    url: str = link.url.rstrip("*")  # a trailing '*' belongs to emphasis
+    full_url = state.md.normalizeLink(url)
+    if not state.md.validateLink(full_url):
+        return False
+    if not silent:
+        state.pending = state.pending[: -len(proto)]
+        token = state.push("link_open", "a", 1)
+        token.attrs = {"href": full_url}
+        token.markup = "linkify"
+        token.info = "auto"
+        token = state.push("text", "", 0)
+        token.content = state.md.normalizeLinkText(url)
+        token = state.push("link_close", "a", -1)
+        token.markup = "linkify"
+        token.info = "auto"
+    state.pos += len(url) - len(proto)
+    return True
+
+
+def _markdown() -> MarkdownIt:
+    md = MarkdownIt("commonmark", {"html": False, "linkify": True}).enable(
+        ["linkify", "table", "strikethrough"]
+    )
+    md.inline.ruler.at("linkify", _linkify_inline)
+    return md
+
+
+_MARKDOWN = _markdown()
 ALLOWED_TAGS = frozenset(
     {
         "p", "br", "strong", "em", "code", "pre", "blockquote", "ul", "ol", "li", "a",
@@ -64,8 +130,77 @@ def _attribute_filter(tag: str, attribute: str, value: str) -> str | None:
     return value
 
 
+class RenderCache:
+    """A thread-safe LRU cache of rendered bodies, bounded by the total number of
+    characters of its keys and values (not by entries), so large crafted bodies cannot
+    make it grow beyond the bound. Entries larger than the bound are not cached."""
+
+    def __init__(self, max_chars: int) -> None:
+        self.max_chars = max_chars
+        self._items: OrderedDict[str, str] = OrderedDict()
+        self._chars = 0
+        self._lock = threading.Lock()
+
+    @property
+    def chars(self) -> int:
+        """Characters held (keys and values)."""
+        return self._chars
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def get(self, key: str) -> str | None:
+        """The cached value (marked as recently used), or None."""
+        with self._lock:
+            value = self._items.get(key)
+            if value is not None:
+                self._items.move_to_end(key)
+            return value
+
+    def put(self, key: str, value: str) -> None:
+        """Cache ``value``; the least recently used entries make room."""
+        size = len(key) + len(value)
+        if size > self.max_chars:
+            return
+        with self._lock:
+            if key in self._items:
+                self._items.move_to_end(key)
+                return
+            self._items[key] = value
+            self._chars += size
+            while self._chars > self.max_chars:
+                old_key, old_value = self._items.popitem(last=False)
+                self._chars -= len(old_key) + len(old_value)
+
+    def clear(self) -> None:
+        """Forget everything."""
+        with self._lock:
+            self._items.clear()
+            self._chars = 0
+
+
+#: Rendered bodies by ``body_md``: 8 million characters, a few thousand typical
+#: comments, at most about 32 MB.
+RENDER_CACHE_CHARS: Final = 8_000_000
+_RENDERED = RenderCache(RENDER_CACHE_CHARS)
+
+
 def render_markdown(body_md: str) -> str:
-    """Render a comment body to sanitised HTML (markdown-it-py, then nh3).
+    """Render a comment body to sanitised HTML, computed on read (API §3.3).
+
+    The result depends only on ``body_md`` (and the renderer of this process), so it is
+    cached in memory: reading a thread renders each comment once per process instead of
+    on every request. Nothing is stored; a changed sanitiser applies after a restart.
+    """
+    cached = _RENDERED.get(body_md)
+    if cached is None:
+        cached = _render(body_md)
+        _RENDERED.put(body_md, cached)
+    return cached
+
+
+def _render(body_md: str) -> str:
+    """markdown-it-py, then nh3.
 
     ``"*": set()`` turns off nh3's default generic attributes (``title``, ``lang``), so
     only the attributes of :data:`ALLOWED_ATTRIBUTES` survive.

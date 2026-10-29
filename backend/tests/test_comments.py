@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import re
+import time
 from html.parser import HTMLParser
 
 import pytest
+from markdown_it import MarkdownIt
 
+from mdt.db.session import read_transaction
+from mdt.domain import comments
 from mdt.domain.comments import (
     ALLOWED_ATTRIBUTES,
     ALLOWED_TAGS,
@@ -21,7 +25,10 @@ from mdt.domain.comments import (
     undelete_comment,
 )
 from mdt.domain.errors import ConflictError, EntityDeletedError, ValidationError
+from mdt.domain.feeds import comments_listing
+from mdt.domain.registry import COMMENT
 from mdt.domain.revisions import apply_change, soft_delete
+from mdt.domain.serialize import load_rows, serialize_comments
 from tests.conftest import Db
 from tests.helpers import (
     ALICE,
@@ -334,3 +341,93 @@ def test_only_allowed_attributes_survive() -> None:
     assert 'align="center"' in html or "text-align" not in html
     assert '<ol start="3">' in html
     assert "class=" not in html and "id=" not in html
+
+
+# --------------------------------------------------------------------------------------
+# Rendering cost (crafted bodies) and the render cache
+# --------------------------------------------------------------------------------------
+
+
+def _upstream_markdown() -> MarkdownIt:
+    """The renderer of API §3.3 with markdown-it-py's own inline linkify rule."""
+    return MarkdownIt("commonmark", {"html": False, "linkify": True}).enable(
+        ["linkify", "table", "strikethrough"]
+    )
+
+
+def _timed_render(body: str) -> float:
+    start = time.perf_counter()
+    comments._render(body)  # uncached
+    return time.perf_counter() - start
+
+
+@pytest.mark.parametrize(
+    ("body", "budget"),
+    [
+        # upstream linkify searched the whole pending text before every "://": 0.5 s
+        (("://" * 3334)[:10000], 0.15),
+        (("<http://" * 1250)[:10000], 0.15),
+        (("a://" * 2500)[:10000], 0.15),
+        ("x" * 9000 + "http://example.org " * 52, 0.15),
+        # unclosed brackets are quadratic in markdown-it itself (about 0.15 s locally);
+        # the budget only guards against anything worse
+        ("![" * 5000, 1.0),
+    ],
+)
+def test_crafted_comment_bodies_render_in_bounded_time(body: str, budget: float) -> None:
+    assert len(body) <= 10_000
+    assert min(_timed_render(body) for _ in range(2)) < budget
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        "see http://example.org and https://a.example/b?c=d#e, ftp://f.example/g",
+        "mailto://x Mailto:a@b.example HTTP://EXAMPLE.ORG/X",
+        "foo.http://x.example xhttp://a.example 1http://a.example +http://a.example",
+        "a" * 70 + "http://a.example " + "b" * 64 + "https://c.example",
+        "javascript://x a-b+c.d://e.example <http://a.example> [x](http://a.example)",
+        "**http://bold.example/*** _https://em.example_ `http://code.example`",
+        "x://y http://example.org/://z http://://",
+        "Дія: https://diia.example/шлях?q=1 та www.example.org і user@example.org",
+    ],
+)
+def test_the_linear_linkify_rule_renders_like_markdown_it(body: str) -> None:
+    upstream = _upstream_markdown()
+    assert comments._MARKDOWN.render(body) == upstream.render(body)
+
+
+def test_serialised_comments_are_rendered_once(db: Db, monkeypatch: pytest.MonkeyPatch) -> None:
+    calls: list[str] = []
+    original = comments._render
+
+    def counting(body: str) -> str:
+        calls.append(body)
+        return original(body)
+
+    monkeypatch.setattr(comments, "_render", counting)
+    monkeypatch.setattr(comments, "_RENDERED", comments.RenderCache(1_000_000))
+    with db.session() as session:
+        project_id = create_project(session).entity_id
+        first = create_comment(session, project_id, "Cached **body** zq1", ALICE).entity_id
+        create_comment(session, project_id, "Cached **body** zq1", BOB)  # same text
+        with read_transaction(session):
+            rows = load_rows(session, COMMENT, [first])
+            assert serialize_comments(session, rows)[0]["body_html"].startswith("<p>Cached")
+            serialize_comments(session, rows)
+        feed = comments_listing(session, {"subject_id": project_id})
+        assert len(feed["threads"]) == 2
+    assert calls == ["Cached **body** zq1"]
+
+
+def test_the_render_cache_is_bounded_by_characters() -> None:
+    cache = comments.RenderCache(100)
+    cache.put("a" * 10, "x" * 30)
+    cache.put("b" * 10, "y" * 30)
+    assert cache.get("a" * 10) == "x" * 30  # now the most recently used
+    cache.put("c" * 10, "z" * 30)  # 120 > 100: the least recently used ("b") goes
+    assert cache.get("b" * 10) is None
+    assert cache.get("a" * 10) == "x" * 30 and cache.get("c" * 10) == "z" * 30
+    assert cache.chars == 80 and len(cache) == 2
+    cache.put("d", "w" * 200)  # larger than the whole cache: not cached
+    assert cache.get("d") is None and cache.chars == 80

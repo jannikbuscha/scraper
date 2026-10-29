@@ -119,10 +119,20 @@ def state_of(spec: EntityTypeSpec, row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def field_meta_of(spec: EntityTypeSpec, row: Mapping[str, Any]) -> dict[str, Any]:
-    """A deep copy of the row's ``field_meta`` (comments have none)."""
+    """A deep copy of the row's ``field_meta`` (comments have none); write paths change
+    the copy and assign it as a new value."""
     if not spec.curated:
         return {}
     return copy.deepcopy(dict(row.get("field_meta") or {}))
+
+
+def field_meta_for_reading(spec: EntityTypeSpec, row: Mapping[str, Any]) -> dict[str, Any]:
+    """The row's ``field_meta`` without a deep copy, for read paths that only serialise
+    it: a freshly loaded row's JSON value belongs to nobody else, and copying the
+    entries of every row dominated the cost of large reads."""
+    if not spec.curated:
+        return {}
+    return dict(row.get("field_meta") or {})
 
 
 def to_columns(spec: FieldSpec, value: Any) -> dict[str, Any]:

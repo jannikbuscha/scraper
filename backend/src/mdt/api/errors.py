@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import http.client
 import logging
+import re
 import secrets
 from collections.abc import Mapping, Sequence
 from typing import Any, Final
@@ -17,11 +18,13 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.routing import APIRoute
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 from starlette.exceptions import HTTPException
 from starlette.routing import Match
 
 from mdt.domain.errors import (
+    DatabaseBusyError,
     DomainError,
     InternalError,
     MethodNotAllowedError,
@@ -40,9 +43,24 @@ _LOCATIONS: Final = frozenset({"body", "query", "path", "header", "cookie"})
 MAX_PATH_CHARS: Final = 200
 
 
+_SURROGATES: Final = re.compile(r"[\ud800-\udfff]")
+
+
+def _encodable(value: Any) -> Any:
+    """``value`` with unpaired surrogates in strings and keys replaced by U+FFFD, so the
+    envelope can always be encoded as UTF-8 (a path may repeat a key the client sent)."""
+    if isinstance(value, str):
+        return _SURROGATES.sub("\ufffd", value)
+    if isinstance(value, dict):
+        return {_encodable(key): _encodable(item) for key, item in value.items()}
+    if isinstance(value, list | tuple):
+        return [_encodable(item) for item in value]
+    return value
+
+
 def envelope(code: str, message: str, details: Any = None) -> dict[str, Any]:
     """The error envelope."""
-    return {"error": {"code": code, "message": message, "details": details}}
+    return {"error": {"code": code, "message": _encodable(message), "details": _encodable(details)}}
 
 
 def error_response(error: DomainError, headers: Mapping[str, str] | None = None) -> JSONResponse:
@@ -127,9 +145,50 @@ def _http_error(status: int) -> DomainError | None:
 async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """A :class:`DomainError` from a handler or domain function → its envelope."""
     assert isinstance(exc, DomainError)
+    if isinstance(exc, DatabaseBusyError):
+        return busy_response(request)
     if exc.status >= 500:
         return internal_error_response(request, exc)
     return error_response(exc)
+
+
+def busy_response(request: Request) -> JSONResponse:
+    """``503 database_busy`` with ``Retry-After``: the request found the database locked
+    (or no free connection) and changed nothing; repeating it later is safe."""
+    log.warning("database busy on %s %s", request.method, request.url.path)
+    return error_response(
+        DatabaseBusyError(), {"Retry-After": str(DatabaseBusyError.retry_after_seconds)}
+    )
+
+
+#: SQLite result codes of a lock that did not clear within ``busy_timeout``.
+_SQLITE_BUSY: Final = 5
+_SQLITE_LOCKED: Final = 6
+_BUSY_MESSAGES: Final = ("database is locked", "database table is locked", "database is busy")
+
+
+def is_busy_error(exc: OperationalError) -> bool:
+    """True if a database error means "locked by someone else, try again later"
+    (``SQLITE_BUSY``/``SQLITE_LOCKED``, extended codes included)."""
+    original = exc.orig
+    code = getattr(original, "sqlite_errorcode", None)
+    if isinstance(code, int):
+        return code & 0xFF in (_SQLITE_BUSY, _SQLITE_LOCKED)
+    return any(message in str(original).lower() for message in _BUSY_MESSAGES)
+
+
+async def operational_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """A lock that did not clear within the busy timeout → ``503 database_busy`` (the
+    write unit was rolled back); any other database failure is an internal error."""
+    assert isinstance(exc, OperationalError)
+    if is_busy_error(exc):
+        return busy_response(request)
+    return internal_error_response(request, exc)
+
+
+async def pool_timeout_handler(request: Request, exc: Exception) -> JSONResponse:
+    """No database connection became free in time → ``503 database_busy``."""
+    return busy_response(request)
 
 
 def allowed_methods(request: Request) -> list[str]:
@@ -186,4 +245,6 @@ def install_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(HTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, request_validation_handler)
     app.add_exception_handler(IntegrityError, integrity_error_handler)
+    app.add_exception_handler(OperationalError, operational_error_handler)
+    app.add_exception_handler(PoolTimeoutError, pool_timeout_handler)
     app.add_exception_handler(Exception, unhandled_error_handler)

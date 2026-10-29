@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import sqlite3
@@ -10,10 +11,15 @@ from typing import Any
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolTimeoutError
 
+from mdt.api.errors import error_response
 from mdt.api.headers import SECURITY_HEADERS
+from mdt.app import create_app
+from mdt.domain.errors import ValidationError
 from tests.api.helpers import BASE_URL, ApiClient, call_asgi, error_of
+from tests.conftest import Db
 
 SECRET = "SELECT secret FROM /etc/passwd"
 
@@ -127,6 +133,57 @@ def test_other_integrity_errors_are_internal_errors(
     assert "FOREIGN" not in response.text
 
 
+def test_a_locked_database_is_503_database_busy(
+    api_db: Db, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A long write transaction elsewhere (e.g. a maintenance command) used to turn UI
+    # writes into "500 Internal error" after the busy timeout.
+    monkeypatch.setattr("mdt.db.engine.BUSY_TIMEOUT_MS", 100)
+    app = create_app(api_db.settings)
+    locker = sqlite3.connect(api_db.root / "app.db", isolation_level=None)
+    try:
+        with TestClient(app, base_url=BASE_URL, headers={"X-Requested-With": "mdt"}) as raw:
+            client = ApiClient(raw)
+            project = client.create_project()
+            locker.execute("BEGIN IMMEDIATE")
+            body = {"expected_version": 1, "changes": {"notes": "Synthetic"}}
+            response = client.patch(f"/api/entities/project/{project['id']}", body)
+            assert response.status_code == 503
+            assert error_of(response)["code"] == "database_busy"
+            assert response.headers["retry-after"] == "5"
+            assert_security_headers(response.headers)
+            comment = client.post("/api/comments", {"subject_id": project["id"], "body_md": "x"})
+            assert error_of(comment)["code"] == "database_busy"
+            # readers are not blocked (WAL)
+            assert client.list("project", q="Example")["total"] >= 1
+            locker.execute("ROLLBACK")
+            updated = client.update("project", project, {"notes": "Synthetic"})
+            assert updated["item"]["version"] == 2  # nothing was written while locked
+    finally:
+        locker.close()
+        app.state.mdt.engine.dispose()
+
+
+def test_pool_timeouts_are_503_and_other_database_errors_500(
+    app: FastAPI, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def pool_exhausted(*_args: Any, **_kwargs: Any) -> Any:
+        raise PoolTimeoutError("QueuePool limit of size 5 overflow 10 reached")
+
+    def broken(*_args: Any, **_kwargs: Any) -> Any:
+        raise OperationalError("SELECT …", {}, sqlite3.OperationalError("no such table: x"))
+
+    with TestClient(app, base_url=BASE_URL, raise_server_exceptions=False) as client:
+        monkeypatch.setattr("mdt.api.meta.entity_stats", pool_exhausted)
+        response = client.get("/api/stats", headers={"X-Requested-With": "mdt"})
+        assert (response.status_code, error_of(response)["code"]) == (503, "database_busy")
+        assert response.headers["retry-after"] == "5"
+        monkeypatch.setattr("mdt.api.meta.entity_stats", broken)
+        response = client.get("/api/stats", headers={"X-Requested-With": "mdt"})
+        assert (response.status_code, error_of(response)["code"]) == (500, "internal_error")
+        assert "no such table" not in response.text
+
+
 @pytest.mark.parametrize(
     ("path", "code"),
     [
@@ -208,6 +265,14 @@ def test_invalid_json_is_a_validation_error(client: ApiClient) -> None:
     }
 
 
+def test_error_envelopes_can_always_be_encoded() -> None:
+    # A path may repeat a key the client sent; an unpaired surrogate in it must not turn
+    # the 400 into a 500 while the response is encoded as UTF-8.
+    response = error_response(ValidationError({"set.k\ud800": ["bad \udc00 value"]}))
+    assert response.status_code == 400
+    assert json.loads(response.body)["error"]["details"] == {"set.k\ufffd": ["bad \ufffd value"]}
+
+
 def test_non_utf8_bodies_are_a_validation_error(client: ApiClient) -> None:
     response = client.client.post(
         "/api/entities/project",
@@ -238,6 +303,42 @@ def test_bad_filters_and_sorts(client: ApiClient) -> None:
     assert (response.status_code, error_of(response)["code"]) == (400, "bad_sort")
     response = client.get("/api/entities/project", {"page_size": "501"})
     assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
+
+
+def test_openapi_matches_the_error_contract(client: ApiClient) -> None:
+    # FastAPI generates "422 HTTPValidationError"; the API answers 400 with the envelope.
+    schema = client.ok(client.get("/api/openapi.json"))
+    text = json.dumps(schema)
+    assert '"422"' not in text and "HTTPValidationError" not in text
+    envelope_ref = {"$ref": "#/components/schemas/ErrorEnvelope"}
+    assert "ErrorEnvelope" in schema["components"]["schemas"]
+    operations = [
+        (path, method, operation)
+        for path, methods in schema["paths"].items()
+        for method, operation in methods.items()
+    ]
+    assert len(operations) > 30
+    for path, method, operation in operations:
+        responses = operation["responses"]
+        names = {(p["in"], p["name"]) for p in operation.get("parameters", [])}
+        for status in ("400", "500"):
+            content = responses[status]["content"]["application/json"]["schema"]
+            assert content == envelope_ref, (path, method, status)
+        if path == "/api/health":
+            assert ("header", "X-Requested-With") not in names
+            continue
+        assert {"403", "503"} <= set(responses), (path, method)
+        assert ("header", "X-Requested-With") in names, (path, method)
+        if method in ("post", "patch"):
+            assert {"409", "413", "415"} <= set(responses), (path, method)
+            assert ("header", "X-Author") in names, (path, method)
+        else:
+            assert ("header", "X-Author") not in names, (path, method)
+        if "{" in path:
+            assert "404" in responses, (path, method)
+    export = schema["paths"]["/api/entities/{entity_type}/export"]["get"]["responses"]
+    assert "429" in export
+    assert "docs/API.md is authoritative" in schema["info"]["description"]
 
 
 def test_openapi_is_under_api_and_the_docs_are_off(client: ApiClient, app: FastAPI) -> None:

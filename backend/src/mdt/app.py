@@ -32,6 +32,7 @@ from mdt.api.deps import AppContext
 from mdt.api.errors import install_error_handlers
 from mdt.api.guard import HostAllowlist, RequestGuardMiddleware
 from mdt.api.headers import SecurityHeadersMiddleware
+from mdt.api.openapi import contract_openapi
 from mdt.config import Settings, get_settings
 from mdt.db.engine import create_db_engine
 from mdt.db.migrate import head_revision
@@ -62,12 +63,21 @@ class MdtApp(FastAPI):
 
     def __init__(self, *, allowed_hosts: HostAllowlist, **kwargs: Any) -> None:
         self.allowed_hosts = allowed_hosts
+        self._contract_openapi: tuple[dict[str, Any], dict[str, Any]] | None = None
         super().__init__(**kwargs)
 
     def build_middleware_stack(self) -> ASGIApp:
         """Wrap FastAPI's stack in the guard and the security headers."""
         guarded = RequestGuardMiddleware(super().build_middleware_stack(), self.allowed_hosts)
         return SecurityHeadersMiddleware(guarded)
+
+    def openapi(self) -> dict[str, Any]:
+        """The generated OpenAPI document, aligned with the error envelope (API §1.2, §6);
+        rebuilt whenever FastAPI regenerates its own document."""
+        generated = super().openapi()
+        if self._contract_openapi is None or self._contract_openapi[0] is not generated:
+            self._contract_openapi = (generated, contract_openapi(generated))
+        return self._contract_openapi[1]
 
 
 def _check_database(settings: Settings, engine: Engine) -> None:
