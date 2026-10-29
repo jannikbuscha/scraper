@@ -1,0 +1,26 @@
+{
+  "fixture": "news_en_2019_regulation",
+  "body": "news_en_2019_regulation.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "EN translation of news_uk_2019_regulation (same slug; 'posted 18 September 2019 15:50'; body as plain text): EN date format and UA-EN pairing by slug",
+  "url": "https://www.kmu.gov.ua/en/news/uryad-zatverdiv-polozhennya-pro-ministerstvo-cifrovoyi-transformaciyi",
+  "final_url": "https://www.kmu.gov.ua/en/news/uryad-zatverdiv-polozhennya-pro-ministerstvo-cifrovoyi-transformaciyi",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:34:48.616369Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "d28ba721ce489da9ff1df4dad3bde86cf231499ce6eaa4fa1c1335ee4b698af1",
+  "bytes_original": 103327,
+  "sha256_stored": "e04be8d569fadc2a78ee251c30192053007d0e7cb1c87b109f575ab00abbfd25",
+  "bytes_stored": 7228,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer of the English version: 'All content is available under the Creative Commons Attribution 4.0 International license unless otherwise noted.' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

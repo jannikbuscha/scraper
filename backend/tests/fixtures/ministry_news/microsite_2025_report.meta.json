@@ -1,0 +1,28 @@
+{
+  "fixture": "microsite_2025_report",
+  "body": "microsite_2025_report.html",
+  "collector": "ministry_news",
+  "source": "S4 (C-4)",
+  "purpose": "Year-in-review microsite 2025 (static Webflow page, 22 numbered sections) as an S4 report document: text extraction; no publication date on the page",
+  "url": "https://2025.thedigital.gov.ua/",
+  "final_url": "https://2025.thedigital.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:09:17.613559Z",
+  "content_type": "text/html",
+  "headers": {
+    "content-length": "128288",
+    "content-type": "text/html",
+    "etag": "\"69ef06d3-1f520\"",
+    "last-modified": "Mon, 27 Apr 2026 06:48:51 GMT"
+  },
+  "sha256_original": "9b29cbb1657c84e9ff3e97a3624ef71924ce715aa2fd5eb9fe6f72001c2b836a",
+  "bytes_original": 128288,
+  "sha256_stored": "28d01ca71cf5e74882c2ed1e9f6f06b465c80e669200ec52f5ffd281cbce01a7",
+  "bytes_stored": 7240,
+  "trimmed": true,
+  "trim_note": "kept <title>/meta description/og tags, the hero text, the first 3 navigation links, the first 2 of 22 section boxes (texts over 120 characters shortened, marked …) and the © label; media, styles and scripts removed",
+  "licence": "no licence statement on the page (only a '©' year label)",
+  "attribution": "2025.thedigital.gov.ua ('Підсумки року роботи Мінцифри 2025'), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

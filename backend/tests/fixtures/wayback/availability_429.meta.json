@@ -1,0 +1,27 @@
+{
+  "fixture": "availability_429",
+  "body": "availability_429.html",
+  "collector": "wayback",
+  "source": "S5",
+  "purpose": "Throttling: HTTP 429 on the first archive.org request from this environment (shared egress IP); the stored headers have no Retry-After. The only archive bytes obtainable here: no CDX response, no id_ capture",
+  "url": "https://archive.org/wayback/available?url=thedigital.gov.ua/projects&timestamp=20191231",
+  "final_url": "https://archive.org/wayback/available?url=thedigital.gov.ua/projects&timestamp=20191231",
+  "redirects": [],
+  "status": 429,
+  "retrieved_at": "2026-10-29T13:33:03.945998Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "no-cache",
+    "content-type": "text/html; charset=utf-8",
+    "server": "nginx/1.31.3"
+  },
+  "sha256_original": "ae138caf8767f7be2fe6f47f1663b0e2e28d903264707aa9b6f73bb7b223902c",
+  "bytes_original": 117,
+  "sha256_stored": "ae138caf8767f7be2fe6f47f1663b0e2e28d903264707aa9b6f73bb7b223902c",
+  "bytes_stored": 117,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "error page (117 bytes), no creative content",
+  "attribution": "archive.org, retrieved 2026-10-29; unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

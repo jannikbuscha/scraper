@@ -1,0 +1,26 @@
+{
+  "fixture": "center_sitemap",
+  "body": "center_sitemap.xml",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Host normalisation: 398 of 445 URLs use the internal host http://center-back-app/ next to center.diia.gov.ua URLs",
+  "url": "https://center.diia.gov.ua/sitemap.xml",
+  "final_url": "https://center.diia.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:16:34.392823Z",
+  "content_type": "application/xml",
+  "headers": {
+    "content-type": "application/xml",
+    "server": "cloudflare"
+  },
+  "sha256_original": "cd9006c9ec53d62129d11df10e175a78bf45b5b458b5160bbd1e6d27e7e1f3ad",
+  "bytes_original": 175577,
+  "sha256_stored": "0e8dc79f23ec1c2dbe4835766328d53393384086a983337de633ab343c2ccf86",
+  "bytes_stored": 2652,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog and 3 internal-host plus 3 public <url> entries",
+  "licence": "not openly licensed: footer '© 2026. Усі права захищені.' (the file holds URLs and dates only)",
+  "attribution": "center.diia.gov.ua (Дія. Платформа Центрів), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

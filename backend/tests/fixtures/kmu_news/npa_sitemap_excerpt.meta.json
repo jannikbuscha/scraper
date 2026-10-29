@@ -1,0 +1,26 @@
+{
+  "fixture": "npa_sitemap_excerpt",
+  "body": "npa_sitemap_excerpt.xml",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "Substitute for an /npas/ act page (robots-disallowed): one entry per slug scheme, a 6-digit group that is no valid date, and the two acts referenced by captured news; /npas/ links are references only, and suffixes are never dates",
+  "url": "https://www.kmu.gov.ua/sitemap-kitsoft-npa-models-act-1.xml",
+  "final_url": "https://www.kmu.gov.ua/sitemap-kitsoft-npa-models-act-1.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:29:11.127203Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml"
+  },
+  "sha256_original": "8b167606a459dae3b537c222e138b8cca3b614bdd956f29fb70bbb41e2a06cd5",
+  "bytes_original": 8813714,
+  "sha256_stored": "7cf3a2d6983e4a4f8bfe24319ad34db03b020f6cb8dee415c280417c108168b6",
+  "bytes_stored": 2104,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog and 9 <url> entries: the first match for each slug scheme (numeric id, -<num>-<DDMMYY>, <letter><DDMMYY>, -<letter><num>, -<letter>-<num>, -<num>), s930125, and the acts ending in t180919 and t210325; order unchanged",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk) (the file holds URLs and dates only)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt of <url> entries",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

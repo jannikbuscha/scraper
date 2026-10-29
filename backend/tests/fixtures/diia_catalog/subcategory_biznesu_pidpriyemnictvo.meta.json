@@ -1,0 +1,27 @@
+{
+  "fixture": "subcategory_biznesu_pidpriyemnictvo",
+  "body": "subcategory_biznesu_pidpriyemnictvo.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Subcategory page: breadcrumb (Головна | Бізнесу | Підприємництво), h1, service links (a.service-acc_item-service; 39 on 2026-10-29) and the repeated 'Від А до Я' accordion",
+  "url": "https://diia.gov.ua/services/categories/biznesu/pidpriyemnictvo",
+  "final_url": "https://diia.gov.ua/services/categories/biznesu/pidpriyemnictvo",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:25.075866Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "f17bf8fbca1752c45b5107daa5bad782ea1467d22afc8271213a321722180a53",
+  "bytes_original": 116391,
+  "sha256_stored": "964205d0309bbc255bf8db469987559564426170ca242b06fe9141fc2bc34c1a",
+  "bytes_stored": 4684,
+  "trimmed": true,
+  "trim_note": "kept head basics, breadcrumb, h1, 4 of 39 service links (incl. reyestraciya-fop and e-pidpriyemec), the A-Z accordion with its first two blocks, and the copyright line",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

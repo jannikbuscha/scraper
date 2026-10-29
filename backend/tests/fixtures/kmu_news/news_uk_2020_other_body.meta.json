@@ -1,0 +1,26 @@
+{
+  "fixture": "news_uk_2020_other_body",
+  "body": "news_uk_2020_other_body.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "Item about Diia published by another body (Міністерство соціальної політики України, link msp.gov.ua, zero-padded day '05 жовтня 2020'): body attribution and alias-tagger relevance",
+  "url": "https://www.kmu.gov.ua/news/uryad-sproshchuye-mehanizmi-nadannya-poslug-vpo-za-dopomogoyu-mobilnogo-zastosunku-diya",
+  "final_url": "https://www.kmu.gov.ua/news/uryad-sproshchuye-mehanizmi-nadannya-poslug-vpo-za-dopomogoyu-mobilnogo-zastosunku-diya",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:42:11.538137Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "f39bef4e1534610193bb501675d3b40c1da14c2da6ef7ad8b033c69e8ec40fdd",
+  "bytes_original": 246193,
+  "sha256_stored": "19706464e30b3668594bd424052611ff9affe0f9abb50bd34b1a8674b0904b16",
+  "bytes_stored": 9861,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

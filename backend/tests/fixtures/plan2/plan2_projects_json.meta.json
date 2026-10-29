@@ -1,0 +1,26 @@
+{
+  "fixture": "plan2_projects_json",
+  "body": "plan2_projects_json.json",
+  "collector": "plan2",
+  "source": "S3 (C-3)",
+  "purpose": "PlanDiia 2.0 project list (94 projects, 306 sub-projects, publishedAt February-June 2021; no status fields): parser for translations_array (an 'en' object with null values in 60 projects, absent in 34), type, subprojectCount and subproject",
+  "url": "https://plan2-backend.diia.gov.ua/api/front/project",
+  "final_url": "https://plan2-backend.diia.gov.ua/api/front/project",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:10:28.600511Z",
+  "content_type": "application/json",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/json"
+  },
+  "sha256_original": "aee977450d07b2dc4261097173a9f1f30f7d34f71b80fde8a0669517d8a77d01",
+  "bytes_original": 332995,
+  "sha256_stored": "953aadfef9481fe4e3cff44fd154bdef7174040a619018b3b708e334226a209c",
+  "bytes_stored": 2932,
+  "trimmed": true,
+  "trim_note": "reduced to 3 of 94 projects (one with an 'en' translation object, one without, one with 0 sub-projects); at most 2 sub-projects each; description HTML shortened to 120 characters (marked …); re-serialised with indent=1",
+  "licence": "no licence statement found on plan2.diia.gov.ua or in the API response",
+  "attribution": "plan2.diia.gov.ua / plan2-backend.diia.gov.ua (PlanDiia 2.0), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

@@ -1,0 +1,28 @@
+{
+  "fixture": "microsite_2years_report",
+  "body": "microsite_2years_report.html",
+  "collector": "ministry_news",
+  "source": "S4 (C-4)",
+  "purpose": "Year-in-review microsite (2021) as an S4 report document: text extraction, legacy /projects/<slug> links, title containing U+200D",
+  "url": "https://2years.thedigital.gov.ua/",
+  "final_url": "https://2years.thedigital.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:09:20.376627Z",
+  "content_type": "text/html",
+  "headers": {
+    "content-length": "103577",
+    "content-type": "text/html",
+    "etag": "\"66b46706-19499\"",
+    "last-modified": "Thu, 08 Aug 2024 06:34:46 GMT"
+  },
+  "sha256_original": "6c5aea2ebf40ce7c21ad61089dceb2fb2dba96ef27173d05bce9b50f572649af",
+  "bytes_original": 103577,
+  "sha256_stored": "6c5aea2ebf40ce7c21ad61089dceb2fb2dba96ef27173d05bce9b50f572649af",
+  "bytes_stored": 103577,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the microsite footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України, 'Мінцифра: два роки в дії', 2years.thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

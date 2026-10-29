@@ -1,0 +1,27 @@
+{
+  "fixture": "guide_sitemap_500",
+  "body": "guide_sitemap_500.html",
+  "collector": "diia_guide",
+  "source": "S3 (C-2)",
+  "purpose": "Error fixture: the sitemap named in robots.txt answered HTTP 500 (27-byte error page)",
+  "url": "https://guide.diia.gov.ua/sitemap.xml",
+  "final_url": "https://guide.diia.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 500,
+  "retrieved_at": "2026-10-29T13:07:26.049256Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "content-language": "uk",
+    "content-length": "27",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "e594d64172e3456e5d71e24cb0a5cf0082ca6be74fe041feb2538344804f739a",
+  "bytes_original": 27,
+  "sha256_stored": "e594d64172e3456e5d71e24cb0a5cf0082ca6be74fe041feb2538344804f739a",
+  "bytes_stored": 27,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the site footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/)",
+  "attribution": "Гід з державних послуг / Реєстр адміністративних послуг, guide.diia.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

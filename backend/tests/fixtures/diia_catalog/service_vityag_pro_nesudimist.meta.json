@@ -1,0 +1,27 @@
+{
+  "fixture": "service_vityag_pro_nesudimist",
+  "body": "service_vityag_pro_nesudimist.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Citizen service: info pairs (submission, processing, cost, description), 'Онлайн' channel, FAQ, 'Пов’язані закони та накази' with zakon.rada.gov.ua links, call-to-action my.diia.gov.ua/tasks/create/161036/161036001",
+  "url": "https://diia.gov.ua/services/vityag-pro-nesudimist",
+  "final_url": "https://diia.gov.ua/services/vityag-pro-nesudimist",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:56.489713Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "f19ab03b65b4b18e2d082164407f4fa70181a9c3a6d6de548ffc896a0f36f3b5",
+  "bytes_original": 104354,
+  "sha256_stored": "97b9c509b84874b15affb674801f1668073c1c30077b2c9b4bbeb95585622638",
+  "bytes_stored": 11830,
+  "trimmed": true,
+  "trim_note": "kept head basics (incl. meta title), the service header (h1, call-to-action), the info block and every section.service-acc_section (FAQ cut to its first 2 questions; texts over 160 characters shortened, marked …) and the copyright line; modal, menus and scripts removed",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

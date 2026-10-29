@@ -1,0 +1,28 @@
+{
+  "fixture": "mintsyfra_preview_latest",
+  "body": "mintsyfra_preview_latest.html",
+  "collector": "telegram",
+  "source": "S7a",
+  "purpose": "Newest preview page (12 posts, IDs 8558-8585): canonical ?before=8586, rel=prev, per-post data-post, permalink with <time datetime> (UTC), forwarded and album posts",
+  "url": "https://t.me/s/mintsyfra",
+  "final_url": "https://t.me/s/mintsyfra",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:31:46.107255Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "no-store",
+    "content-length": "116240",
+    "content-type": "text/html; charset=utf-8",
+    "server": "nginx/1.30.1"
+  },
+  "sha256_original": "fc6bc43706b0dfc21750aa906a7e8f8a724bd7d40eaccb401f687d13b3bda399",
+  "bytes_original": 116240,
+  "sha256_stored": "f3a244bd65f52030d107fc041bc85c7b9ccd28c48e02583c29d563ba164fb198",
+  "bytes_stored": 22644,
+  "trimmed": true,
+  "trim_note": "kept head basics (canonical, rel=prev/next), the channel header with counters, the 'more' pagination element(s) and the first 3 message blocks (texts over 160 characters shortened, marked …); removed the per-render data-view attributes, the per-visitor 'tme' token of the download links (REDACTED), og:image, images, media and background-image URLs, scripts and the other posts",
+  "licence": "no licence statement on the preview page (the thedigital.gov.ua CC BY footer does not cover Telegram)",
+  "attribution": "Telegram channel @mintsyfra (Мінцифра), t.me/s/mintsyfra, retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

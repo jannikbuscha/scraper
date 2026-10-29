@@ -1,0 +1,26 @@
+{
+  "fixture": "playcity_pravovi_zasady",
+  "body": "playcity_pravovi_zasady.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Legal-basis list (cards: type + date + title, linking on-site /npas/ pages) for the C6 queue; the card date is a CMS posting date, not the act date (e.g. law 270/96-ВР shown with 22.01.2026)",
+  "url": "https://playcity.gov.ua/pravovi-zasady",
+  "final_url": "https://playcity.gov.ua/pravovi-zasady",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:37:59.762714Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "must-revalidate, no-cache, no-store, private",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "ad39d74615da562a74c76bf59fb25fc334a9030c52d5ce3dfdf8cbcf8c19d4aa",
+  "bytes_original": 90793,
+  "sha256_stored": "72e3417440d046175443b42fb3d0da326a3f787ec0f0da10ad8d51eec77c840c",
+  "bytes_stored": 4673,
+  "trimmed": true,
+  "trim_note": "kept head basics, 4 act cards (incl. the law 270/96-ВР, a ministry order and a Cabinet resolution) and the rights line",
+  "licence": "not openly licensed: footer 'playcity.gov.ua Всі права захищені.' (the listed acts are official texts)",
+  "attribution": "playcity.gov.ua (Державне агентство України ПлейСіті), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

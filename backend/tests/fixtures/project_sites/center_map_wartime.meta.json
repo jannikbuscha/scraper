@@ -1,0 +1,28 @@
+{
+  "fixture": "center_map_wartime",
+  "body": "center_map_wartime.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "301 from /cnap-map to /mapa-centriv-so-pracuut-pid-cas-vijni-2 (redirect chain in this meta file); wartime statement about the map of centres working during the war; the map itself is a client-side Tableau Public embed",
+  "url": "https://center.diia.gov.ua/cnap-map",
+  "final_url": "https://center.diia.gov.ua/mapa-centriv-so-pracuut-pid-cas-vijni-2",
+  "redirects": [
+    "301 https://center.diia.gov.ua/mapa-centriv-so-pracuut-pid-cas-vijni-2"
+  ],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:15:57.532758Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "1192e3c03c00b6c62cbb14bc139d05dc50fc5fae563d39d2a4efcaf80bca020a",
+  "bytes_original": 209542,
+  "sha256_stored": "2818d34e87d018cc707f36e0a23189ecab4b77cd8e012d6b12871abd139f48eb",
+  "bytes_stored": 3345,
+  "trimmed": true,
+  "trim_note": "kept head basics, the heading section with the wartime statement, the empty embed placeholder, the footer statements and the hidden /cdn-cgi/content link (id REDACTED); window.__NUXT__ (which carries the Tableau embed code as BlockDashboard.dashboardInfo) and all other scripts removed",
+  "licence": "not openly licensed: footer '© 2026. Усі права захищені.'",
+  "attribution": "center.diia.gov.ua (Дія. Платформа Центрів), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

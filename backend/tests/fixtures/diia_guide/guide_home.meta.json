@@ -1,0 +1,27 @@
+{
+  "fixture": "guide_home",
+  "body": "guide_home.html",
+  "collector": "diia_guide",
+  "source": "S3 (C-2)",
+  "purpose": "Download links /register/download/json|xlsx/, licence and pilot-operation footer, 20 thematic areas and 43 life events incl. the broken 'None' slugs, JSON-LD SearchAction",
+  "url": "https://guide.diia.gov.ua/",
+  "final_url": "https://guide.diia.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:04:34.937930Z",
+  "content_type": "text/html; charset=utf8",
+  "headers": {
+    "content-language": "uk",
+    "content-length": "50973",
+    "content-type": "text/html; charset=utf8"
+  },
+  "sha256_original": "8f2a160d078947cb83cccf6e203e83a1842efd94027c6016dfd070fac5488e55",
+  "bytes_original": 50973,
+  "sha256_stored": "8f2a160d078947cb83cccf6e203e83a1842efd94027c6016dfd070fac5488e55",
+  "bytes_stored": 50973,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the site footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/)",
+  "attribution": "Гід з державних послуг / Реєстр адміністративних послуг, guide.diia.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

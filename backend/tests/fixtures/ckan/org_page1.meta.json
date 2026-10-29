@@ -1,0 +1,27 @@
+{
+  "fixture": "org_page1",
+  "body": "org_page1.html",
+  "collector": "ckan",
+  "source": "S7b",
+  "purpose": "Organisation listing page 1 (CKAN 2.7.2; 30 datasets, 20 per page): dataset links by CKAN name, facets incl. license_id, pagination",
+  "url": "https://data.gov.ua/organization/mincyfry",
+  "final_url": "https://data.gov.ua/organization/mincyfry",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:36:02.478968Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=14400",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "6641ebe30a302c85824f5daaeff7f988223a567333561d976f2ba42ca1201030",
+  "bytes_original": 67587,
+  "sha256_stored": "6106c955568116f749b8610be2a3131eb41be9cd6813903ff0d58c92421a5e23",
+  "bytes_stored": 9199,
+  "trimmed": true,
+  "trim_note": "kept head basics (incl. the CKAN generator meta), h1, the dataset count, 3 of the listed datasets (descriptions shortened to 100 characters, marked …), the facet sections (licence facet complete, other facets cut to 3 items) and the pagination",
+  "licence": "portal page: no licence statement for the page itself; the organisation's datasets carry license_id cc-by (facet 30 of 30)",
+  "attribution": "data.gov.ua (Єдиний державний веб-портал відкритих даних), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

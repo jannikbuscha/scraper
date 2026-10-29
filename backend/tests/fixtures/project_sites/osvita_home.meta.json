@@ -1,0 +1,26 @@
+{
+  "fixture": "osvita_home",
+  "body": "osvita_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Generic C2 pass for Diia.Education: title/meta, footer statement ('© 2026 Усі права захищено', contact, link to thedigital.gov.ua) and the menu link to /cdto-campus (CDTO Campus is a section here)",
+  "url": "https://osvita.diia.gov.ua/",
+  "final_url": "https://osvita.diia.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:13:00.187146Z",
+  "content_type": "text/html;charset=utf-8",
+  "headers": {
+    "content-type": "text/html;charset=utf-8",
+    "x-powered-by": "Nuxt"
+  },
+  "sha256_original": "5d7f1763373c3ebad2f2fc6b6993057ef1a7373f4bae3e88a67fe825043f5c7f",
+  "bytes_original": 557977,
+  "sha256_stored": "1fa27eae03c91d58d4b69fbc729f072b6b6c1cdbdabe7edb63d633b73be69b30",
+  "bytes_stored": 12091,
+  "trimmed": true,
+  "trim_note": "kept head basics, the /cdto-campus menu link and the footer; the __NUXT_DATA__ payload (190 KB), the runtime config (which embeds a public API key) and all other scripts removed",
+  "licence": "not openly licensed: footer '© 2026 Усі права захищено'",
+  "attribution": "osvita.diia.gov.ua (Дія.Освіта), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

@@ -1,0 +1,27 @@
+{
+  "fixture": "guide_card_00031",
+  "body": "guide_card_00031.html",
+  "collector": "diia_guide",
+  "source": "S3 (C-2)",
+  "purpose": "Service card: identifier 00031, 'Де отримати' with Diia channels, 14 zakon.rada.gov.ua links, related cards in the /register/<identifier>/<slug>-<uuid> scheme (UUID to identifier mapping)",
+  "url": "https://guide.diia.gov.ua/view/derzhavna-reiestratsiia-shliubu-097b2fa9-2c83-4ea9-988f-b5c6b48f71fe",
+  "final_url": "https://guide.diia.gov.ua/view/derzhavna-reiestratsiia-shliubu-097b2fa9-2c83-4ea9-988f-b5c6b48f71fe",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:06:29.376360Z",
+  "content_type": "text/html; charset=utf8",
+  "headers": {
+    "content-language": "uk",
+    "content-length": "73464",
+    "content-type": "text/html; charset=utf8"
+  },
+  "sha256_original": "73ce9b549ab7946d581549e50643f5e2ee249178d7fded9d7fced8ebdc8a99a0",
+  "bytes_original": 73464,
+  "sha256_stored": "73ce9b549ab7946d581549e50643f5e2ee249178d7fded9d7fced8ebdc8a99a0",
+  "bytes_stored": 73464,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the site footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/)",
+  "attribution": "Гід з державних послуг / Реєстр адміністративних послуг, guide.diia.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

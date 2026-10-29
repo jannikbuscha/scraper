@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MDT Portfolio test fixture: minimal excerpt of https://www.kmu.gov.ua/sitemap-rainlab-blog-models-post-1.xml (retrieved 2026-10-29); see the .meta.json file; 8 of 49999 <url> entries kept -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+<url>
+        <loc>https://www.kmu.gov.ua/news/redyzain-hrantovoi-prohramy-dlia-pererobnykh-pidpryiemstv-uriad-onovyv-umovy</loc>
+        <lastmod>2026-10-28T18:45:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/piat-rokiv-u-statusi-derzhavnoi-ustanovy-iak-shkola-superheroiv-zminiuie-likarnianu-osvitu-v-ukraini</loc>
+        <lastmod>2026-10-28T18:34:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/vsevolod-chentsov-obhovoryv-z-ievrokomisarom-martoiu-kos-podalshi-kroky-u-perehovornomu-protsesi-shchodo-vstupu-ukrainy-do-ies</loc>
+        <lastmod>2026-10-28T17:30:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/vid-shi-asystenta-v-dii-do-suputnykovoho-zviazku-ta-oboronnykh-tekhnolohii-pidsumky-mintsyfry-u-2025-rotsi</loc>
+        <lastmod>2025-12-24T17:07:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/pleisiti-stane-novym-rehuliatorom-azartnykh-ihor-uriad-ukhvalyv-postanovu</loc>
+        <lastmod>2025-03-21T18:12:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/vidmovitisya-vid-rosijskoyi-muziki-pidtrimati-ukrayinsku-armiyu-mincifri-z-partnerami-zapustili-proekt-dlya-borotbi-z-propagandoyu</loc>
+        <lastmod>2022-11-30T12:36:33+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/wi-fi-v-ukryttiakh-ta-it-kursy-mykhailo-fedorov-pro-osvitni-initsiatyvy-mintsyfry-pid-chas-viiny</loc>
+        <lastmod>2022-09-16T14:21:00+03:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/news/usuneno-nedoliki-u-provedenni-ispitiv-na-riven-volodinnya-derzhavnoyu-movoyu</loc>
+        <lastmod>2021-08-04T17:40:48+03:00</lastmod>
+
+            </url>
+</urlset>

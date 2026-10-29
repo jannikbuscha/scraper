@@ -1,0 +1,27 @@
+{
+  "fixture": "usf_sitemap_soft404",
+  "body": "usf_sitemap_soft404.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Soft 404: /sitemap.xml answers 200 text/html 'Post not found'; the sitemap probe must classify it as 'no sitemap'",
+  "url": "https://usf.com.ua/sitemap.xml",
+  "final_url": "https://usf.com.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:41:25.900812Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "2af549787629271d2464d7ba5808edacf4fcb7638d674fba2c074011c2c105ed",
+  "bytes_original": 125130,
+  "sha256_stored": "3638c11b82f56d21a9a1d01951e052320681f213efa073907d56920d33e63a5f",
+  "bytes_stored": 316,
+  "trimmed": true,
+  "trim_note": "kept <title> and the 'not found' message element; everything else removed",
+  "licence": "not openly licensed: footer 'Український Фонд Стартапів © 2026'; robots.txt carries 'Content-Signal: search=yes,ai-train=no,use=reference' and a reservation of rights under Art. 4 of Directive (EU) 2019/790",
+  "attribution": "usf.com.ua (Український фонд стартапів / Ukrainian Startup Fund), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

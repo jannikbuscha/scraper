@@ -1,0 +1,26 @@
+{
+  "fixture": "playcity_sitemap",
+  "body": "playcity_sitemap.xml",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Non-standard sitemap: a <urlset> listing 4 sub-sitemaps as <url> entries, without lastmod",
+  "url": "https://playcity.gov.ua/sitemap.xml",
+  "final_url": "https://playcity.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:37:49.452490Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml"
+  },
+  "sha256_original": "c35190f76feb2b80fc0f6f53f027b882ff28e13138e7d1d634b268621c1c20d8",
+  "bytes_original": 808,
+  "sha256_stored": "c35190f76feb2b80fc0f6f53f027b882ff28e13138e7d1d634b268621c1c20d8",
+  "bytes_stored": 808,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "not openly licensed: footer 'playcity.gov.ua Всі права захищені.' (technical file listing 4 URLs)",
+  "attribution": "playcity.gov.ua (Державне агентство України ПлейСіті), retrieved 2026-10-29; unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "news_en_2025_plans",
+  "body": "news_en_2025_plans.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "EN 2025 item ('posted 18 August 2025 19:11') on the ministry's plans for 2025-2026",
+  "url": "https://www.kmu.gov.ua/en/news/hranty-brave1-pilotnyi-zapusk-5g-ta-novi-posluhy-v-dii-mykhailo-fedorov-prezentuvav-plany-mintsyfry-na-2025-2026-roky",
+  "final_url": "https://www.kmu.gov.ua/en/news/hranty-brave1-pilotnyi-zapusk-5g-ta-novi-posluhy-v-dii-mykhailo-fedorov-prezentuvav-plany-mintsyfry-na-2025-2026-roky",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:34:52.479626Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "cbc34b23c5e0a362a740e9f5603ca3587fc88f8ec299130a3fb8e8007c5b14d0",
+  "bytes_original": 109064,
+  "sha256_stored": "582a3c19823c099d84e2b61d6fc29ef51c35d9baf5cdc782d28d74728a1b6996",
+  "bytes_stored": 12812,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer of the English version: 'All content is available under the Creative Commons Attribution 4.0 International license unless otherwise noted.' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

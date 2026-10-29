@@ -1,0 +1,27 @@
+{
+  "fixture": "project_govtech_diia",
+  "body": "project_govtech_diia.html",
+  "collector": "digitalstate_catalog",
+  "source": "S2 (C-1)",
+  "purpose": "Detail page: project.id, translations, blocks with the outbound linkListItem (https://diia.gov.ua/), tags, suggestedArticles with publishedAt; no project dates",
+  "url": "https://digitalstate.gov.ua/projects/govtech/diia",
+  "final_url": "https://digitalstate.gov.ua/projects/govtech/diia",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:34:21.067980Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8",
+    "server": "nginx"
+  },
+  "sha256_original": "78f4a28cb5e660055d7221c403fd769ddbe5f2d608b2ebd577e9bd7686857ca1",
+  "bytes_original": 166139,
+  "sha256_stored": "04ce06c03da0315aff0ae46fc682034e48844baec24eed85d2e9370f594f2bbc",
+  "bytes_stored": 61627,
+  "trimmed": true,
+  "trim_note": "kept head basics, the footer statement (implementation by the ministry, donor projects) and the rights line, the window.__remixContext script and the streamController.enqueue/close scripts; inside the turbo-stream payload every prose string over 60 characters was shortened (marked …) and the Sentry baggage values (public key, trace id) replaced by REDACTED, with the array structure and all indices unchanged; rendered markup, module scripts and other scripts removed",
+  "licence": "not openly licensed: footer '© 2026 Digital State UA . All rights reserved'",
+  "attribution": "Digital State UA, digitalstate.gov.ua, retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

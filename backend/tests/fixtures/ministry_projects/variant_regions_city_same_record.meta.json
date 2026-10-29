@@ -1,0 +1,26 @@
+{
+  "fixture": "variant_regions_city_same_record",
+  "body": "variant_regions_city_same_record.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "200 under a rubric that is not the record's: same UUID as business/city, the canonical echoes the requested path (match by id, never by URL or canonical)",
+  "url": "https://thedigital.gov.ua/projects/regions/city",
+  "final_url": "https://thedigital.gov.ua/projects/regions/city",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:03:08.128077Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "b1b8325785ae42f04651d970c71ff8ef73ba8c55dcea4b2e4bed0a5d966a3a7d",
+  "bytes_original": 85073,
+  "sha256_stored": "b1b8325785ae42f04651d970c71ff8ef73ba8c55dcea4b2e4bed0a5d966a3a7d",
+  "bytes_stored": 85073,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

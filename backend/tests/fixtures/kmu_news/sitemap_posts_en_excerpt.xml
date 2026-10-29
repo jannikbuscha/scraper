@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MDT Portfolio test fixture: minimal excerpt of https://www.kmu.gov.ua/en/sitemap-rainlab-blog-models-post-1.xml (retrieved 2026-10-29); see the .meta.json file; 5 of 28213 <url> entries kept -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+<url>
+        <loc>https://www.kmu.gov.ua/en/news/ukraina-ta-niderlandy-pohlybliuiut-ekonomichnu-spivpratsiu-12-mlrd-neviiskovoi-dopomohy-na-20272029-roky</loc>
+        <lastmod>2026-10-28T17:05:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/en/news/uriad-terminovo-pratsiuie-nad-vidnovlenniam-elektropostachannia-v-konotopi-ta-zabezpechyt-misto-dyzelnym-palnym</loc>
+        <lastmod>2026-10-28T16:07:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/en/news/hranty-brave1-pilotnyi-zapusk-5g-ta-novi-posluhy-v-dii-mykhailo-fedorov-prezentuvav-plany-mintsyfry-na-2025-2026-roky</loc>
+        <lastmod>2025-08-18T19:11:00+03:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/en/news/uryad-zatverdiv-polozhennya-pro-ministerstvo-cifrovoyi-transformaciyi</loc>
+        <lastmod>2019-09-18T15:50:00+03:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/en/news/246959220</loc>
+        <lastmod>2014-01-07T10:23:58+02:00</lastmod>
+
+            </url>
+</urlset>

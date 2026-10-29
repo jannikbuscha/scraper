@@ -1,0 +1,26 @@
+{
+  "fixture": "news_uk_2019_komanda_duplicate_pair",
+  "body": "news_uk_2019_komanda_duplicate_pair.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "UA 2019 item ('11 жовтня 2019 року о 17:48'); same title as ministry_news/news_article_2019 (thedigital.gov.ua, 13:21) with a different slug transliteration: cross-site duplicate test",
+  "url": "https://www.kmu.gov.ua/news/komanda-ministerstva-cifrovoyi-transformaciyi-prezentuvala-proyekti-z-cifrovoyi-osviti-ta-rozvitku-malogo-ta-serednogo-biznesu",
+  "final_url": "https://www.kmu.gov.ua/news/komanda-ministerstva-cifrovoyi-transformaciyi-prezentuvala-proyekti-z-cifrovoyi-osviti-ta-rozvitku-malogo-ta-serednogo-biznesu",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:41:46.897335Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "316dde7ce3f244ff66515534c078561a8f05526349e0ca3a1f164409dbaa52ba",
+  "bytes_original": 252162,
+  "sha256_stored": "4d7d14390b339a42dc0f283d6dcb851c4ccfdd64b4900cb2704c23334d494fa7",
+  "bytes_stored": 13620,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

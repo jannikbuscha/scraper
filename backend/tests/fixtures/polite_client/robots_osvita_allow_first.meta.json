@@ -1,0 +1,25 @@
+{
+  "fixture": "robots_osvita_allow_first",
+  "body": "robots_osvita_allow_first.txt",
+  "collector": "polite_client",
+  "source": "S2",
+  "purpose": "'Allow: /' before the Disallow lines plus wildcard rules: RFC 9309 longest match disallows e.g. /programmes, a first-match parser (urllib.robotparser) allows everything",
+  "url": "https://osvita.diia.gov.ua/robots.txt",
+  "final_url": "https://osvita.diia.gov.ua/robots.txt",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:13:21.867253Z",
+  "content_type": "text/plain;charset=UTF-8",
+  "headers": {
+    "content-type": "text/plain;charset=UTF-8"
+  },
+  "sha256_original": "a6235c4fe10247c4643a1927efdac26f9d7ccf226928bf22f4bf8720287f167c",
+  "bytes_original": 603,
+  "sha256_stored": "a6235c4fe10247c4643a1927efdac26f9d7ccf226928bf22f4bf8720287f167c",
+  "bytes_stored": 603,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "technical file of osvita.diia.gov.ua (site not openly licensed; no creative content)",
+  "attribution": "osvita.diia.gov.ua, retrieved 2026-10-29; unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

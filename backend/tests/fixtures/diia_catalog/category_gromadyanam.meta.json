@@ -1,0 +1,27 @@
+{
+  "fixture": "category_gromadyanam",
+  "body": "category_gromadyanam.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Audience page (citizens): h1 plus subcategory tiles (div.services_item; 14 on 2026-10-29) and no services, so the parser must not expect services here",
+  "url": "https://diia.gov.ua/services/categories/gromadyanam",
+  "final_url": "https://diia.gov.ua/services/categories/gromadyanam",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:22.365472Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "fd4b1ab67c9731e6d63b606f6b1c19021fff84e48669251b2a8ad4fe0856fda7",
+  "bytes_original": 91611,
+  "sha256_stored": "e6fbbe373737114f923dde6ae16129af6f245adf4fd7ef9c40f70bea4d929081",
+  "bytes_stored": 3074,
+  "trimmed": true,
+  "trim_note": "kept head basics, breadcrumb, h1 and 3 of 14 subcategory tiles (descriptions shortened to 60 characters, marked …) and the copyright line",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

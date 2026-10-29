@@ -1,0 +1,26 @@
+{
+  "fixture": "news_uk_2025_year_review",
+  "body": "news_uk_2025_year_review.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "UA 2025 year-in-review (report-type, 24 грудня 2025 17:07) with outbound links to storage.thedigital.gov.ua PDFs, cms.thedigital.gov.ua and 2025.thedigital.gov.ua (C4 document queue)",
+  "url": "https://www.kmu.gov.ua/news/vid-shi-asystenta-v-dii-do-suputnykovoho-zviazku-ta-oboronnykh-tekhnolohii-pidsumky-mintsyfry-u-2025-rotsi",
+  "final_url": "https://www.kmu.gov.ua/news/vid-shi-asystenta-v-dii-do-suputnykovoho-zviazku-ta-oboronnykh-tekhnolohii-pidsumky-mintsyfry-u-2025-rotsi",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:34:44.823723Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "80d3a99a919aa59096733cd005182c9eac1d6403574e6be7314a869e51288d72",
+  "bytes_original": 262882,
+  "sha256_stored": "595f99353ca864066cde0943be94f3a1f0656bd7183d6705418338bb3a42ad07",
+  "bytes_stored": 27169,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

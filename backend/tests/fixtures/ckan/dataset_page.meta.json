@@ -1,0 +1,27 @@
+{
+  "fixture": "dataset_page",
+  "body": "dataset_page.html",
+  "collector": "ckan",
+  "source": "S7b",
+  "purpose": "Dataset page: licence line, additional-info table (version, dates in 'Липень 12, 2019, 09:45 (EEST)' format, identifier = CKAN name), resources, DCAT alternates",
+  "url": "https://data.gov.ua/dataset/96612ea3-53b5-45db-be0b-377cac72704d",
+  "final_url": "https://data.gov.ua/dataset/96612ea3-53b5-45db-be0b-377cac72704d",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:37:52.202672Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=14400",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "f0a4e89ad9178e4f33f19f6e958663f3d3e691bc0c6ec79da8bb9afe270a25c3",
+  "bytes_original": 41094,
+  "sha256_stored": "040a8082313d0869e79e7da779dc387dfbc3ac18d0a0e7d6e12321935034eccb",
+  "bytes_stored": 6308,
+  "trimmed": true,
+  "trim_note": "kept head basics with the DCAT alternate links, h1, the licence block, the additional-info table (the responsible person's name replaced by [redacted]) and the resource list",
+  "licence": "dataset licence 'Creative Commons Attribution' as stated on the page; no licence statement for the page itself",
+  "attribution": "data.gov.ua (Єдиний державний веб-портал відкритих даних), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

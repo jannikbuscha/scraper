@@ -1,0 +1,26 @@
+{
+  "fixture": "news_uk_2025_playcity",
+  "body": "news_uk_2025_playcity.html",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "UA 2025 item 'Уряд ухвалив постанову' (21 березня 2025 18:12) in the new transliteration style; no link to the act itself",
+  "url": "https://www.kmu.gov.ua/news/pleisiti-stane-novym-rehuliatorom-azartnykh-ihor-uriad-ukhvalyv-postanovu",
+  "final_url": "https://www.kmu.gov.ua/news/pleisiti-stane-novym-rehuliatorom-azartnykh-ihor-uriad-ukhvalyv-postanovu",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:34:40.822700Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "private, must-revalidate",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "f721d7c965821e43dd48cbf18cfcf6a1c94285c78d8c0eba617da203984d0dbb",
+  "bytes_original": 246155,
+  "sha256_stored": "75b239e0c20ab4b8dba0f7192adde443607d3217de3fbde1ff49a77fc4bbbf05",
+  "bytes_stored": 9499,
+  "trimmed": true,
+  "trim_note": "kept head basics, the csrf-token meta and one inline script with its CSP nonce (volatile parts for normalisation tests), the breadcrumb, div#page-title (h1, div.page_title-desc with publishing body and date, ul.wcag-tags), the article body div.news__item--inner, nav#blogNavigation and the footer licence line; removed everything else, in particular the inline bot-manager script whose __uzdbm_2 token encodes the requesting client's IP address",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt (navigation, scripts and the bot-manager token removed)",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

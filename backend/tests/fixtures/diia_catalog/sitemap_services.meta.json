@@ -1,0 +1,27 @@
+{
+  "fixture": "sitemap_services",
+  "body": "sitemap_services.xml",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Service discovery: 171 /services/<slug> URLs with lastmod, sorted by lastmod descending (lastmod is not a launch date)",
+  "url": "https://diia.gov.ua/sitemap-kitsoftservicesmodelsservice-1.xml",
+  "final_url": "https://diia.gov.ua/sitemap-kitsoftservicesmodelsservice-1.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:31.092727Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml",
+    "server": "cloudflare"
+  },
+  "sha256_original": "7e59d3776c6ead0d05175fe37753ba40e15c44e1a89dc7311993c3252f68f2d1",
+  "bytes_original": 36784,
+  "sha256_stored": "72d9348563d1d81ad120d627ac48eb5522016e79f421899b16070a9406c8f8be",
+  "bytes_stored": 1618,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog, the 3 newest and the oldest <url> entries and the entries of the 3 service fixtures (order unchanged)",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.' (the file holds URLs and dates only)",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

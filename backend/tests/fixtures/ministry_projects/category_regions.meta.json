@@ -1,0 +1,26 @@
+{
+  "fixture": "category_regions",
+  "body": "category_regions.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Rubric listing with 1 entry (Дія.Центр); Дія.City is not listed here",
+  "url": "https://thedigital.gov.ua/projects/regions",
+  "final_url": "https://thedigital.gov.ua/projects/regions",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:44.196379Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "fe79a9d9b469777db460459159185b01bc23b4f3cea9a8270942a260a591ecab",
+  "bytes_original": 48385,
+  "sha256_stored": "fe79a9d9b469777db460459159185b01bc23b4f3cea9a8270942a260a591ecab",
+  "bytes_stored": 48385,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

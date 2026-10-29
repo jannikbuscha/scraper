@@ -1,0 +1,26 @@
+{
+  "fixture": "news_article_2022",
+  "body": "news_article_2022.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Wartime article (2022-05-20) announcing a new Diia service: event-proposal phrases, tags, link marks",
+  "url": "https://thedigital.gov.ua/news/technologies/nova-posluga-v-dii-oformlennya-sotsialnoi-dopomogi-dlya-tikh-khto-vtrativ-robotu-pid-chas-viyni",
+  "final_url": "https://thedigital.gov.ua/news/technologies/nova-posluga-v-dii-oformlennya-sotsialnoi-dopomogi-dlya-tikh-khto-vtrativ-robotu-pid-chas-viyni",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T14:03:35.021171Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "26502b8e3630e67bbf8a3f7692275193f32c66fd2e8b17e0773f263bf006856b",
+  "bytes_original": 77600,
+  "sha256_stored": "26502b8e3630e67bbf8a3f7692275193f32c66fd2e8b17e0773f263bf006856b",
+  "bytes_stored": 77600,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

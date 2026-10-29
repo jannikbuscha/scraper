@@ -1,0 +1,26 @@
+{
+  "fixture": "center_home",
+  "body": "center_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Generic C2 pass: footer operator statement (developer, ministry, ДП “Дія”, SURGe, UN programme), copyright line, and a hidden /cdn-cgi/content link that collectors must never follow",
+  "url": "https://center.diia.gov.ua/",
+  "final_url": "https://center.diia.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:12:04.884554Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "4ffc7f064b0c20c1f200c619dd86dfe09b88061e7c8ec2a58527a1b98167a03a",
+  "bytes_original": 251420,
+  "sha256_stored": "9dfbc0f6ac628b35df4556fd8e797274a4ecbe9e9136f2ffcfb79c67ed842680",
+  "bytes_stored": 2222,
+  "trimmed": true,
+  "trim_note": "kept head basics, JSON-LD, h1, the footer operator statement and copyright line, and the hidden /cdn-cgi/content link (its id value replaced by REDACTED); the window.__NUXT__ state (24.9 KB) and all other scripts removed",
+  "licence": "not openly licensed: footer '© 2026. Усі права захищені.'",
+  "attribution": "center.diia.gov.ua (Дія. Платформа Центрів), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

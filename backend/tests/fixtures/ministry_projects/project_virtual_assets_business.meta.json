@@ -1,0 +1,26 @@
+{
+  "fixture": "project_virtual_assets_business",
+  "body": "project_virtual_assets_business.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Project page without an own domain: functional mailto, a Rada bill link (C6 queue), 4 PDF links on cms.thedigital.gov.ua, section/buttons/backgroundSection blocks",
+  "url": "https://thedigital.gov.ua/projects/business/virtual_assets",
+  "final_url": "https://thedigital.gov.ua/projects/business/virtual_assets",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:48.982763Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "2d5b6fec50165a3fb8e5546ebc3bd09f925b175792057233923a5d0f04830acc",
+  "bytes_original": 101695,
+  "sha256_stored": "2d5b6fec50165a3fb8e5546ebc3bd09f925b175792057233923a5d0f04830acc",
+  "bytes_stored": 101695,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "news_article_en_2024",
+  "body": "news_article_en_2024.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "English article labelled language uk (deterministic language detection)",
+  "url": "https://thedigital.gov.ua/news/technologies/foreigners-can-start-and-run-business-in-ukraine-online-launch-of-the-uresidency-program",
+  "final_url": "https://thedigital.gov.ua/news/technologies/foreigners-can-start-and-run-business-in-ukraine-online-launch-of-the-uresidency-program",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T14:01:39.260097Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "43a89b6955489e5eac450147e2d01ea598be9bce64e981455de9f73cb3f969e2",
+  "bytes_original": 82972,
+  "sha256_stored": "43a89b6955489e5eac450147e2d01ea598be9bce64e981455de9f73cb3f969e2",
+  "bytes_stored": 82972,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

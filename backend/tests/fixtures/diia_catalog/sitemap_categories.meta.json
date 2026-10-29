@@ -1,0 +1,27 @@
+{
+  "fixture": "sitemap_categories",
+  "body": "sitemap_categories.xml",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Category sitemap: only the two audience pages are listed; subcategories are in no sitemap",
+  "url": "https://diia.gov.ua/sitemap-kitsoftservicesmodelscategory-1.xml",
+  "final_url": "https://diia.gov.ua/sitemap-kitsoftservicesmodelscategory-1.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:33.130451Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml",
+    "server": "cloudflare"
+  },
+  "sha256_original": "1c7e641c189832a479fc466a1f669fb95b038b463c7501bc13fc1334216dcc8b",
+  "bytes_original": 655,
+  "sha256_stored": "1c7e641c189832a479fc466a1f669fb95b038b463c7501bc13fc1334216dcc8b",
+  "bytes_stored": 655,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.' (the file holds URLs only)",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

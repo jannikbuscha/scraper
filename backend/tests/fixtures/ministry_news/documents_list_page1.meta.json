@@ -1,0 +1,26 @@
+{
+  "fixture": "documents_list_page1",
+  "body": "documents_list_page1.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Documents listing (documents.list): types file and content, the filter vocabularies (kinds, categories, subjects), the constant 'Розпорядження від …' label next to the real kind",
+  "url": "https://thedigital.gov.ua/documents",
+  "final_url": "https://thedigital.gov.ua/documents",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:58:04.472986Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "15ae874bbeaa49230af989f9f433815d80a13cd9d306d31600ff1b4556904925",
+  "bytes_original": 89338,
+  "sha256_stored": "15ae874bbeaa49230af989f9f433815d80a13cd9d306d31600ff1b4556904925",
+  "bytes_stored": 89338,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

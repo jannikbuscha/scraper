@@ -1,0 +1,26 @@
+{
+  "fixture": "news_article_2019",
+  "body": "news_article_2019.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "2019 article (news.view): no authors, JSON-LD Article datePublished; duplicate pair with kmu_news/news_uk_2019_komanda_duplicate_pair (same title, different time and slug)",
+  "url": "https://thedigital.gov.ua/news/education/komanda-ministrerstva-prezentuvala-proekty-tsyfrovoi-osvity",
+  "final_url": "https://thedigital.gov.ua/news/education/komanda-ministrerstva-prezentuvala-proekty-tsyfrovoi-osvity",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T14:03:31.842209Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "1c524e6f308ce48ccae318195e5b6f1e54bcbbce12e64a2e0e39ff632864e253",
+  "bytes_original": 67176,
+  "sha256_stored": "1c524e6f308ce48ccae318195e5b6f1e54bcbbce12e64a2e0e39ff632864e253",
+  "bytes_stored": 67176,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

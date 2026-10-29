@@ -1,0 +1,31 @@
+User-agent: *
+Allow: /
+
+Disallow: /test/results
+Disallow: /uploads/certificate
+Disallow: /profile
+Disallow: /certificates
+Disallow: /programmes
+Disallow: /favorites
+Disallow: /notes
+Disallow: /personal-skills
+Disallow: /settings
+Disallow: /search
+Disallow: /personal-course
+Disallow: /digigram-share
+Disallow: /*gclid=*
+Disallow: /*yclid=*
+Disallow: /*fbclid=*
+Disallow: /*scroll=*
+Disallow: /*tab=*
+Disallow: /*utm_*
+Disallow: /ambassador
+Disallow: /expert
+
+User-agent: Yandex
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+Sitemap: https://osvita.diia.gov.ua/sitemap.xml

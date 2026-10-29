@@ -1,0 +1,29 @@
+{
+  "fixture": "guide_register_json",
+  "body": "guide_register_json.json",
+  "collector": "diia_guide",
+  "source": "S3 (C-2)",
+  "purpose": "Register JSON {'entries': [...]} (1921 entries x 28 keys on 2026-10-29): parser for identifier, thematic_area, sector, events, level, moderation_status, service_provider, application_ways, access_link, created_at",
+  "url": "https://guide.diia.gov.ua/register/download/json/",
+  "final_url": "https://guide.diia.gov.ua/register/download/json/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:05:18.424343Z",
+  "content_type": "application/json",
+  "headers": {
+    "cache-control": "no-cache must-revalidate proxy-revalidate",
+    "content-length": "18539651",
+    "content-type": "application/json",
+    "etag": "\"6ae33ac7-11ae483\"",
+    "last-modified": "Thu, 29 Oct 2026 12:23:35 GMT"
+  },
+  "sha256_original": "19f364b97c5d80b6ae21258731784cd3bad838d222413e4c1827907fe5aa4e20",
+  "bytes_original": 18539651,
+  "sha256_stored": "f7401ceaf844cb39d378049ac9d36aa5d45123348610ac5fc1a32d214b4c716b",
+  "bytes_stored": 45549,
+  "trimmed": true,
+  "trim_note": "reduced for size (18.5 MB) to 4 complete entries with all 28 keys, in original order: 00031 (service_provider incl. 'Мобільний додаток Порталу Дія (Дія)'), 00037 (access_link to diia.gov.ua/services), 00177 ('Місцева') and 01326 ('Архівна'); re-serialised with indent=1",
+  "licence": "CC BY 4.0 per the site footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/)",
+  "attribution": "Гід з державних послуг / Реєстр адміністративних послуг, guide.diia.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: reduced to 4 of 1921 entries and re-serialised with indentation",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "projects_page2",
+  "body": "projects_page2.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Listing page 2 (route projects.list.page): 8 entries incl. 4 type=link entries and the rubric army (UNITED24); last-page handling",
+  "url": "https://thedigital.gov.ua/projects/page/2",
+  "final_url": "https://thedigital.gov.ua/projects/page/2",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:00.770331Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "06789d8d4682a4c3b7088e31a2162c4d9eb662911c08ec7906b61508636449d1",
+  "bytes_original": 77467,
+  "sha256_stored": "06789d8d4682a4c3b7088e31a2162c4d9eb662911c08ec7906b61508636449d1",
+  "bytes_stored": 77467,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

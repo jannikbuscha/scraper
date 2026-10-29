@@ -1,0 +1,26 @@
+{
+  "fixture": "document_page_content",
+  "body": "document_page_content.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Content-type document (documents.view): id, type, group, kind, category; 4 attachment links to storage.thedigital.gov.ua PDFs (TipTap link marks) with the attachment role as anchor text",
+  "url": "https://thedigital.gov.ua/documents/ministry/povidomlennia-pro-opryliudnennia-na-hromadske-obhovorennia-proektu-postanovy-kabinetu-ministriv-ukrayiny-deiaki-pytannia-rozvytku-ukrayinskykh-velykykh-movnykh-modeley",
+  "final_url": "https://thedigital.gov.ua/documents/ministry/povidomlennia-pro-opryliudnennia-na-hromadske-obhovorennia-proektu-postanovy-kabinetu-ministriv-ukrayiny-deiaki-pytannia-rozvytku-ukrayinskykh-velykykh-movnykh-modeley",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:59:51.599834Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "90afb39942dd037db3fdb7dfa9def6823df21a4fa0b2daeb86b322cd3cffe934",
+  "bytes_original": 52588,
+  "sha256_stored": "c586a16c3b0fb9e178d45bc677a35eae0d9d9be8c1863d47776ce52884f8edab",
+  "bytes_stored": 52572,
+  "trimmed": true,
+  "trim_note": "original bytes except one personal staff e-mail address (4 occurrences in HTML and payload), replaced by the same-shape placeholder redacted@example.invalid",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: one staff e-mail address replaced by redacted@example.invalid",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

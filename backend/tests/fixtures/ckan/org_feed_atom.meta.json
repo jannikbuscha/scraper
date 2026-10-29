@@ -1,0 +1,28 @@
+{
+  "fixture": "org_feed_atom",
+  "body": "org_feed_atom.xml",
+  "collector": "ckan",
+  "source": "S7b",
+  "purpose": "Structured inventory (Atom, 20 entries per page, rel=next/first/last, published/updated, entry links by CKAN id)",
+  "url": "https://data.gov.ua/feeds/organization/mincyfry.atom",
+  "final_url": "https://data.gov.ua/feeds/organization/mincyfry.atom",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:36:36.646380Z",
+  "content_type": "application/atom+xml; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=14400",
+    "content-length": "25448",
+    "content-type": "application/atom+xml; charset=utf-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "0afa4531e294442e5c29306a451e7affa6c6da41ab68b0e0636c4f5b401858f7",
+  "bytes_original": 25448,
+  "sha256_stored": "d63fe33693f0aed44926608725aa7aab989d56d7e7e2ba57df083b61bf47e581",
+  "bytes_stored": 5988,
+  "trimmed": true,
+  "trim_note": "kept the feed header (incl. pagination links) and the first 3 of 20 entries; each entry's author <name> and <email> replaced by [redacted] (personal data)",
+  "licence": "portal feed: no licence statement; dataset metadata cc-by per the organisation facet",
+  "attribution": "data.gov.ua (Єдиний державний веб-портал відкритих даних), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

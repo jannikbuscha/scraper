@@ -1,0 +1,25 @@
+{
+  "fixture": "sitemap_latest100",
+  "body": "sitemap_latest100.xml",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "The only sitemap: the 100 most recently modified news URLs; lastmod is a modification time, not publishedAt",
+  "url": "https://thedigital.gov.ua/sitemap.xml",
+  "final_url": "https://thedigital.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:08:27.869067Z",
+  "content_type": "application/xml",
+  "headers": {
+    "content-type": "application/xml"
+  },
+  "sha256_original": "5a043ed1dea5eba13784ad7ca435514492115855cb1fb1447e5a63da00780f9d",
+  "bytes_original": 30351,
+  "sha256_stored": "5a043ed1dea5eba13784ad7ca435514492115855cb1fb1447e5a63da00780f9d",
+  "bytes_stored": 30351,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

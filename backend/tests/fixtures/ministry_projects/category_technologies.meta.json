@@ -1,0 +1,26 @@
+{
+  "fixture": "category_technologies",
+  "body": "category_technologies.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Largest rubric listing (11 entries, content and link types) with the rubric object",
+  "url": "https://thedigital.gov.ua/projects/technologies",
+  "final_url": "https://thedigital.gov.ua/projects/technologies",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:39.323651Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "dfbba6269e8635c99b2b80e6fd900a768c605059f8f15f811dae0aff808c9d78",
+  "bytes_original": 87982,
+  "sha256_stored": "dfbba6269e8635c99b2b80e6fd900a768c605059f8f15f811dae0aff808c9d78",
+  "bytes_stored": 87982,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

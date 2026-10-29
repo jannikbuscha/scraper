@@ -1,0 +1,27 @@
+{
+  "fixture": "se_portal_page",
+  "body": "se_portal_page.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Operator self-designation (title and footer 'SE DIIA'), hreflang uk/en, the reference to the CMU resolution of 4 December 2019 № 1137, inline Vue menu JSON, Cloudflare e-mail protection and a hidden /cdn-cgi/content link",
+  "url": "https://se.diia.gov.ua/en/unified-state-web-portal-of-electronic-services-diia",
+  "final_url": "https://se.diia.gov.ua/en/unified-state-web-portal-of-electronic-services-diia",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:13:02.649672Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "no-store, no-cache, must-revalidate",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "9babc923a1b50dd69ffdb8ecfd7f0b4c6ad6f77fdefc4f0cc4f2e27cf7e5e1e6",
+  "bytes_original": 22452,
+  "sha256_stored": "7f859c5cc479ffa5a19e09034a4965a1ebdfccdaf942cf483f18cf5e782c23ef",
+  "bytes_stored": 12546,
+  "trimmed": true,
+  "trim_note": "kept head basics with hreflang links, the main text (paragraphs over 200 characters shortened, marked …), the footer, the inline Vue menu script and the hidden /cdn-cgi/content link (id REDACTED); other scripts removed",
+  "licence": "not openly licensed: footer '©2026 SE DIIA' (no licence statement)",
+  "attribution": "se.diia.gov.ua (SE DIIA), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

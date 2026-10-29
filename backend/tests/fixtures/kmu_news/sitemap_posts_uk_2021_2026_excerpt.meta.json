@@ -1,0 +1,26 @@
+{
+  "fixture": "sitemap_posts_uk_2021_2026_excerpt",
+  "body": "sitemap_posts_uk_2021_2026_excerpt.xml",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "UA news sitemap 1 (49,999 URLs, 2026-10-28 back to 2021-08-04): new transliteration style (mintsyfr, tsyfrov) and the 2022 overlap of both styles",
+  "url": "https://www.kmu.gov.ua/sitemap-rainlab-blog-models-post-1.xml",
+  "final_url": "https://www.kmu.gov.ua/sitemap-rainlab-blog-models-post-1.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:27:22.826358Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml"
+  },
+  "sha256_original": "9a6d1fc73b61ea4cd740177883f6e616187886431af0fb65b990784cb98896c5",
+  "bytes_original": 11421182,
+  "sha256_stored": "5bb397ec806fd6610f91befb08c9b67193dce69e465560d38f999da92f15c311",
+  "bytes_stored": 2333,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog, the 3 newest and the oldest entries, two known 2025 ministry items, and one old-style (mincifr, Oct-Dec 2022) and one new-style (mintsyfr, Jan-Sep 2022) slug; order unchanged",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk) (the file holds URLs and dates only)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt of <url> entries",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

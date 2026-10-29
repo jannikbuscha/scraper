@@ -1,0 +1,28 @@
+{
+  "fixture": "u24_home",
+  "body": "u24_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Server-rendered Angular page: weekly report PDF links with the date in the path (files.u24.gov.ua/reports/<yyyy>/<month>/<dd>/report-<yyyymmdd>-<area>.pdf), the 'Total collected' figure (indicator proposal only after review), link to the President's announcement",
+  "url": "https://u24.gov.ua/",
+  "final_url": "https://u24.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:36:06.662244Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=300",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "x-powered-by": "Express"
+  },
+  "sha256_original": "1ff9b96bace602cac72a5cf103a53a48179a8883eca96f6236f2fa5687e4c3c5",
+  "bytes_original": 206928,
+  "sha256_stored": "cfba4bc6bf09a6e1588789d37bbc881ecdb8ba745526fc45177bbbf518fde521",
+  "bytes_stored": 6589,
+  "trimmed": true,
+  "trim_note": "kept head basics, the report PDF links, the 'weekly reports' and 'Total collected' elements, the president.gov.ua link and the footer; texts over 200 characters shortened (marked …)",
+  "licence": "no licence statement: footer '2026©'",
+  "attribution": "u24.gov.ua (UNITED24), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MDT Portfolio test fixture: minimal excerpt of https://center.diia.gov.ua/sitemap.xml (retrieved 2026-10-29); see the .meta.json file; 6 of 445 <url> entries kept -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"
+        xmlns:news="http://www.google.com/schemas/sitemap-news/0.9"
+        xmlns:xhtml="http://www.w3.org/1999/xhtml">
+<url>
+            <loc>https://center.diia.gov.ua/</loc>
+                            <lastmod>2022-09-13T17:49:53+03:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+<url>
+            <loc>https://center.diia.gov.ua/employee</loc>
+                            <lastmod>2021-12-23T10:20:12+02:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+<url>
+            <loc>https://center.diia.gov.ua/blog</loc>
+                            <lastmod>2021-09-10T15:28:50+03:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+<url>
+            <loc>http://center-back-app/education/course/ak-nadavati-administrativni-poslugi</loc>
+                            <lastmod>2021-11-09T11:29:18+02:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+<url>
+            <loc>http://center-back-app/education/course/uridicni-ta-organizacijni-aspekti-roboti-cnapu</loc>
+                            <lastmod>2021-09-17T17:03:56+03:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+<url>
+            <loc>http://center-back-app/education/course/prakticni-aspekti-nadanna-administrativnih-poslug-u-sferi-zemelnih-vidnosin</loc>
+                            <lastmod>2021-09-17T17:04:00+03:00</lastmod>
+                                        <changefreq>daily</changefreq>
+                                        <priority>0.8</priority>
+                                                        </url>
+</urlset>

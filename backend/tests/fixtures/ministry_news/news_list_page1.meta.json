@@ -1,0 +1,26 @@
+{
+  "fixture": "news_list_page1",
+  "body": "news_list_page1.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Newest news listing (news.list): pagination {total 4385, perPage 12, lastPage 366}, the 12 news rubrics, visible dates without year next to <time dateTime>",
+  "url": "https://thedigital.gov.ua/news",
+  "final_url": "https://thedigital.gov.ua/news",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:54:18.777238Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "9f25cabf8face1fa0e125c57273270a0139444e14d9940683850e76fe330ff44",
+  "bytes_original": 97910,
+  "sha256_stored": "9f25cabf8face1fa0e125c57273270a0139444e14d9940683850e76fe330ff44",
+  "bytes_stored": 97910,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

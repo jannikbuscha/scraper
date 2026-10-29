@@ -1,0 +1,28 @@
+{
+  "fixture": "united24media_home",
+  "body": "united24media_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "JSON-LD NewsMediaOrganization (founder 'Ministry of Digital Transformation of Ukraine', foundingDate 2024-03-29), hreflang en/es, a teaser with <time datetime>, rights line",
+  "url": "https://united24media.com/",
+  "final_url": "https://united24media.com/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:36:51.368402Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "etag": "\"48deafd3869feb5e65127180052077e4\"",
+    "server": "nginx"
+  },
+  "sha256_original": "fb9c2c638d70dfd04f27ebc9f976491152064c7e8084c0528078e76453a7c2ca",
+  "bytes_original": 201683,
+  "sha256_stored": "e1e95a79fe894e51399320f19223644b80408a2478547cf27cae51b43f1fd963",
+  "bytes_stored": 3767,
+  "trimmed": true,
+  "trim_note": "kept head basics with the JSON-LD blocks and hreflang links, one article teaser with <time datetime> and the rights line; texts over 200 characters shortened (marked …)",
+  "licence": "not openly licensed: footer '© 2026 UNITED24. All rights reserved.'",
+  "attribution": "united24media.com (UNITED24 Media), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

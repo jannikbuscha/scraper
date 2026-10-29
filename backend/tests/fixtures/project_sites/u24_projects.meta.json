@@ -1,0 +1,28 @@
+{
+  "fixture": "u24_projects",
+  "body": "u24_projects.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Fundraising campaigns: '61 all projects' counter, campaign cards without dates, a Cloudflare e-mail-protection link that must be skipped",
+  "url": "https://u24.gov.ua/projects",
+  "final_url": "https://u24.gov.ua/projects",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:41:37.027970Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=300",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "x-powered-by": "Express"
+  },
+  "sha256_original": "53f44e977d0d3d1ae25046ce2f92ef5a34dc2c87cbc969fd5433c106e4b5888c",
+  "bytes_original": 173691,
+  "sha256_stored": "1462d5a1767ff4692d6c71680582c186c1302ce36cee75893cd9d8ebf3568961",
+  "bytes_stored": 5399,
+  "trimmed": true,
+  "trim_note": "kept head basics, the project counter, 3 campaign card links, one /cdn-cgi/l/email-protection link and the footer; texts over 200 characters shortened (marked …)",
+  "licence": "no licence statement: footer '2026©'",
+  "attribution": "u24.gov.ua (UNITED24), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

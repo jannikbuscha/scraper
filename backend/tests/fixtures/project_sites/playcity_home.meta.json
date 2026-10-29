@@ -1,0 +1,26 @@
+{
+  "fixture": "playcity_home",
+  "body": "playcity_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Meta description with the coordination statement (through the First Vice Prime Minister - Minister of Digital Transformation, as captured on 2026-10-29), navigation to /pravovi-zasady, /npas/, /news/, footer",
+  "url": "https://playcity.gov.ua/",
+  "final_url": "https://playcity.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:37:22.838735Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "must-revalidate, no-cache, no-store, private",
+    "content-type": "text/html; charset=UTF-8"
+  },
+  "sha256_original": "767cd46bf4762dd17601a62da62066c671ef8cce0a811b5b48b6a31d69b77ebd",
+  "bytes_original": 92625,
+  "sha256_stored": "c258468d05f6d9e5c0d2cbfbd0675aaac6b2df643891e5124df739a7ff1acb56",
+  "bytes_stored": 4627,
+  "trimmed": true,
+  "trim_note": "kept head basics (incl. the meta description), four navigation links and the rights line",
+  "licence": "not openly licensed: footer 'playcity.gov.ua Всі права захищені.'",
+  "attribution": "playcity.gov.ua (Державне агентство України ПлейСіті), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

@@ -1,0 +1,26 @@
+{
+  "fixture": "project_brave1_technologies",
+  "body": "project_brave1_technologies.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Project page (projects.view): UUID, tags, video/gallery/bulletList blocks, linkListItem to the own domain, related articles with publishedAt",
+  "url": "https://thedigital.gov.ua/projects/technologies/brave1",
+  "final_url": "https://thedigital.gov.ua/projects/technologies/brave1",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:26.224497Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "958e1cd8dae37be9d077d818ed7bd966f006003e8a9aa7a58ef6d3b4795bd2cf",
+  "bytes_original": 99029,
+  "sha256_stored": "958e1cd8dae37be9d077d818ed7bd966f006003e8a9aa7a58ef6d3b4795bd2cf",
+  "bytes_stored": 99029,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

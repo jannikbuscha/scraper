@@ -1,0 +1,31 @@
+{
+  "fixture": "link_entry_winwin_redirect",
+  "body": "link_entry_winwin_redirect.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Ministry URL of a type=link entry: 302 to https://winwin.gov.ua/ (redirect chain in this meta file). C1 must not follow link entries; it records externalUrl from the listing",
+  "url": "https://thedigital.gov.ua/projects/technologies/winwin",
+  "final_url": "https://winwin.gov.ua/",
+  "redirects": [
+    "302 https://winwin.gov.ua/"
+  ],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:04:41.479535Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=300",
+    "content-length": "162929",
+    "content-type": "text/html; charset=utf-8",
+    "etag": "W/\"27c71-e9PGoQ7Dau3cCZcpGBSIDuuiSi4\"",
+    "x-powered-by": "Express"
+  },
+  "sha256_original": "1dd2ce975517f965c06efcb8106fa00f139053856951a54e9eac71ffe2e43207",
+  "bytes_original": 162929,
+  "sha256_stored": "26d4d0c7725b913aaeb3c8ae49638ff5ce42fc408bc148cb1421e734314b4c35",
+  "bytes_stored": 346,
+  "trimmed": true,
+  "trim_note": "kept only <title> and the charset of the redirect target; everything else removed",
+  "licence": "body is the home page of winwin.gov.ua (redirect target): no licence statement found",
+  "attribution": "winwin.gov.ua (WINWIN), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

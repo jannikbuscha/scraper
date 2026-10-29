@@ -1,0 +1,222 @@
+# As a condition of accessing this website, you agree to abide by the following
+# content signals:
+
+# (a)  If a Content-Signal = yes, you may collect content for the corresponding
+#      use.
+# (b)  If a Content-Signal = no, you may not collect content for the
+#      corresponding use.
+# (c)  If the website operator does not include a Content-Signal for a
+#      corresponding use, the website operator neither grants nor restricts
+#      permission via Content-Signal with respect to the corresponding use.
+
+# The content signals and their meanings are:
+
+# search:   building a search index and providing search results (e.g., returning
+#           hyperlinks and short excerpts from your website's contents). Search does not
+#           include providing AI-generated search summaries.
+# ai-input: inputting content into one or more AI models (e.g., retrieval
+#           augmented generation, grounding, or other real-time taking of content for
+#           generative AI search answers).
+# ai-train: training or fine-tuning AI models.
+# use:      how AI systems may consume the content (immediate, reference, or full).
+
+# ANY RESTRICTIONS EXPRESSED VIA CONTENT SIGNALS ARE EXPRESS RESERVATIONS OF
+# RIGHTS UNDER ARTICLE 4 OF THE EUROPEAN UNION DIRECTIVE 2019/790 ON COPYRIGHT
+# AND RELATED RIGHTS IN THE DIGITAL SINGLE MARKET.
+
+# BEGIN Cloudflare Managed content
+
+
+User-agent: *
+Content-Signal: search=yes,ai-train=no,use=reference
+Allow: /
+
+# Training crawlers
+User-agent: Amazonbot
+Disallow: /
+
+User-agent: Applebot-Extended
+Disallow: /
+
+User-agent: Bytespider
+Disallow: /
+
+User-agent: CCBot
+Disallow: /
+
+User-agent: ClaudeBot
+Disallow: /
+
+User-agent: Diffbot
+Disallow: /
+
+User-agent: Google-Extended
+Disallow: /
+
+User-agent: GPTBot
+Disallow: /
+
+User-agent: omgili
+Disallow: /
+
+User-agent: anthropic-ai
+Disallow: /
+
+User-agent: Claude-Web
+Disallow: /
+
+User-agent: cohere-ai
+Disallow: /
+
+User-agent: MistralAI-Training
+Disallow: /
+
+User-agent: meta-externalagent
+Disallow: /
+
+User-agent: GoogleOther
+Disallow: /
+
+User-agent: Baiduspider
+Disallow: /
+
+User-agent: PetalBot
+Disallow: /
+
+User-agent: AwarioSmartBot
+User-agent: AwarioRssBot
+Disallow: /
+
+User-agent: Google-CloudVertexBot
+Disallow: /
+
+User-agent: QualifiedBot
+Disallow: /
+
+User-agent: Cotoyogi
+Disallow: /
+
+User-agent: ICC-Crawler
+Disallow: /
+
+User-agent: atlassian-bot
+Disallow: /
+
+User-agent: FishBot
+Disallow: /
+
+User-agent: BorderxBot
+Disallow: /
+
+User-agent: NavuBot
+Disallow: /
+
+User-agent: SemrushBot-SWA
+Disallow: /
+
+User-agent: WARDBot
+Disallow: /
+
+User-agent: magpie-crawler
+Disallow: /
+
+User-agent: KimiBot
+Disallow: /
+
+User-agent: CitibotSiteCrawler
+Disallow: /
+
+# END Cloudflare Managed Content
+
+# =============================================================================
+# ROBOTS.TXT
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# General rules for all search bots
+# -----------------------------------------------------------------------------
+User-agent: *
+Disallow: /dataset/rate/
+Disallow: /revision/
+Disallow: /dataset/*/history
+Disallow: /api/
+Disallow: /global_search
+Disallow: /user
+Crawl-delay: 10
+
+# -----------------------------------------------------------------------------
+# Full block for AI crawlers and aggressive bots
+# -----------------------------------------------------------------------------
+
+# --- AI / LLM bots ---
+User-agent: GPTBot
+User-agent: ChatGPT-User
+User-agent: ClaudeBot
+User-agent: Claude-Web
+User-agent: Anthropic-ai
+User-agent: CCBot
+User-agent: Diffbot
+User-agent: Bytespider
+User-agent: Applebot
+User-agent: Applebot-extended
+User-agent: FacebookBot
+User-agent: Meta-ExternalAgent
+User-agent: Google-Extended
+User-agent: PerplexityBot
+User-agent: Cohere-ai
+User-agent: YouBot
+
+# --- Amazon ---
+User-agent: Amazonbot
+
+# --- Chinese bots ---
+User-agent: Baiduspider
+User-agent: Baiduspider-image
+User-agent: Baiduspider-video
+User-agent: Baiduspider-news
+User-agent: Baiduspider-favo
+User-agent: Baiduspider-cpro
+User-agent: Baiduspider-ads
+User-agent: Baidu-YunGuanCe
+User-agent: YisouSpider
+User-agent: Sogou web spider
+User-agent: Sogou inst spider
+User-agent: Sogou spider
+User-agent: 360Spider
+User-agent: HaoSouSpider
+User-agent: Qihoobot
+User-agent: AlibabaBot
+User-agent: Alibaba.Security.Heimdall
+User-agent: TencentTraveler
+User-agent: Bingbot
+User-agent: Yandex
+User-agent: YandexBot
+User-agent: YandexImages
+User-agent: YandexMobileBot
+
+# --- SEO / scrapers ---
+User-agent: AhrefsBot
+User-agent: SemrushBot
+User-agent: DotBot
+User-agent: MJ12bot
+User-agent: BLEXBot
+User-agent: DataForSeoBot
+User-agent: MegaIndex.ru
+User-agent: SEOkicks
+User-agent: seoscanners.net
+User-agent: Rogerbot
+User-agent: Screaming Frog SEO Spider
+
+# --- Archivers / mirroring tools ---
+User-agent: HTTrack
+User-agent: Wget
+User-agent: curl
+User-agent: libwww-perl
+User-agent: Nutch
+User-agent: Scrapy
+User-agent: Java
+User-agent: python-requests
+User-agent: Go-http-client
+User-agent: PetalBot
+
+Disallow: /

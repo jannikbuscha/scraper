@@ -1,0 +1,28 @@
+{
+  "fixture": "news_article_redirect_2021",
+  "body": "news_article_redirect_2021.html",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Old /news/<slug> URL answered 302 to /news/technologies/<slug> (redirect chain in this meta file); 2021 article",
+  "url": "https://thedigital.gov.ua/news/mintsifra-prezentue-94-proekti-tsifrovoi-transformatsii",
+  "final_url": "https://thedigital.gov.ua/news/technologies/mintsifra-prezentue-94-proekti-tsifrovoi-transformatsii",
+  "redirects": [
+    "302 https://thedigital.gov.ua/news/technologies/mintsifra-prezentue-94-proekti-tsifrovoi-transformatsii"
+  ],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:55:22.223551Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "d1612f311bed07fb2064053fcaa15a3b117c9b367b49f33a7b68f60e3df954cc",
+  "bytes_original": 75356,
+  "sha256_stored": "d1612f311bed07fb2064053fcaa15a3b117c9b367b49f33a7b68f60e3df954cc",
+  "bytes_stored": 75356,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

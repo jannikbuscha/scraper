@@ -1,0 +1,28 @@
+{
+  "fixture": "e_pidpryemets_home",
+  "body": "e_pidpryemets_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Webflow landing page without footer: 'Комплекс послуг' lists the component services (D4 lead); the meta description ('10 сервісів') contradicts the body ('16 сервісів'); call-to-action to the portal",
+  "url": "https://e-pidpryemets.diia.gov.ua/",
+  "final_url": "https://e-pidpryemets.diia.gov.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:13:05.221750Z",
+  "content_type": "text/html",
+  "headers": {
+    "content-length": "120174",
+    "content-type": "text/html",
+    "etag": "\"69a853b2-1d56e\"",
+    "last-modified": "Wed, 04 Mar 2026 15:45:54 GMT"
+  },
+  "sha256_original": "750a812e822f9a8511130c67bb3551b135aeb4c1aaf7dd5f33db59acbfb8d36d",
+  "bytes_original": 120174,
+  "sha256_stored": "e095bebfa7614c5d8a36cbc829f8234b04d7acdd7d9b535a188abf888acf0754",
+  "bytes_stored": 5353,
+  "trimmed": true,
+  "trim_note": "kept head basics, the '16 сервісів' statement, the 'Комплекс послуг' section and the call-to-action link; texts over 160 characters shortened (marked …); media and scripts removed",
+  "licence": "no licence or copyright statement found on the page",
+  "attribution": "e-pidpryemets.diia.gov.ua (е-Підприємець), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

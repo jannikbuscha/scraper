@@ -1,0 +1,28 @@
+{
+  "fixture": "u24_about",
+  "body": "u24_about.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Operator and fund-flow statements (National Bank accounts, named ministries); the page does not name the Ministry of Digital Transformation (negative case for operator extraction)",
+  "url": "https://u24.gov.ua/about",
+  "final_url": "https://u24.gov.ua/about",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:36:30.622764Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=300",
+    "content-type": "text/html; charset=utf-8",
+    "server": "cloudflare",
+    "x-powered-by": "Express"
+  },
+  "sha256_original": "f6bf9f6e19b19ab6273a8ef53c42a84c976d460196b5ab8bd100dffdf9944784",
+  "bytes_original": 173682,
+  "sha256_stored": "f879464bc67e337aa21527e4c197b2b0ce38d7225e4ff066791b4db00888e5e4",
+  "bytes_stored": 3033,
+  "trimmed": true,
+  "trim_note": "kept head basics, the 'we launched UNITED24' and 'National Bank' paragraphs and the footer; texts over 200 characters shortened (marked …)",
+  "licence": "no licence statement: footer '2026©'",
+  "attribution": "u24.gov.ua (UNITED24), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

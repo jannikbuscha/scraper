@@ -1,0 +1,28 @@
+{
+  "fixture": "dataset_dcat_jsonld",
+  "body": "dataset_dcat_jsonld.json",
+  "collector": "ckan",
+  "source": "S7b",
+  "purpose": "DCAT JSON-LD per dataset: dct:identifier (CKAN id), issued/modified (naive UTC), publisher (EDRPOU), distributions; no dct:license",
+  "url": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a.jsonld",
+  "final_url": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a.jsonld",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:38:28.237879Z",
+  "content_type": "application/ld+json",
+  "headers": {
+    "cache-control": "public, max-age=14400",
+    "content-length": "3563",
+    "content-type": "application/ld+json",
+    "server": "cloudflare"
+  },
+  "sha256_original": "774b7ac53a4cebfb4de2fbeaadf116e09f3120c51d09003abb8ee7c18e0e1123",
+  "bytes_original": 3563,
+  "sha256_stored": "ab92db7d2e42772548463ed3ae51f58c6fa1312c7049d0498ebc30c3b054961c",
+  "bytes_stored": 3332,
+  "trimmed": true,
+  "trim_note": "complete document except the contact point: vcard:fn replaced by [redacted] and the address in vcard:hasEmail by the placeholder redacted@example.invalid; re-serialised with indent=1",
+  "licence": "dataset metadata; dataset licence cc-by per the portal; no licence in the document itself",
+  "attribution": "data.gov.ua (Єдиний державний веб-портал відкритих даних), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

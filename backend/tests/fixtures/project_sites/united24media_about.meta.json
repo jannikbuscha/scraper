@@ -1,0 +1,28 @@
+{
+  "fixture": "united24media_about",
+  "body": "united24media_about.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "About page with the same JSON-LD; the visible text does not name the ministry (operator from JSON-LD vs visible text)",
+  "url": "https://united24media.com/about",
+  "final_url": "https://united24media.com/about",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:37:08.654159Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "etag": "\"9a477f3fac0adb46c339db757c4d19f6\"",
+    "server": "nginx"
+  },
+  "sha256_original": "79010e4960bf0354ea77f320e5525c7a44ddd4f9d627cf607edbfe0a50d5f336",
+  "bytes_original": 49316,
+  "sha256_stored": "7d15db5c57d91b2eed1b515ba2d4ccb8abd7e8dfdc85742e15702b5567684874",
+  "bytes_stored": 2444,
+  "trimmed": true,
+  "trim_note": "kept head basics with the JSON-LD blocks, h1 and the rights line",
+  "licence": "not openly licensed: footer '© 2026 UNITED24. All rights reserved.'",
+  "attribution": "united24media.com (UNITED24 Media), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

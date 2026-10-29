@@ -1,0 +1,26 @@
+{
+  "fixture": "sitemap_index",
+  "body": "sitemap_index.xml",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "Entry point: a <urlset> (not a <sitemapindex>) whose 26 <loc> entries are child sitemaps; the parser must accept it",
+  "url": "https://www.kmu.gov.ua/sitemap.xml",
+  "final_url": "https://www.kmu.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:26:56.695892Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml"
+  },
+  "sha256_original": "10381e3bd9a472318492aae0d5efeb588f6e9b3cb9c2269b51126bfd52edc183",
+  "bytes_original": 3494,
+  "sha256_stored": "10381e3bd9a472318492aae0d5efeb588f6e9b3cb9c2269b51126bfd52edc183",
+  "bytes_stored": 3494,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk) (the file holds URLs only)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

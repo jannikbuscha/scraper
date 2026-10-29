@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- MDT Portfolio test fixture: minimal excerpt of https://www.kmu.gov.ua/sitemap-kitsoft-npa-models-act-1.xml (retrieved 2026-10-29); see the .meta.json file; 8 of 48072 <url> entries kept -->
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1" xmlns:video="http://www.google.com/schemas/sitemap-video/1.1" xmlns:news="http://www.google.com/schemas/sitemap-news/0.9">
+<url>
+        <loc>https://www.kmu.gov.ua/npas/pro-vnesennia-zminy-do-punktu-92-osoblyvostei-zdiisnennia-publichnykh-zakupivel-tovariv-robit-t231026</loc>
+        <lastmod>2026-10-28T10:56:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/deiaki-pytannia-orhanizatsii-broniuvannia-viiskovozoboviazanykh-na-period-mobilizatsii-ta-na-voiennyi-chas-1328-231026</loc>
+        <lastmod>2026-10-26T19:01:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/pro-skhvalennia-stratehii-rozvytku-sfery-publichnykh-zakupivel-na-k1120</loc>
+        <lastmod>2026-10-26T18:13:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/my-iaki-zaimaiposady-iakykh-zdiisniuietsia-kabinetom-ministriv-ukrainy-i-1119</loc>
+        <lastmod>2026-10-26T17:40:00+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/pro-tsentralnyi-orhan-vykonavchoi-vlady-shcho-realizuie-derzhavnu-polityku-u-sferi-orhanizatsii-ta-t210325</loc>
+        <lastmod>2025-03-21T19:22:59+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/pro-provedennia-sluzhbovoho-s930125</loc>
+        <lastmod>2025-01-03T17:49:49+02:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/pitannya-ministerstva-cifrovoyi-t180919</loc>
+        <lastmod>2019-10-02T19:06:19+03:00</lastmod>
+
+            </url>
+<url>
+        <loc>https://www.kmu.gov.ua/npas/250448228</loc>
+        <lastmod>2017-11-22T00:00:00+02:00</lastmod>
+
+            </url>
+</urlset>

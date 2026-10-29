@@ -1,0 +1,25 @@
+{
+  "fixture": "projects_data_turbostream",
+  "body": "projects_data_turbostream.txt",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Raw single-fetch turbo-stream (text/x-script) for decoder tests; decoded it equals the data embedded in projects_page1",
+  "url": "https://thedigital.gov.ua/projects.data",
+  "final_url": "https://thedigital.gov.ua/projects.data",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:05:01.516337Z",
+  "content_type": "text/x-script; charset=utf-8",
+  "headers": {
+    "content-type": "text/x-script; charset=utf-8"
+  },
+  "sha256_original": "d87647b4bca1befb5f051069dff78122cc3e0fcc33416e0e7d5ae950775c9f58",
+  "bytes_original": 23642,
+  "sha256_stored": "d87647b4bca1befb5f051069dff78122cc3e0fcc33416e0e7d5ae950775c9f58",
+  "bytes_stored": 23642,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

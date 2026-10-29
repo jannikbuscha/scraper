@@ -1,0 +1,26 @@
+{
+  "fixture": "sitemap_posts_en_excerpt",
+  "body": "sitemap_posts_en_excerpt.xml",
+  "collector": "kmu_news",
+  "source": "S4b",
+  "purpose": "EN news sitemap (28,213 URLs, 2014-01-07 to 2026-10-28): entries with the same slug and lastmod as their UA counterparts (UA-EN pairing)",
+  "url": "https://www.kmu.gov.ua/en/sitemap-rainlab-blog-models-post-1.xml",
+  "final_url": "https://www.kmu.gov.ua/en/sitemap-rainlab-blog-models-post-1.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:32:34.985092Z",
+  "content_type": "application/xml",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "application/xml"
+  },
+  "sha256_original": "ce036511b2346b9c17b0415db1eed46f79d993be1238b75a0a86c27bb5cfc1e8",
+  "bytes_original": 5916111,
+  "sha256_stored": "62f17c661225d0ae6e46463c978933558745354392ecf2623df2052676dd84ef",
+  "bytes_stored": 1597,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog, the 2 newest and the oldest entries and the entries of the two EN news fixtures; order unchanged",
+  "licence": "CC BY 4.0 per the page footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/deed.uk) (the file holds URLs and dates only)",
+  "attribution": "Урядовий портал, Кабінет Міністрів України (Government Portal of Ukraine), www.kmu.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: excerpt of <url> entries",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-kmu-gov-data"
+}

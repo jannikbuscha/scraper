@@ -1,0 +1,27 @@
+{
+  "fixture": "service_poshkodzhene_majno",
+  "body": "service_poshkodzhene_majno.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Wartime service: 'Онлайн' and 'Офлайн' channels, maintenance notice instead of a call-to-action, heading variant with ʼ, link to CMU resolution 380-2022-п",
+  "url": "https://diia.gov.ua/services/poshkodzhene-majno",
+  "final_url": "https://diia.gov.ua/services/poshkodzhene-majno",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:02:01.133489Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "cc73b91bdf92adcc4ceafffa414ac8da430fb301cf28eb03d4733c97ee96f113",
+  "bytes_original": 107874,
+  "sha256_stored": "0421e7a942993ba1f4043819a0d02ad4ce2107995abea1def6b545f241ea1772",
+  "bytes_stored": 13668,
+  "trimmed": true,
+  "trim_note": "kept head basics (incl. meta title), the service header (h1, call-to-action), the info block and every section.service-acc_section (FAQ cut to its first 2 questions; texts over 160 characters shortened, marked …) and the copyright line; modal, menus and scripts removed",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

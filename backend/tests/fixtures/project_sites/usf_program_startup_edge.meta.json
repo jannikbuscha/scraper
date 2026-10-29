@@ -1,0 +1,27 @@
+{
+  "fixture": "usf_program_startup_edge",
+  "body": "usf_program_startup_edge.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Structured offer (grant programme) as free text without dates or JSON-LD: main-text extraction",
+  "url": "https://usf.com.ua/programs/startup-edge",
+  "final_url": "https://usf.com.ua/programs/startup-edge",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:41:49.785353Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "fca5d399cbc42e92434fbc607081d689eac2a09254f7cfbb29d88957e21724c8",
+  "bytes_original": 169976,
+  "sha256_stored": "02447fa708a2f492fa9b1a8b5a77dd35ee2a5be4379e9dedd24034ad21255c5c",
+  "bytes_stored": 18692,
+  "trimmed": true,
+  "trim_note": "kept head basics, the trap link (id REDACTED), <main> (texts over 200 characters shortened, marked …) and the footer statements; scripts and media removed",
+  "licence": "not openly licensed: footer 'Український Фонд Стартапів © 2026'; robots.txt carries 'Content-Signal: search=yes,ai-train=no,use=reference' and a reservation of rights under Art. 4 of Directive (EU) 2019/790",
+  "attribution": "usf.com.ua (Український фонд стартапів / Ukrainian Startup Fund), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

@@ -1,0 +1,117 @@
+[
+ {
+  "id": 26,
+  "slug": "e-mayno-1",
+  "publishedAt": "2021-02-18T20:00:00.000000Z",
+  "type": {
+   "id": 1,
+   "translations_array": {
+    "uk": {
+     "title": "Юстиція"
+    },
+    "en": {
+     "title": "justice"
+    }
+   }
+  },
+  "subprojectCount": 3,
+  "subproject": [
+   {
+    "id": 17,
+    "translations_array": {
+     "uk": {
+      "title": "Електронний адміністративний збір"
+     },
+     "en": {
+      "title": null
+     }
+    }
+   },
+   {
+    "id": 19,
+    "translations_array": {
+     "uk": {
+      "title": "Автоматизований обмін данними з БТІ"
+     },
+     "en": {
+      "title": null
+     }
+    }
+   }
+  ],
+  "translations_array": {
+   "uk": {
+    "title": "Цифрова трансформація державної реєстрації речових прав на нерухоме майно та їх обтяжень (е-Майно)",
+    "description": "<p>Запровадження модернізованого Державного реєстру речових прав на нерухоме майно, запровадження електронних послуг з р…"
+   },
+   "en": {
+    "title": null,
+    "description": null
+   }
+  }
+ },
+ {
+  "id": 32,
+  "slug": "e-bankruptcy-1",
+  "publishedAt": "2021-02-17T16:44:38.000000Z",
+  "type": {
+   "id": 1,
+   "translations_array": {
+    "uk": {
+     "title": "Юстиція"
+    },
+    "en": {
+     "title": "justice"
+    }
+   }
+  },
+  "subprojectCount": 1,
+  "subproject": [
+   {
+    "id": 36,
+    "translations_array": {
+     "uk": {
+      "title": "Автоматизована система \"Банкрутство та неплатоспроможність\""
+     },
+     "en": {
+      "title": null
+     }
+    }
+   }
+  ],
+  "translations_array": {
+   "uk": {
+    "title": "Цифрова трансформація банкрутства\t(е-Банкрутство)",
+    "description": "<p>Автоматизація діяльності арбітражних керуючих, надання їм доступу до відповідних реєстрів, запровадження електронного…"
+   }
+  }
+ },
+ {
+  "id": 108,
+  "slug": "e-economy-1",
+  "publishedAt": "2021-02-18T03:50:31.000000Z",
+  "type": {
+   "id": 25,
+   "translations_array": {
+    "uk": {
+     "title": "Цифрова трансформація"
+    },
+    "en": {
+     "title": null
+    }
+   }
+  },
+  "subprojectCount": 0,
+  "subproject": [],
+  "translations_array": {
+   "uk": {
+    "title": "Цифрова економіка (е-Економіка)",
+    "description": "<p>Запровадження електронного резиденства, становлення віртуальних активів, віртуальної економічної зони Дія.Сіті.</p>"
+   },
+   "en": {
+    "title": null,
+    "description": null
+   }
+  }
+ }
+]

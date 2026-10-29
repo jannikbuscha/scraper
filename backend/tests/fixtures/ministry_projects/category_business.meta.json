@@ -1,0 +1,26 @@
+{
+  "fixture": "category_business",
+  "body": "category_business.html",
+  "collector": "ministry_projects",
+  "source": "S1",
+  "purpose": "Rubric listing with 4 entries incl. Дія.City (business/city)",
+  "url": "https://thedigital.gov.ua/projects/business",
+  "final_url": "https://thedigital.gov.ua/projects/business",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:00:41.392524Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "06ff6bd1ca08bfbc9f96d7239380b405fca16e9b44156c493cef4ebbe2e71b61",
+  "bytes_original": 59233,
+  "sha256_stored": "06ff6bd1ca08bfbc9f96d7239380b405fca16e9b44156c493cef4ebbe2e71b61",
+  "bytes_stored": 59233,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "CC BY 4.0 per the page footer, plain text without a link: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше'",
+  "attribution": "Міністерство цифрової трансформації України (Ministry of Digital Transformation of Ukraine), thedigital.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}

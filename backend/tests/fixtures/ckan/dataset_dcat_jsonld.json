@@ -1,0 +1,84 @@
+{
+ "@context": {
+  "adms": "http://www.w3.org/ns/adms#",
+  "dcat": "http://www.w3.org/ns/dcat#",
+  "dct": "http://purl.org/dc/terms/",
+  "foaf": "http://xmlns.com/foaf/0.1/",
+  "gsp": "http://www.opengis.net/ont/geosparql#",
+  "locn": "http://www.w3.org/ns/locn#",
+  "owl": "http://www.w3.org/2002/07/owl#",
+  "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+  "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+  "schema": "http://schema.org/",
+  "skos": "http://www.w3.org/2004/02/skos/core#",
+  "spdx": "http://spdx.org/rdf/terms#",
+  "time": "http://www.w3.org/2006/time",
+  "vcard": "http://www.w3.org/2006/vcard/ns#",
+  "xsd": "http://www.w3.org/2001/XMLSchema#"
+ },
+ "@graph": [
+  {
+   "@id": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a",
+   "@type": "dcat:Dataset",
+   "dcat:contactPoint": {
+    "@id": "_:N8191fd2f3b214499b92c4e0ade0e22c5"
+   },
+   "dcat:distribution": {
+    "@id": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a/resource/24f04193-605b-4d8a-9421-acf62bf816f0"
+   },
+   "dcat:keyword": [
+    "реєстр",
+    "ресурс",
+    "національний",
+    "інформаційний"
+   ],
+   "dct:description": "Національний  реєстр  електронних  інформаційних  ресурсів \r\nведеться з метою запровадження єдиної системи  обліку  електронних \r\nінформаційних   ресурсів  держави  і  формується  з  використанням \r\nновітніх   досягнень   у   сфері   інформаційно-телекомунікаційних \r\nтехнологій",
+   "dct:download_total": "517",
+   "dct:identifier": "809b0526-3526-4a3b-a88d-5df784674f5a",
+   "dct:issued": {
+    "@type": "xsd:dateTime",
+    "@value": "2019-07-12T06:45:59.790372"
+   },
+   "dct:language": "ua",
+   "dct:modified": {
+    "@type": "xsd:dateTime",
+    "@value": "2023-03-01T09:16:11.972579"
+   },
+   "dct:publisher": {
+    "@id": "https://data.gov.ua/organization/0a0b46c9-ff14-4836-b255-f4eced2233ec"
+   },
+   "dct:title": "Національний реєстр електронних інформаційних ресурсів",
+   "dct:viewstotal": "2441",
+   "owl:versionInfo": "1.0"
+  },
+  {
+   "@id": "https://data.gov.ua/organization/0a0b46c9-ff14-4836-b255-f4eced2233ec",
+   "@type": "foaf:Organization",
+   "foaf:edrpou": "43220851",
+   "foaf:koatuu": "8036100000",
+   "foaf:name": "Міністерство цифрової трансформації України"
+  },
+  {
+   "@id": "_:N8191fd2f3b214499b92c4e0ade0e22c5",
+   "@type": "vcard:Organization",
+   "vcard:fn": "[redacted]",
+   "vcard:hasEmail": {
+    "@id": "mailto:redacted@example.invalid"
+   }
+  },
+  {
+   "@id": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a/resource/24f04193-605b-4d8a-9421-acf62bf816f0",
+   "@type": "dcat:Distribution",
+   "dcat:accessURL": {
+    "@id": "https://data.gov.ua/dataset/809b0526-3526-4a3b-a88d-5df784674f5a/resource/24f04193-605b-4d8a-9421-acf62bf816f0/download/nreir_04-10-2021.csv"
+   },
+   "dcat:byteSize": {
+    "@type": "xsd:decimal",
+    "@value": "20916.0"
+   },
+   "dcat:mediaType": "text/csv",
+   "dct:format": ".csv",
+   "dct:title": "НРЕІР_04.10.2021.csv"
+  }
+ ]
+}

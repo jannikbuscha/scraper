@@ -1,0 +1,27 @@
+{
+  "fixture": "usf_home",
+  "body": "usf_home.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Footer governance sentence (founded 2018 at the initiative of the Minister of Finance; since 1 January 2023 under the ministry), link to thedigital.gov.ua, programme cards, and a hidden /cdn-cgi/content trap link (aria-hidden, rel=nofollow) that collectors must never follow",
+  "url": "https://usf.com.ua/",
+  "final_url": "https://usf.com.ua/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:35:26.731123Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "no-cache, private",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "5c958906a57ffaf047418bf197fe41afd7ca84ac84397338388bb2221e417643",
+  "bytes_original": 151889,
+  "sha256_stored": "2fcca8f6315896302d599e76ffc214fe705d4bc27e4554754aadbc3fc8f9554d",
+  "bytes_stored": 5166,
+  "trimmed": true,
+  "trim_note": "kept head basics, the trap link (id REDACTED), the first programme-card block, the footer governance sentence, the rights line and the thedigital.gov.ua link; texts over 200 characters shortened (marked …); scripts and media removed",
+  "licence": "not openly licensed: footer 'Український Фонд Стартапів © 2026'; robots.txt carries 'Content-Signal: search=yes,ai-train=no,use=reference' and a reservation of rights under Art. 4 of Directive (EU) 2019/790",
+  "attribution": "usf.com.ua (Український фонд стартапів / Ukrainian Startup Fund), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

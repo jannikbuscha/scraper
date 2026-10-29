@@ -1,0 +1,27 @@
+{
+  "fixture": "service_reyestraciya_fop",
+  "body": "service_reyestraciya_fop.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Business service: meta title differs from h1, 'Наступні кроки', 'Пов’язані послуги', heading variant 'Пов’язані закони й накази', call-to-action ID 31854",
+  "url": "https://diia.gov.ua/services/reyestraciya-fop",
+  "final_url": "https://diia.gov.ua/services/reyestraciya-fop",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:01:59.260948Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "511e23a7af4e5be29d35c93f6d6b64b61435ef4e1a57ba6cd9f111c3d797b2de",
+  "bytes_original": 121369,
+  "sha256_stored": "a93352072f2e25329d10b02bf9d82eb53c65d2c51baae597e46166ad9b67b0cc",
+  "bytes_stored": 19581,
+  "trimmed": true,
+  "trim_note": "kept head basics (incl. meta title), the service header (h1, call-to-action), the info block and every section.service-acc_section (FAQ cut to its first 2 questions; texts over 160 characters shortened, marked …) and the copyright line; modal, menus and scripts removed",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

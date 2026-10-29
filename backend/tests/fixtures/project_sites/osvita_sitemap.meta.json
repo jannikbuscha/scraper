@@ -1,0 +1,25 @@
+{
+  "fixture": "osvita_sitemap",
+  "body": "osvita_sitemap.xml",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "Course catalogue discovery (1053 URLs, 254 /courses on 2026-10-29), incl. the duplicated /bytes URL and /cdto-campus",
+  "url": "https://osvita.diia.gov.ua/sitemap.xml",
+  "final_url": "https://osvita.diia.gov.ua/sitemap.xml",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:16:32.106680Z",
+  "content_type": "application/xml; charset=UTF-8",
+  "headers": {
+    "content-type": "application/xml; charset=UTF-8"
+  },
+  "sha256_original": "8f6c9f6e3a7a67e8224df9458fc5c9dbef862eb0ef009c15de5a11e0abbcca7d",
+  "bytes_original": 406212,
+  "sha256_stored": "81317ba5044b3c88b83eb7e6b65ffe4607b1378ad8925c3f65576d00ea255dff",
+  "bytes_stored": 4132,
+  "trimmed": true,
+  "trim_note": "kept the XML prolog and one <url> entry per section, both copies of the duplicated /bytes/talking-to-children-about-war entry and /cdto-campus",
+  "licence": "not openly licensed (site footer '© 2026 Усі права захищено'); the file holds URLs and dates only",
+  "attribution": "osvita.diia.gov.ua (Дія.Освіта), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

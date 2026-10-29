@@ -1,0 +1,27 @@
+{
+  "fixture": "projects_page3_last",
+  "body": "projects_page3_last.html",
+  "collector": "digitalstate_catalog",
+  "source": "S2 (C-1)",
+  "purpose": "Last listing page (1 entry; route projects.($directionSlug).page.$pageNumber._index): pagination end",
+  "url": "https://digitalstate.gov.ua/projects/page/3",
+  "final_url": "https://digitalstate.gov.ua/projects/page/3",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:33:59.072292Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "max-age=60, public, no-transform",
+    "content-type": "text/html; charset=utf-8",
+    "server": "nginx"
+  },
+  "sha256_original": "43739cadd2c2315265912abc8a13f385bbfdb379c5361381d2b650b861ac9b20",
+  "bytes_original": 34271,
+  "sha256_stored": "394d03910946021cb96c3ec6f4cb54a3b027df290591613bdcfbb26a613583f8",
+  "bytes_stored": 6710,
+  "trimmed": true,
+  "trim_note": "kept head basics, the footer statement (implementation by the ministry, donor projects) and the rights line, the window.__remixContext script and the streamController.enqueue/close scripts; inside the turbo-stream payload every prose string over 60 characters was shortened (marked …) and the Sentry baggage values (public key, trace id) replaced by REDACTED, with the array structure and all indices unchanged; rendered markup, module scripts and other scripts removed",
+  "licence": "not openly licensed: footer '© 2026 Digital State UA . All rights reserved'",
+  "attribution": "Digital State UA, digitalstate.gov.ua, retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-projects-archive"
+}

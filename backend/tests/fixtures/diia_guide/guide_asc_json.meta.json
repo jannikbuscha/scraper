@@ -1,0 +1,29 @@
+{
+  "fixture": "guide_asc_json",
+  "body": "guide_asc_json.json",
+  "collector": "diia_guide",
+  "source": "S3 (C-2)",
+  "purpose": "CNAP register JSON (5853 records x 28 keys on 2026-10-29): parser for code, name, idf, state and the amenity flags (centres indicator)",
+  "url": "https://guide.diia.gov.ua/asc/download/json/",
+  "final_url": "https://guide.diia.gov.ua/asc/download/json/",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:17:22.773914Z",
+  "content_type": "application/json",
+  "headers": {
+    "cache-control": "no-cache must-revalidate proxy-revalidate",
+    "content-length": "5714173",
+    "content-type": "application/json",
+    "etag": "\"6ae33978-5730fd\"",
+    "last-modified": "Thu, 29 Oct 2026 12:18:00 GMT"
+  },
+  "sha256_original": "b3adfa76a3e06cbf4fd8755e95629a041333643f880ed5096625bcfdec97c47d",
+  "bytes_original": 5714173,
+  "sha256_stored": "1bfbf30dcd60bdfe30bf0294cbd18333a611c44319ef40ae81ebfba792b90daa",
+  "bytes_stored": 3633,
+  "trimmed": true,
+  "trim_note": "reduced for size (5.7 MB) to 3 records (the first two and one whose amenity flags are null); values holding phone numbers or e-mail addresses replaced by '[redacted]'; keys unchanged; re-serialised with indent=1",
+  "licence": "CC BY 4.0 per the site footer: 'Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше' (link to https://creativecommons.org/licenses/by/4.0/)",
+  "attribution": "Гід з державних послуг / Реєстр адміністративних послуг, guide.diia.gov.ua, retrieved 2026-10-29, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); changes by MDT Portfolio: reduced to 3 of 5853 records, phone numbers and e-mail addresses replaced by [redacted]",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

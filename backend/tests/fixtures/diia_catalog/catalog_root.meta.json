@@ -1,0 +1,27 @@
+{
+  "fixture": "catalog_root",
+  "body": "catalog_root.html",
+  "collector": "diia_catalog",
+  "source": "S3",
+  "purpose": "Catalogue root: alphabetical service list (div.services-byletter_item; 172 services in 23 letter groups on 2026-10-29, incl. /services/RD4U which is missing from the sitemap), the category grid (footer, 14 + 13 subcategory links) and the footer copyright line",
+  "url": "https://diia.gov.ua/services",
+  "final_url": "https://diia.gov.ua/services",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T12:58:14.636604Z",
+  "content_type": "text/html; charset=UTF-8",
+  "headers": {
+    "cache-control": "max-age=60, public",
+    "content-type": "text/html; charset=UTF-8",
+    "server": "cloudflare"
+  },
+  "sha256_original": "273f8bb056f1cc7a763269fa5c15462354f9902b4512dad688aa67133bb961e3",
+  "bytes_original": 124324,
+  "sha256_stored": "0c1e8d0402b22bc08725f71ce91922071186415dbfcbb47e92ac6f51ad7f5032",
+  "bytes_stored": 9411,
+  "trimmed": true,
+  "trim_note": "kept head basics, the breadcrumb, 2 of 23 letter groups (first 3 entries of 'A'; the group with /services/RD4U), the full category grid, the 'Що таке Дія' link and the copyright line; menus, cookie banner, scripts and styles removed",
+  "licence": "not openly licensed: page footer 'diia.gov.ua 2019 - 2026. Всі права захищені.'",
+  "attribution": "diia.gov.ua (Портал Дія), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-diia"
+}

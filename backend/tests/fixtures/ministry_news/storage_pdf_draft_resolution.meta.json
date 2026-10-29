@@ -1,0 +1,28 @@
+{
+  "fixture": "storage_pdf_draft_resolution",
+  "body": "storage_pdf_draft_resolution.pdf",
+  "collector": "ministry_news",
+  "source": "S4",
+  "purpose": "Small PDF (1 page, text layer) linked from document_page_content; the file name equals the MD5 of the content and the ETag (integrity check, text extraction)",
+  "url": "https://storage.thedigital.gov.ua/files/5/15/fa231dbe2422c63e946dc25c3c26f154.pdf",
+  "final_url": "https://storage.thedigital.gov.ua/files/5/15/fa231dbe2422c63e946dc25c3c26f154.pdf",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-29T14:05:06.464279Z",
+  "content_type": "application/pdf",
+  "headers": {
+    "content-length": "99231",
+    "content-type": "application/pdf",
+    "etag": "\"fa231dbe2422c63e946dc25c3c26f154\"",
+    "last-modified": "Thu, 03 Sep 2026 14:52:10 GMT"
+  },
+  "sha256_original": "231729f18fc34d7a14701561221eb760fded20b9df9fcd03382765293895afbd",
+  "bytes_original": 99231,
+  "sha256_stored": "231729f18fc34d7a14701561221eb760fded20b9df9fcd03382765293895afbd",
+  "bytes_stored": 99231,
+  "trimmed": false,
+  "trim_note": "original bytes, unchanged",
+  "licence": "no licence statement in the PDF; linked from a thedigital.gov.ua page whose footer states CC BY 4.0 'якщо не зазначено інше' (whether the footer covers linked files is for the data lead to confirm)",
+  "attribution": "Міністерство цифрової трансформації України, draft Cabinet resolution 'Деякі питання розвитку українських великих мовних моделей', storage.thedigital.gov.ua, retrieved 2026-10-29; unchanged",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-news"
+}

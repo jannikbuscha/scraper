@@ -1,0 +1,31 @@
+{
+  "fixture": "winwin_home_csr_shell",
+  "body": "winwin_home_csr_shell.html",
+  "collector": "project_sites",
+  "source": "S2",
+  "purpose": "HTML shell of a client-rendered Angular app (68 visible characters; reached through the ministry's 302): the generic collector must flag 'no server-rendered content' instead of storing an empty description",
+  "url": "https://thedigital.gov.ua/projects/technologies/winwin",
+  "final_url": "https://winwin.gov.ua/",
+  "redirects": [
+    "302 https://winwin.gov.ua/"
+  ],
+  "status": 200,
+  "retrieved_at": "2026-10-29T13:04:41.479535Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "cache-control": "public, max-age=300",
+    "content-length": "162929",
+    "content-type": "text/html; charset=utf-8",
+    "etag": "W/\"27c71-e9PGoQ7Dau3cCZcpGBSIDuuiSi4\"",
+    "x-powered-by": "Express"
+  },
+  "sha256_original": "1dd2ce975517f965c06efcb8106fa00f139053856951a54e9eac71ffe2e43207",
+  "bytes_original": 162929,
+  "sha256_stored": "79c5d10a5eaae93dca19435a64e10c7a9da3c7ec3a574368eddfdd26843dbefd",
+  "bytes_stored": 11823,
+  "trimmed": true,
+  "trim_note": "kept head basics (title, description, og tags), the empty <app-root> component shell and the script src tags; inline scripts, styles and the loader animation removed",
+  "licence": "no licence statement found",
+  "attribution": "winwin.gov.ua (WINWIN), retrieved 2026-10-29; minimal excerpt for software tests only",
+  "capture": "Phase 0b, 2026-10-29: fetched once through the shared polite fetcher (robots.txt obeyed, at least 1 s between requests per host, Retry-After honoured); explorer explore-ministry-projects"
+}
