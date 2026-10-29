@@ -1,0 +1,33 @@
+.dayHeader {
+  background: var(--mantine-color-gray-0);
+  font-weight: 600;
+  text-align: start;
+}
+
+.note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cell {
+  vertical-align: top;
+}
+
+.details {
+  background: var(--mantine-color-gray-0);
+  padding: var(--mantine-spacing-sm);
+}
+
+.row {
+  cursor: pointer;
+}
+
+.excerpt {
+  overflow-wrap: anywhere;
+}
+
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}

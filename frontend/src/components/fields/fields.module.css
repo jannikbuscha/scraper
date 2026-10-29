@@ -1,0 +1,50 @@
+.dot {
+  display: inline-block;
+  flex-shrink: 0;
+  border-radius: 50%;
+  vertical-align: middle;
+}
+
+.derived {
+  font-style: italic;
+}
+
+.clamp {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.preWrap {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.precision {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+  white-space: nowrap;
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.mainBadge {
+  font-weight: 700;
+}
+
+.list {
+  margin: 0;
+  padding-inline-start: 1.1em;
+}

@@ -1,0 +1,13 @@
+/* Global tweaks on top of Mantine's styles. */
+mark {
+  background: var(--mantine-color-yellow-2);
+  color: inherit;
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+ins,
+del {
+  border-radius: 2px;
+  padding: 0 1px;
+}

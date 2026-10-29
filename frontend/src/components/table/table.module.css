@@ -1,0 +1,68 @@
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 600;
+  font-size: var(--mantine-font-size-sm);
+  white-space: nowrap;
+  border-radius: var(--mantine-radius-xs);
+}
+
+.sortButton:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}
+
+.sortHint {
+  color: var(--mantine-color-gray-4);
+}
+
+.sortButton:hover .sortHint {
+  color: var(--mantine-color-gray-7);
+}
+
+.activeSort {
+  display: inline-flex;
+  align-items: center;
+  color: var(--mantine-color-indigo-7);
+}
+
+.defaultSort {
+  display: inline-flex;
+  align-items: center;
+  color: var(--mantine-color-gray-6);
+}
+
+.busy {
+  opacity: 0.6;
+  transition: opacity 120ms;
+}
+
+.row {
+  cursor: pointer;
+}
+
+.row[data-selected='true'] {
+  background: var(--mantine-color-indigo-0);
+}
+
+.row[data-deleted='true'] {
+  color: var(--mantine-color-dimmed);
+}
+
+.th {
+  vertical-align: bottom;
+  background: var(--mantine-color-white);
+}
+
+.td {
+  vertical-align: top;
+  max-width: 28rem;
+}
+
+.snippet {
+  margin-top: 2px;
+  color: var(--mantine-color-gray-7);
+  font-size: var(--mantine-font-size-xs);
+  overflow-wrap: anywhere;
+}

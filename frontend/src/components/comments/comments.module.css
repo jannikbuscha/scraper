@@ -1,0 +1,40 @@
+.body {
+  font-size: var(--mantine-font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.body p,
+.body ul,
+.body ol,
+.body pre,
+.body blockquote,
+.body table {
+  margin-block: 0 var(--mantine-spacing-xs);
+}
+
+.body > div > :last-child {
+  margin-bottom: 0;
+}
+
+.thread {
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-sm);
+  padding: var(--mantine-spacing-xs);
+  background: var(--mantine-color-white);
+}
+
+.thread[data-highlighted='true'] {
+  border-color: var(--mantine-primary-color-filled);
+  box-shadow: 0 0 0 1px var(--mantine-primary-color-filled);
+}
+
+.replies {
+  margin-top: var(--mantine-spacing-xs);
+  margin-left: var(--mantine-spacing-sm);
+  padding-left: var(--mantine-spacing-sm);
+  border-left: 2px solid var(--mantine-color-gray-2);
+}
+
+.deleted {
+  opacity: 0.65;
+}

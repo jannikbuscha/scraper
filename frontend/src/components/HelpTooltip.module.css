@@ -1,0 +1,14 @@
+.icon {
+  display: inline-flex;
+  align-items: center;
+  margin-inline-start: 0.25em;
+  color: var(--mantine-color-gray-6);
+  vertical-align: middle;
+  cursor: help;
+  border-radius: 50%;
+}
+
+.icon:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 1px;
+}

@@ -1,0 +1,44 @@
+.chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+}
+
+.selectedRow {
+  background: var(--mantine-color-indigo-0);
+}
+
+.note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.removed {
+  background: var(--mantine-color-red-1);
+  color: var(--mantine-color-red-9);
+  text-decoration: line-through;
+}
+
+.added {
+  background: var(--mantine-color-green-1);
+  color: var(--mantine-color-green-9);
+  text-decoration: none;
+}
+
+.wordDiff {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.valueCell {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.arrow {
+  color: var(--mantine-color-dimmed);
+  vertical-align: top;
+  width: 1.5em;
+  text-align: center;
+}

@@ -1,0 +1,29 @@
+.menuRow {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 6px;
+  border-radius: var(--mantine-radius-sm);
+}
+
+.menuRow:hover {
+  background: var(--mantine-color-gray-1);
+}
+
+.menuRow:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: -2px;
+}
+
+.menuRow[aria-current='true'] {
+  background: var(--mantine-color-indigo-0);
+}
+
+.check {
+  flex-shrink: 0;
+  margin-top: 3px;
+  visibility: hidden;
+}
+
+.check[data-active='true'] {
+  visibility: visible;
+}

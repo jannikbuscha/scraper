@@ -1,0 +1,26 @@
+.root {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.link {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.host {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
