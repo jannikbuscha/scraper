@@ -324,7 +324,7 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 
 ### Provenance kinds (`field_meta.src`)
 
-`seed` (from the assignment's seed table), `collector:<name>@<run>`, `manual:<name>`, `import:<file>`. A restore keeps the original source and records the restoring person in `by`.
+`seed` (from the assignment's seed table), `collector:<name>@<run>`, `manual` (set in the app; its one user is recorded as `user` in `by`, D-15), `import:<file>`. A restore keeps the original source.
 
 ### `language`
 

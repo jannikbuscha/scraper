@@ -15,7 +15,7 @@
 
 ## Not in the seed
 
-Descriptions, ministry categories, statuses, dates and all classification fields stay empty. Collectors and the team fill them, with evidence. The second listing of Diia.City under `/projects/regions/city`, mentioned in assignment §5, is not seeded; collector C1 records it.
+Descriptions, ministry categories, statuses, dates and all classification fields stay empty. Collectors and the user of the app fill them, with evidence. The second listing of Diia.City under `/projects/regions/city`, mentioned in assignment §5, is not seeded; collector C1 records it.
 
 ## Working copy
 

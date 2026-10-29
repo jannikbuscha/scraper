@@ -1,13 +1,13 @@
 # PLAN: data platform for "Digital Innovation for Governments under Crisis"
 
-> **Status:** Phase 0 plan, 2026-10-28; approved, Phase 1 in progress. For Phase 1 onwards, the contract documents [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), [`docs/API.md`](docs/API.md) and [`docs/UI.md`](docs/UI.md) are binding; where they differ from this plan in detail (e.g. provenance rules, derived-field algorithm, seed matching), they take precedence.
+> **Status:** Phase 0 plan, 2026-10-28; approved, Phase 1 done (2026-10-29). Decision D-15 of 2026-10-29 (§12: one user, no concurrent editing, no additional security layer) supersedes the plan passages marked with it. For Phase 1 onwards, the contract documents [`docs/DATA_MODEL.md`](docs/DATA_MODEL.md), [`docs/API.md`](docs/API.md) and [`docs/UI.md`](docs/UI.md) are binding; where they differ from this plan in detail (e.g. provenance rules, derived-field algorithm, seed matching), they take precedence.
 > **Companion drafts:** [`docs/SOURCES.md`](docs/SOURCES.md) (source register), [`docs/CODEBOOK.md`](docs/CODEBOOK.md) (vocabularies).
 > **Language:** code, UI, docs and codebook in English (language of the paper).
 
 ## TL;DR
 
 - **One container, one process.** FastAPI serves the API and the built React app. The working store is SQLite (WAL, FTS5). Collectors run as subprocesses of the same image, started by a scheduler, a UI button or the CLI.
-- **Traceability built into the model.** Every curated field records where its value came from (`seed`, `collector:<name>@<run>`, `manual:<name>`, `import:<file>`), who set it, whether a human has locked it, and optional evidence. Revisions are append-only, enforced by database triggers. Collectors never overwrite human values: they open **proposals** instead.
+- **Traceability built into the model.** Every curated field records where its value came from (`seed`, `collector:<name>@<run>`, `manual`, `import:<file>`), who set it, whether a human has locked it, and optional evidence. Revisions are append-only, enforced by database triggers. Collectors never overwrite human values: they open **proposals** instead.
 - **Collectors** are separate modules with offline tests against saved fixtures. They use a polite HTTP client (robots.txt, about 1 request per second per host, conditional requests, backoff, no circumvention). Every response is kept unchanged as a content-addressed raw snapshot. The Wayback Machine serves as a fallback and supplies *upper bounds* for start dates, never start dates.
 - **Main additions to the proposed model:** dates stored as intervals with precision and the verbatim source text; per-source observations (for `first_seen`/`last_seen` and "possibly discontinued"); an explicit `development_mode` field (adaptation vs. new development, Yoo et al. 2012); `unit_type` (product vs. platform, programme, strategy, organisation); the derived `portfolio_entry` (launch ≠ entry into the ministry's portfolio); institutional context events; derived values in their own table; content-addressed document texts; screening reason codes (for a PRISMA-style flow in the paper).
 - **Phase 0 findings relevant for the paper (§13, all still to be verified):** responsibility for PlayCity moved away from the ministry in 2026; the ministry's leadership and mandate changed in 2025–2026; for several projects the ministry is not the initiator; European Integration and WINWIN look more like policy areas or strategies than products.
@@ -36,7 +36,7 @@ The platform has two jobs: (1) reproducibly collect the portfolio of projects an
 
 | Principle | Design consequence |
 |---|---|
-| No facts from model knowledge | Values enter only through collectors (each backed by a raw snapshot), the seed, an import or a named person. Every write needs an author. The app makes no LLM calls (non-goal). |
+| No facts from model knowledge | Values enter only through collectors (each backed by a raw snapshot), the seed, an import or the app's user. Every write records its channel and, per field, its provenance (the app's user is recorded as `user`, D-15). The app makes no LLM calls (non-goal). |
 | Derived values are marked | Derived fields live in a separate table. They are read-only, carry their basis and reason, and are exported with a `derived_` prefix. |
 | Automation never overwrites humans | A per-field `locked` flag. Collectors write only unlocked fields; for locked fields they create proposals. |
 | Nothing is hard-deleted | Soft delete with a trash view. The revision table is append-only (UPDATE and DELETE are blocked by triggers). Hard purge is CLI-only. |
@@ -93,8 +93,8 @@ Details, evidence and the Phase 0b checklist per source are in [`docs/SOURCES.md
 ```
                 ┌──────────────────────────── container "app" (one image) ───────────────────────────┐
  Browser ─HTTP─▶│ uvicorn + FastAPI                                                                  │
- (team via      │   /api/*      REST + Pydantic models                                               │
-  VPN / proxy)  │   /*          built React app (static files)                                       │
+ (one user)     │   /api/*      REST + Pydantic models                                               │
+                │   /*          built React app (static files)                                       │
                 │   domain services: revisions · provenance · reconciliation · derived fields        │
                 │   scheduler (APScheduler) ──spawns──▶ `mdt collect <source>`  (subprocess, queued) │
                 │   SQLite: data/app.db (WAL, FTS5)                                                   │
@@ -130,7 +130,7 @@ The proposed stack is kept. Additions and choices are marked with ➕:
 | PDF/DOCX | ➕ pdfminer.six / pypdf, python-docx | permissive licences; PyMuPDF avoided (AGPL) |
 | Browser | Playwright **only for Phase 0b exploration** (watching XHR/JSON endpoints) | collectors stay browser-free unless a source is unusable otherwise |
 | Morphology | ➕ `pymorphy3` + Ukrainian dictionaries | generates inflected **alias candidates when an alias is edited**; a person confirms them, so matching stays deterministic and reproducible (§5.3) |
-| Markdown | ➕ markdown-it-py + `nh3` | comments rendered and sanitised server-side |
+| Markdown | ➕ markdown-it-py | comments rendered server-side with raw HTML disabled; no further sanitising (D-15) |
 | Scheduling | ➕ APScheduler 3.x in-process | jobs run as subprocesses behind a global run lock (§3.4) |
 | IDs | ➕ `python-ulid` | stable, sortable, prefixed IDs (§4.1) |
 | Spreadsheets | openpyxl | XLSX import and export |
@@ -182,7 +182,7 @@ Python package and CLI name: **`mdt`** (Ministry of Digital Transformation).
 
 ### 3.5 Configuration (`.env`, template in `.env.example`)
 
-`HOST` (default `127.0.0.1`), `PORT` (`8080`), `DATA_DIR`, `CONTACT_EMAIL` (**required for collectors**: they refuse to start without it), `USER_AGENT` template, `ALLOWED_HOSTS` (Host-header allowlist, §7.5), `COLLECT_SCHEDULE` (cron; default weekly, Monday 03:00 Europe/Kyiv), `BACKUP_SCHEDULE` (daily), `BACKUP_RETENTION` (7 daily / 4 weekly / 6 monthly), `TEAM_MEMBERS` (initial names for the author picker), `MAX_UPLOAD_MB` (50), `MAX_COMMENT_CHARS` (10 000), per-source overrides of throttling in `sources.yaml`.
+`HOST` (default `127.0.0.1`), `PORT` (`8080`), `DATA_DIR`, `CONTACT_EMAIL` (**required for collectors**: they refuse to start without it), `USER_AGENT` template, `COLLECT_SCHEDULE` (cron; default weekly, Monday 03:00 Europe/Kyiv), `BACKUP_SCHEDULE` (daily), `BACKUP_RETENTION` (7 daily / 4 weekly / 6 monthly), `MAX_UPLOAD_MB` (50), `MAX_COMMENT_CHARS` (10 000), per-source overrides of throttling in `sources.yaml`.
 
 ---
 
@@ -191,7 +191,7 @@ Python package and CLI name: **`mdt`** (Ministry of Digital Transformation).
 ### 4.1 Conventions
 
 - **IDs:** prefixed ULIDs: `prj_`, `svc_`, `evt_`, `doc_`, `evd_`, `org_`, `par_`, `cmp_`, `rel_`, `ind_`, `cmt_`, `prp_`, `run_`, `raw_`. The prefix makes polymorphic references self-describing (`subject_id = "svc_01J…"`) and keeps exports readable. Projects also have a `slug` (unique; an old slug becomes an alias when renamed).
-- **Common columns of every curated row:** `version` (optimistic locking), `created_at`, `updated_at`, `deleted_at`/`deleted_by` (soft delete), `merged_into`, `verification_status`, `notes`, `field_meta` (JSON, §6.2).
+- **Common columns of every curated row:** `version` (numbers the row's revisions; no optimistic locking, D-15), `created_at`, `updated_at`, `deleted_at`/`deleted_by` (soft delete), `merged_into`, `verification_status`, `notes`, `field_meta` (JSON, §6.2).
 - **Multi-valued vocabulary fields** (`policy_domains`, `beneficiaries`, `channels`, …) are JSON arrays of codes, validated against active vocabulary terms. Facet counts and filters use SQLite's `json_each`.
 - **Dates of events and publications** are stored as an interval plus metadata: `date_start`, `date_end` (inclusive), `date_precision` (day/month/quarter/year), `date_basis` (stated_in_source/inferred/archive_upper_bound) and `date_text` (verbatim from the source, e.g. `22 жов., 14:00`). "March 2022" becomes 2022-03-01…2022-03-31 with precision `month`.
 - **Time zones:** timestamps in UTC (ISO 8601); publication dates as calendar dates in Europe/Kyiv. If a source gives a UTC timestamp, the Kyiv date is computed and the timestamp kept in `published_at_utc`.
@@ -405,9 +405,9 @@ For every collector, Phase 0b first looks for **structured access** (XHR/JSON se
 - **CKAN:** datasets of the organisation `mincyfry` → Documents (statistics); figures become Indicators only after human review.
 
 **C8 `manual`**
-- **By URL:** fetched with the polite client, so a snapshot exists. **SSRF protection:** the host is resolved and loopback, private and link-local addresses are refused, re-checked on every redirect.
-- **By upload:** PDF/DOCX/HTML/TXT, served back only as attachments (docs/API.md §6).
-- Provenance `manual:<name>`.
+- **By URL:** fetched with the polite client, so a snapshot exists. (The SSRF filter planned here is dropped: D-15.)
+- **By upload:** PDF/DOCX/HTML/TXT, offered back as downloads.
+- Provenance `manual`.
 <!-- COLLECTORS:END -->
 
 ### 5.3 Matching and auto-tagging
@@ -446,28 +446,26 @@ Phrases such as `запустили`, `запустило`, `запрацюва�
 
 ### 6.1 Revisions
 
-- **All writes go through one domain function:** `apply_change(entity, changes, actor, channel, note, expected_version)`. It validates, computes the diff against the current state, and does nothing if the diff is empty. Otherwise it bumps `version` and writes the entity and the revision (full snapshot plus field-wise diff) **in one transaction**, then recomputes derived values if needed.
+- **All writes go through one domain function:** `apply_change(entity, changes, actor, channel, note)`. It validates, computes the diff against the current state, and does nothing if the diff is empty. Otherwise it bumps `version` and writes the entity and the revision (full snapshot plus field-wise diff) **in one transaction**, then recomputes derived values if needed.
 - **Append-only:** SQLite triggers abort every `UPDATE` and `DELETE` on `revision`.
 - **Covered:** all curated entities, vocabulary terms, relations, participations, evidence, comment edits, document screening and tags, saved views.
 - **Restore** a version = `apply_change` with that version's snapshot, `channel = restore`, `restored_from = <revision>`. This creates a new revision; history is never rewritten.
 - **Diff between any two versions** is computed from their snapshots, field by field; long texts get word-level diffs in the UI.
-- **Recent changes:** a global feed over `revision`, filterable by author, entity type, channel and period.
+- **Recent changes:** a global feed over `revision`, filterable by entity type, channel and period (no author filter: D-15).
 
 ### 6.2 Field provenance
 
 `field_meta[<field>] = {src, by, at, locked, evidence_id?, verified}`
 
-- `src`: `seed` | `collector:<name>@<run_id>` | `manual:<name>` | `import:<file>`. A restore keeps the original `src`.
-- `by`: who wrote the value (a person, or `collector:<name>`).
+- `src`: `seed` | `collector:<name>@<run_id>` | `manual` | `import:<file>`. A restore keeps the original `src`.
+- `by`: who wrote the value (`user` for the app's single user, D-15; otherwise `seed`, `import:<file>` or `collector:<name>`).
 - `locked`: becomes `true` as soon as a person sets, accepts, imports, restores or seeds the value. From then on collectors can only propose.
 - `verified`: unverified / verified / disputed per field. Clicking the badge creates a revision.
 - **UI:** a badge per field (`seed`, `collector`, `manual`, `import`) plus a lock icon and a verification dot; the tooltip shows the run, snapshot or evidence and the time.
 
-### 6.3 Optimistic locking and the conflict dialog
+### 6.3 Optimistic locking and the conflict dialog (superseded by D-15)
 
-- Every editable resource carries `version`. A save sends the base version (`If-Match`).
-- On a mismatch the server answers **409** with the base snapshot (taken from the revisions), the current snapshot and the submitted changes. The conflict dialog shows a three-way comparison per field ("base / theirs / yours"). Fields only one side changed can be taken over with one click; **nothing is saved silently**.
-- Bulk edits send one version per row; conflicts are reported per row and the other rows are saved.
+Superseded by decision D-15 (§12): the app has one user, so saves send no base version, there is no 409 conflict and no conflict dialog, and bulk edits send only the record IDs. Writes are serialised by SQLite's write lock, `version` only numbers a record's revisions, and every change stays in the history (`docs/DATA_MODEL.md` §6.5).
 
 ### 6.4 Soft delete, trash, merge
 
@@ -493,7 +491,7 @@ Partial or failed runs **never** trigger the disappearance logic. `last_seen` ke
 
 - `dedup_key = hash(kind, subject, field, normalised proposed value)`. An identical open proposal is not duplicated (only `last_run` is updated). A **rejected** proposal with the same key is not opened again; a different new value opens a new proposal.
 - When the source value changes again, older open proposals for the same field become `superseded`.
-- **Accept** applies the value (keeps the collector `src`, sets `by` to the person and `locked = true`). **Edit & accept** stores `manual:<name>` with a reference to the proposal. **Reject** requires a short reason. Bulk actions are available.
+- **Accept** applies the value (keeps the collector `src`, sets `by` to `user` and `locked = true`). **Edit & accept** stores `manual` with a reference to the proposal. **Reject** requires a short reason. Bulk actions are available.
 
 ### 6.7 Releases
 
@@ -516,14 +514,14 @@ Partial or failed runs **never** trigger the disappearance logic. `last_seen` ke
 
 ## 7. Web app
 
-### 7.1 Navigation and author attribution
+### 7.1 Navigation
 
-There is no login. Every revision still needs an author, so the app asks "Who are you?" on first visit (team list from `TEAM_MEMBERS`, editable in the UI, or free text). The name is stored in the browser and sent with every write as the `X-Author` header. This is **attribution, not authentication**. On an isolated server that is enough, and the README states it clearly.
+There is no login and no author picker (D-15): the app has one user, and every write through it is recorded as by `user`. (The earlier plan asked "Who are you?" on first visit and sent the name as an `X-Author` header with every write.)
 
 ```
 ┌────────────────────────────────────────────────────────────────────────────────────────────┐
 │ MDT Portfolio │ Dashboard  Projects  Services  Events  Documents  Organizations  Timeline   │
-│               │ Review (n)  Changes  Runs  Codebook  Releases     [ Search everything… ] [👤 Name ▾] │
+│               │ Review (n)  Changes  Runs  Codebook  Releases     [ Search everything… ]   │
 └────────────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -551,8 +549,8 @@ Quick: [Unverified n] [Open comments n] [No start date n] [In paper scope] [Peri
 ← Projects / example-project                                         v14 · unverified ▾ · [History] [Compare]
 Example Project · Приклад      [cluster badge] [in paper scope ✓]                [Edit] [⋯ Merge · Delete]
 ┌ Basics ─────────────────────────────────────────────────────┐ ┌ Comments (2 open) ─────────────┐
-│ Name (en)        Example Project       seed 🔒 ● verified    │ │ ▸ field launch_date · Name (open)│
-│ Ministry pages   /projects/business/…  collector ○           │ │   └ reply · Name                 │
+│ Name (en)        Example Project       seed 🔒 ● verified    │ │ ▸ field launch_date · open       │
+│ Ministry pages   /projects/business/…  collector ○           │ │   └ reply                        │
 ├ Classification ─────────────────────────────────────────────┤ │ [+ Comment] [on field ▾]         │
 │ Policy domains   economic_affairs      manual 🔒 ○           │ └──────────────────────────────────┘
 │ Beneficiaries    …                     manual 🔒 ○           │
@@ -579,7 +577,7 @@ Example Project · Приклад      [cluster badge] [in paper scope ✓]     
 │ Published  2023-05-12 (d) │└──────────────────────────────────────────────────────────────────────┘
 │ Retrieved  2026-11-02 UTC │┌ Project tags ─────────────────────────┐┌ Evidence from this document ─┐
 │ Original ↗  Archive ↗     ││ example-a  suggested  [✓] [✗]           ││ D1 · Example project · “…”   │
-│ Screening [included ▾]    ││ example-b  confirmed (Name)             │└──────────────────────────────┘
+│ Screening [included ▾]    ││ example-b  confirmed                    │└──────────────────────────────┘
 │ Reason    [code ▾] note   │└───────────────────────────────────────┘
 ```
 
@@ -610,7 +608,7 @@ Cluster 3              ┆                    ┆    ●──◇──◇──
 ```
 Review   [Proposals n] [New unverified n]       Filter: kind ▾ · source ▾ · run ▾ · entity type ▾
 ☐ update_field · project example · description_uk · run_123 (ministry_projects)
-     current  (manual 🔒 Name, 2026-11-02): «…»
+     current  (manual 🔒, 2026-11-02): «…»
      proposed (snapshot raw_…, 2026-11-09):  «…»            [Accept] [Edit & accept] [Reject…]
 ☐ possibly_discontinued · service … · missing in 2 complete runs since 2026-11-10
 ☐ create_event · launch? · “… запустили …” · doc_…             [Open draft]
@@ -634,13 +632,11 @@ Further views: **Recent changes** (feed with filters; diff popover), **Collector
 - **QDA corpus:** one UTF-8 text file per **included** document, grouped in folders by project (a document linked to several projects appears in each folder, and the metadata records that), plus a metadata table in a shape suitable for MAXQDA document variables, ATLAS.ti document groups and NVivo classification sheets. The exact column layout will be checked against the current versions in Phase 3.
 - **Codebook** as Markdown.
 
-### 7.5 Security without login
+### 7.5 Security (superseded by D-15)
 
-- **DNS rebinding:** a Host-header allowlist (`ALLOWED_HOSTS`). Without it, a malicious website could rebind its domain to the internal address and read or write data in the name of a team member's browser.
-- **Cross-site writes:** all writes require JSON plus the custom `X-Author` header and a same-origin `Origin`/`Sec-Fetch-Site`. Browsers send a preflight for such requests, and since no CORS is allowed, the request fails.
-- **Stored XSS:** Markdown is rendered and sanitised server-side (`nh3`). Document texts are always rendered as plain text and search highlights as React elements. A strict **Content-Security-Policy** (`default-src 'self'`, no inline scripts) adds a second line of defence.
-- **Uploads:** size limit, file type checked by content (magic bytes), stored content-addressed, served with `Content-Disposition: attachment` and `X-Content-Type-Options: nosniff`.
-- **Input validation** with Pydantic (lengths, vocabulary codes, URL schemes `http`/`https` only).
+The planned security layer is superseded by decision D-15 (§12): the server is secured by its environment, so the app has no Host allowlist, no cross-site and origin checks, no security headers (CSP), no HTML sanitiser (`nh3`, DOMPurify) and no upload hardening. What stays, because it is correctness rather than defence:
+- **Input validation** with Pydantic and the registry (lengths, vocabulary codes, URL schemes `http`/`https` only).
+- **Rendering:** Markdown is rendered server-side with raw HTML disabled; document texts are always rendered as plain text and search highlights as React elements.
 - **Secrets** only in `.env` (`.env.example` in the repo). Lockfiles for Python and npm. Delete is soft; hard purge is CLI-only.
 
 ---
@@ -648,15 +644,15 @@ Further views: **Recent changes** (feed with filters; diff popover), **Collector
 ## 8. Operations
 
 - `docker compose up -d` starts the single `app` service: port `${HOST:-127.0.0.1}:${PORT:-8080}:8080`, volume `./data:/app/data`, bind mount `./releases`, healthcheck, `restart: unless-stopped`. The image is multi-stage (Node build → slim Python runtime), runs as a non-root user and carries the git commit as a label. On start it runs `mdt db upgrade`.
-- **Team access** (README): via VPN (e.g. WireGuard or Tailscale), an SSH tunnel, or a reverse proxy (Caddy or nginx) with TLS and preferably basic auth or an IP allowlist in front. The app itself stays bound to 127.0.0.1.
+- **Access** (README; D-15 replaces the planned team access): the app is published on 127.0.0.1 by default; its one user reaches it through the server's environment, e.g. an SSH tunnel or a protected network interface set as `HOST`. Access control is the environment's job.
 - **Scheduled jobs:** collector runs weekly by default (cron in `.env`, visible in the UI), backup daily.
 - **Makefile:** `dev`, `test`, `lint`, `typecheck`, `build`, `up`, `down`, `logs`, `migrate`, `seed`, `collect SOURCE=…`, `import FILE=… [DRY_RUN=1]`, `fixtures SOURCE=…`, `release NAME=…`, `backup`, `restore FILE=…`, `codebook`, `check`.
 
 ## 9. Quality and tests
 
-- **Backend:** ruff, mypy; pytest for parsers (offline fixtures), the HTTP client (throttling, robots, conditional GET, backoff, block detection; with a fake transport), the domain logic (revision, empty-diff no-op, restore, conflict 409 with three-way payload, locks, proposals including dedup and rejection memory, disappearance only after complete runs, derived-field rules including precision edge cases at both cut-off dates), the API, the importer (mapping, dry run) and release manifests.
-- **Frontend:** ESLint, tsc; Vitest for filter-URL round trips, diff and conflict dialogs.
-- **E2E smoke tests** (Playwright, Chromium): start the app on a seeded DB → filter the projects table → edit with a note → history and diff → restore → provoke a conflict (two browser contexts) → comment and resolve.
+- **Backend:** ruff, mypy; pytest for parsers (offline fixtures), the HTTP client (throttling, robots, conditional GET, backoff, block detection; with a fake transport), the domain logic (revision, empty-diff no-op, restore, serialised writes, locks, proposals including dedup and rejection memory, disappearance only after complete runs, derived-field rules including precision edge cases at both cut-off dates), the API, the importer (mapping, dry run) and release manifests.
+- **Frontend:** ESLint, tsc; Vitest for filter-URL round trips, diff views and the edit form.
+- **E2E smoke tests** (Playwright, Chromium): start the app on a seeded DB → filter the projects table → edit with a note → history and diff → restore → comment and resolve → export. (The conflict scenario with two browser contexts was dropped with D-15.)
 - **CI** (GitHub Actions): lint, type checks and tests for backend and frontend, plus a Docker build. Network-dependent tests are excluded by marker.
 
 ---
@@ -667,8 +663,8 @@ Further views: **Recent changes** (feed with filters; diff popover), **Collector
 |---|---|---|
 | **0 (this)** | Paper read; environment checked; plan, SOURCES and CODEBOOK drafts; open questions | Approval |
 | **0b — source checks** | Once there is network access (this environment or the server): for each source robots.txt, licence footer, sitemaps/RSS, JSON endpoints (Playwright XHR log on 1–2 pages), pagination, date formats, archive depth (binary search over listing pages), CDX coverage. **Budget:** ≈ 150 requests overall, ≤ 1 request/s per host. Fixtures captured. `docs/SOURCES.md` and the collector strategy (§5.2) finalised. | Every `[hypothesis]` and `[search-summary]` item for S1–S5 is confirmed, refuted or documented as not determinable; fixtures committed |
-| **1 — skeleton** | Repo structure, `CLAUDE.md`, tooling; models, Alembic migrations, FTS, revision triggers; `apply_change` with diff, no-op, restore; field provenance and locks; optimistic locking (409 + payload); soft delete and trash; comments (threads, status, Markdown, revisioned edits); vocabularies (YAML → DB) and seed (19 + 1 projects); API with server-side filters, sort, pagination and facets; UI tables (filters, column chooser, URL state, saved views, bulk edit, CSV/XLSX export of the current view), detail pages with edit, badges, history, diff, restore, conflict dialog, comments; Recent changes; Docker and compose | Definition of Done 1, 2, 4 and 6 on seed data; tests green |
-| **2 — data acquisition** | `PoliteHttpClient`, snapshot store, CollectorRun and FetchLog, run queue and scheduler hook; reconciler, proposals and review inbox; SourceObservations and "possibly discontinued"; collectors C1–C5; alias tagging and event proposals; merging duplicates; importer (CSV/XLSX mapping + dry run; `defusedxml` installed against XML bombs in untrusted XLSX); manual documents (URL with SSRF protection, upload); collector-run view | Definition of Done 3 and 5; idempotency test green |
+| **1 — skeleton** | Repo structure, `CLAUDE.md`, tooling; models, Alembic migrations, FTS, revision triggers; `apply_change` with diff, no-op, restore; field provenance and locks; optimistic locking (409 + payload; removed again by D-15); soft delete and trash; comments (threads, status, Markdown, revisioned edits); vocabularies (YAML → DB) and seed (19 + 1 projects); API with server-side filters, sort, pagination and facets; UI tables (filters, column chooser, URL state, saved views, bulk edit, CSV/XLSX export of the current view), detail pages with edit, badges, history, diff, restore, conflict dialog (removed again by D-15), comments; Recent changes; Docker and compose | Definition of Done 1, 2, 4 and 6 on seed data; tests green |
+| **2 — data acquisition** | `PoliteHttpClient`, snapshot store, CollectorRun and FetchLog, run queue and scheduler hook; reconciler, proposals and review inbox; SourceObservations and "possibly discontinued"; collectors C1–C5; alias tagging and event proposals; merging duplicates; importer (CSV/XLSX mapping + dry run); manual documents (URL, upload; the planned XML-bomb and SSRF protections are dropped, D-15); collector-run view | Definition of Done 3 and 5; idempotency test green |
 | **3 — analysis** | Document view with evidence capture; Organizations, Participations, Components, Relations (D2–D4); Indicators; timeline (SVG/PNG); dashboard; all exports (dataset, QDA corpus, codebook); C6 (legal acts) and C7 (Telegram, CKAN) where useful | Definition of Done 7 (except releases) |
 | **4 — operations** | `make release` with manifest and tag; releases view; backups with rotation and restore test; schedules; CI; README, DATA_MODEL, CODEBOOK (generated), SOURCES, METHODS | Definition of Done 1–8 |
 
@@ -689,10 +685,10 @@ Phase 1 does not depend on the source checks and can start right after approval;
 | R6 | Catalogue HTML changed over the years | Historic captures need era-specific parsers | Parsers versioned per layout era with fixtures for each era; scope limited to the yearly cut-off dates and 2022-02-23 |
 | R7 | Homonyms and inflection in auto-tagging (`дія` = action) [local] | False or missed tags | Curated alias forms, case-sensitive brand aliases, exclusions, suggested state, one-click review |
 | R8 | Portfolio changes (PlayCity, 19 vs. 20 entries) [user] | Unclear unit of analysis | Listing date as an observation; governance_change events; `in_paper_scope` with reason |
-| R9 | Training-knowledge leakage into the data | Unverifiable values | No writes without author and provenance; seed limited to §3 of the assignment; reviews |
+| R9 | Training-knowledge leakage into the data | Unverifiable values | No writes without channel and provenance; seed limited to §3 of the assignment; reviews |
 | R10 | Copyright of full texts from third-party media | Publishing risk | Releases without non-open full texts; QDA export internal only |
 | R11 | SQLite concurrency | Lock errors | WAL, `busy_timeout`, serialised runs, small transactions |
-| R12 | No authentication | Spoofed author names; exposure if the server becomes reachable from outside | Binding to 127.0.0.1, VPN or proxy auth, Host allowlist, CSRF protection, CSP; README warning |
+| R12 | No authentication and no security layer in the app (D-15) | Exposure if the server's environment stops protecting it | Binding to 127.0.0.1 by default; access control stays with the server's environment (decision of the data lead) |
 | R13 | Interview transcripts (later) contain personal data | Data protection | Not in v1; if added later: a separate protected document class, excluded from releases (decision for the team) |
 | R14 | Responsibilities change during the observation window (PlayCity coordination, Brave1 management, leadership and mandate of the ministry in 2025–2026 [search]) | Portfolio statements in the paper go stale | Participations with periods, governance_change and context events, statements tied to a release date (§13) |
 | R15 | Wayback rate limits are undocumented [doc] | Blocks or bans | 1 request per 5 s by default, backoff, cached CDX responses, no parallelism |
@@ -710,7 +706,7 @@ Phase 1 does not depend on the source checks and can start right after approval;
 | D-2 | Which event types count as a modification for `adapted_in_war`? | expansion, major_update, rebrand, governance_change, suspension |
 | D-3 | Period for items with only an archive bound before the invasion | Strict `unknown` + flag `existed_before_invasion`; optional extra value `pre_invasion_or_earlier` |
 | D-4 | Definitions of `wartime_relevance` (direct/indirect/none/unclear) | Draft in CODEBOOK |
-| D-5 | Release content (full texts, comments, author names) | Without comments, proposals or non-open full texts; with team author names |
+| D-5 | Release content (full texts, comments) | Without comments, proposals or non-open full texts. Author names no longer arise (D-15): changes made in the app are recorded as `user`, the others under their channel (`seed`, `import:<file>`, `collector:<name>`) |
 | D-6 | Service granularity (what is a sub-service? app features vs. portal services) | Rules in CODEBOOK (draft) |
 | D-7 | Policy domains and beneficiaries | COFOG divisions as the top level + subcodes from the data (draft in CODEBOOK) |
 | D-8 | May collectors create Services directly (unverified)? | Yes for catalogue sources; projects only via proposal |
@@ -719,7 +715,8 @@ Phase 1 does not depend on the source checks and can start right after approval;
 | D-11 | Add `unit_type` to Project (product/service, platform, programme, strategy/policy area, organisation)? | Yes (R16); the vocabulary draft is in CODEBOOK |
 | D-12 | Add the Digital State UA catalogue and the Diia service guide as sources (after 0b)? | Yes if 0b confirms structured access; as cross-check sources, not as the portfolio definition |
 | D-13 | Enforce the coding rules of CODEBOOK §2.3 and §2.8 in the app: "verified" only with evidence that quotes the source verbatim; an excluded document needs a screening reason, and only excluded documents carry one? | Yes (enforced since the Phase 1 review). Side effect: excluding documents needs the reason in the same change, so a single-field bulk edit cannot exclude |
-| D-14 | Full-text search over comments: also match status words and resolver names (`open`, a person's name), as now (DATA_MODEL §10), or comment text only? | Comment text only (status and author have their own filters); a small change with a reindex. Until decided, the current behaviour stays |
+| D-14 | Full-text search over comments: also match status words and the resolver (`open`, `user`), as now (DATA_MODEL §10), or comment text only? | Comment text only (the status has its own filter, and the resolver is always `user`, D-15); a small change with a reindex. Until decided, the current behaviour stays |
+| D-15 | Single user, no concurrent editing, no additional security layer | **Decided by the data lead on 2026-10-29.** The data lead only provides the server; one other person uses the app. No names are entered (writes in the app are recorded as `user`), nothing has to work for several users at once, and the server is secured by its environment, so the app needs no security functions of its own. Removed: the author picker and `X-Author`, author filters and `TEAM_MEMBERS`; optimistic locking (`expected_version`) and the conflict dialog; the request guard (`ALLOWED_HOSTS`, origin checks, size limits), the security headers and the HTML sanitisers; the team access notes. Kept: revisions, restore, field provenance and locks, soft delete, input validation. Definition of Done item 4 changed accordingly (CLAUDE.md) |
 <!-- DECISIONS:END -->
 
 ---
@@ -801,10 +798,10 @@ Phase 1 does not depend on the source checks and can start right after approval;
 Also asked in the session (in German).
 
 1. **Contact e-mail for the User-Agent:** ideally a project or functional address. It goes into `.env` only, never into the repository.
-2. **Server:** operating system and version; Docker and Compose versions; CPU, RAM, free disk; **location/hosting (country)**, relevant for possible geo-blocking; outbound internet access; team access via VPN, reverse proxy (which?) or SSH tunnel; off-host backup target.
+2. **Server:** operating system and version; Docker and Compose versions; CPU, RAM, free disk; **location/hosting (country)**, relevant for possible geo-blocking; outbound internet access; how the user reaches the app (SSH tunnel or a protected network interface; the server's environment secures it, D-15); off-host backup target.
 3. **Existing table:** does the dataset mentioned in the paper exist? Format, columns, who collected it, from which sources and when? If yes: upload it here or put it into `data/import/` on the server; the importer gets a mapping and a dry run.
 4. **Network for Phase 0b:** open the source domains for this cloud environment (list in the session), or run the exploration and fixture capture on the server?
-5. **Team:** names for the author picker; how many people edit at the same time?
-6. **Git:** the reply "Ok mach weiter" (2026-10-28) was taken as approval to push to the working branch `claude/sharp-heisenberg-inzace`; a merge into the default branch still needs explicit approval.
-7. **Decisions D-1 to D-14** (§12): can be answered later; the defaults above apply until then.
+5. **Team:** answered on 2026-10-29 (D-15): one person uses the app, without names and without concurrent editing.
+6. **Git:** the reply "Ok mach weiter" (2026-10-28) was taken as approval to push to the working branch `claude/sharp-heisenberg-inzace`; on 2026-10-29 the data lead asked for the simplified state (D-15) to be merged into `main`.
+7. **Decisions D-1 to D-15** (§12; D-15 is decided): the open ones can be answered later; the defaults above apply until then.
 <!-- QUESTIONS:END -->

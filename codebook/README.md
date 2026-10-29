@@ -19,7 +19,7 @@ One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus `pa
   - `policy_domain`: `cofog`, the COFOG division number ("01" to "10"). The label is the COFOG division name without the number. The labels still have to be checked against the official COFOG publication (decision D-7).
   - `beneficiary`: `candidate: true` for the candidate codes; `paper_basis` (CODEBOOK.md column "Basis in the paper") for the codes grounded in the paper.
   - `participation_role`: `draft_addition: true` for `coordinator`.
-- Decision IDs (D-1 … D-12) refer to `PLAN.md` §12. `[search]` marks information that was only seen in search results (legend of `docs/CODEBOOK.md`).
+- Decision IDs (D-n) refer to `PLAN.md` §12. `[search]` marks information that was only seen in search results (legend of `docs/CODEBOOK.md`).
 
 ## parameters.yaml
 

@@ -1,10 +1,10 @@
 # MDT Portfolio
 
-Research data platform for the paper **"Digital Innovation for Governments under Crisis"** (ICIS 2026 Paper Development Workshop). It maps the portfolio of projects and digital services of the Ministry of Digital Transformation of Ukraine (Мінцифри) and builds a document corpus for the qualitative document analysis. In the web app the research team views, filters, sorts, comments on and corrects the data, with a complete revision history.
+Research data platform for the paper **"Digital Innovation for Governments under Crisis"** (ICIS 2026 Paper Development Workshop). It maps the portfolio of projects and digital services of the Ministry of Digital Transformation of Ukraine (Мінцифри) and builds a document corpus for the qualitative document analysis. In the web app its user views, filters, sorts, comments on and corrects the data, with a complete revision history. The app has one user and no login; the server it runs on is secured by its environment (decision D-15 in [`PLAN.md`](PLAN.md) §12).
 
-Guiding principle: **traceability before completeness.** Every value records where it came from (seed, collector run, import or a named person), automatic updates never overwrite manual corrections, and nothing is hard-deleted.
+Guiding principle: **traceability before completeness.** Every value records where it came from (seed, collector run, import or a change made in the app), automatic updates never overwrite manual corrections, and nothing is hard-deleted.
 
-> **Status: Phase 1 (skeleton) is in progress.** This README covers the Docker start, local development, configuration, data and team access. The full README (deployment, collectors and schedules, backup and restore, releases, adding a source) follows in Phase 4. The plan and all phases are in [`PLAN.md`](PLAN.md).
+> **Status: Phase 1 (skeleton) is done.** This README covers the Docker start, local development, configuration, access and data. The full README (deployment, collectors and schedules, backup and restore, releases, adding a source) follows in Phase 4. The plan and all phases are in [`PLAN.md`](PLAN.md).
 
 Phase 1 covers: the data model with migrations; the seed with the 19 projects of the paper plus European Integration (seeded as outside the paper's scope until the team decides) and the draft vocabularies; revisions with diff and restore; comments; the HTTP API; tables with server-side filters, sorting and export; detail pages with editing; and the start via Docker. Collectors follow in Phase 2.
 
@@ -14,11 +14,11 @@ Requirements: Docker Engine with Docker Compose v2.24 or newer.
 
 ```bash
 git clone <repository URL> mdt-portfolio && cd mdt-portfolio
-cp .env.example .env      # optional: review ALLOWED_HOSTS and TEAM_MEMBERS
+cp .env.example .env      # optional: adjust HOST and PORT
 docker compose up -d      # or: make up
 ```
 
-Then open **http://127.0.0.1:8080** on the server (from other machines see [Team access](#team-access)).
+Then open **http://127.0.0.1:8080** on the server (from another machine see [Access](#access)).
 
 - The first start builds the image, creates `data/app.db`, applies the database migrations and loads the seed. Every later start runs the migrations and the seed again; both are idempotent, so existing data and manual changes are kept.
 - `docker compose ps` shows the health status; `docker compose logs -f app` (or `make logs`) follows the logs.
@@ -61,34 +61,19 @@ Settings come from environment variables, usually from a `.env` file in the repo
 | Variable | Default | Purpose |
 |---|---|---|
 | `HOST`, `PORT` | `127.0.0.1`, `8080` | Docker: host interface and port where the app is published. Without Docker: default listen address of `mdt serve` (`make dev` always uses 127.0.0.1:8000) |
-| `ALLOWED_HOSTS` | `127.0.0.1,localhost` | Host-header allowlist against DNS rebinding: comma-separated host names without port (no wildcards, no IPv6 literals; `*` alone disables the check, unsafe). Add the name the team uses (VPN address, proxy host name). Keep `127.0.0.1`: the container health check uses it. A malformed value stops the server at startup |
-| `TEAM_MEMBERS` | empty | Names offered by the "Who are you?" author picker, comma-separated |
 | `CONTACT_EMAIL` | unset (`.env.example` has a placeholder) | Contact address in the collectors' User-Agent (Phase 2). Replace the placeholder before running collectors |
 | `MAX_COMMENT_CHARS`, `FOCAL_ORG_SEED_KEY`, `LOG_LEVEL` | `10000`, `ministry-of-digital-transformation`, `INFO` | Comment length limit, seed key of the ministry, log level |
 | `DATA_DIR`, `DATABASE_URL`, `CODEBOOK_DIR`, `SEED_DIR`, `FRONTEND_DIST` | `data`, `sqlite:///<DATA_DIR>/app.db`, `codebook`, `seed`, `frontend/dist` | Paths for local development; relative directory paths resolve against the repository root. Inside the container they are fixed |
 | `APP_UID`, `APP_GID` | `1000` | Docker build: user and group that run the app and own `./data` |
 
-docker compose reads `.env` both for `${...}` substitution in `docker-compose.yml` (`HOST`, `PORT`, `ALLOWED_HOSTS`, `APP_UID`, `APP_GID`) and as environment of the container. Inside the container compose pins `HOST`, `PORT` and all paths, so a `.env` with local development values cannot redirect them.
+docker compose reads `.env` both for `${...}` substitution in `docker-compose.yml` (`HOST`, `PORT`, `APP_UID`, `APP_GID`) and as environment of the container. Inside the container compose pins `HOST`, `PORT` and all paths, so a `.env` with local development values cannot redirect them.
 
-## Team access
+## Access
 
-By default the app is reachable on **127.0.0.1** only, that is from the server itself (Docker publishes the port on 127.0.0.1; `mdt serve` listens there). **The app has no login.** Anyone who can reach it can read and change all data, and author names are self-declared. Never expose it unprotected, for example by setting `HOST=0.0.0.0` on a machine that is reachable from the internet. Note that ports published by Docker bypass host firewalls such as ufw.
+By default the app is reachable on **127.0.0.1** only, that is from the server itself (Docker publishes the port on 127.0.0.1; `mdt serve` listens there). The app has one user and no login of its own; who can reach the server is decided by the server's environment (D-15). To use the app from another machine:
 
-Ways for the team to reach it, from the simplest to the most comfortable:
-
-1. **SSH tunnel** (no change on the server): `ssh -N -L 8080:127.0.0.1:8080 <user>@<server>`, then open http://127.0.0.1:8080 on your own machine. Every team member needs SSH access to the server.
-2. **VPN** (e.g. WireGuard or Tailscale): set `HOST` to the server's VPN address, so the app is published on the VPN interface only, and add that address (or the VPN host name) to `ALLOWED_HOSTS`. Then restart with `make up`. The VPN interface must be up before Docker starts the container, otherwise publishing the port fails.
-3. **Reverse proxy with TLS and authentication** (e.g. Caddy or nginx) on the server, forwarding to `127.0.0.1:8080`. Use basic auth, single sign-on or at least an IP allowlist, and add the proxy's host name to `ALLOWED_HOSTS`. The proxy must pass the original `Host` header on (Caddy does this by default; nginx needs `proxy_set_header Host $host;`), otherwise writes fail the same-origin check. A minimal Caddy sketch:
-
-   ```
-   mdt.example.org {
-       basic_auth {
-           # user name and bcrypt hash from: caddy hash-password
-           team <hash>
-       }
-       reverse_proxy 127.0.0.1:8080
-   }
-   ```
+1. **SSH tunnel** (no change on the server): `ssh -N -L 8080:127.0.0.1:8080 <user>@<server>`, then open http://127.0.0.1:8080 on your own machine.
+2. **Another network interface** (e.g. a VPN address): set `HOST` in `.env` to that address and restart with `make up`. The interface must be up before Docker starts the container, otherwise publishing the port fails.
 
 ## Data
 
@@ -102,19 +87,19 @@ Ways for the team to reach it, from the simplest to the most comfortable:
 These rules come from the project brief and are enforced by the app where it can:
 
 - **No invented facts.** Every value comes from a captured source (URL or document with retrieval time), the seed data of the brief (provenance `seed`), an import, or a person on the team. This applies to seeds, fixtures and test data as well. There is no machine translation: a missing English name stays empty.
-- **Provenance per field.** Every write records its author (the name sent with each write; attribution, not authentication) and, per field, where the value came from. Derived values (period, war trajectory, launch) are marked as derived and link the deciding event.
+- **Provenance per field.** Every write records its channel (a change made in the app, the seed, an import or a collector run) and, per field, where the value came from. Derived values (period, war trajectory, launch) are marked as derived and link the deciding event.
 - **Manual corrections win.** Automatically collected values never overwrite a value that a person set; differences become proposals for review (Phase 2). The seed, too, never overwrites a value that a person has set, cleared, restored or verified.
-- **Nothing is hard-deleted.** Every change creates a revision with a full snapshot; deleted records go to the trash and can be undeleted, and any earlier version can be restored. Concurrent edits are detected and resolved in a conflict dialog instead of being overwritten.
+- **Nothing is hard-deleted.** Every change creates a revision with a full snapshot; deleted records go to the trash and can be undeleted, and any earlier version can be restored.
 
 ## Exports
 
 Every table can be exported as CSV ("for analysis tools") or XLSX ("for Excel, exact values"), with the current filters, sort order and columns.
 
-**Spreadsheet safety:** a text cell that a spreadsheet program could read as a formula (one that starts with `=`, `+`, `-`, `@`, a tab or a line break) is prefixed with an apostrophe in CSV; numbers, booleans and dates are never changed. XLSX stores every text value as a text cell, never as a formula, so values stay exact. CSV files are UTF-8 with a byte order mark. Details: [`docs/API.md`](docs/API.md) §5.
+**File formats:** CSV files are UTF-8 with a byte order mark and hold the values verbatim. XLSX stores every text value as a text cell, never as a formula, so values stay exact. Details: [`docs/API.md`](docs/API.md) §5.
 
 ## Troubleshooting
 
-- **Container stays "unhealthy":** check `make logs`. The health check requests `http://127.0.0.1:8080/api/health` inside the container, so `ALLOWED_HOSTS` must contain `127.0.0.1`.
+- **Container stays "unhealthy":** check `make logs`. The health check requests `http://127.0.0.1:8080/api/health` inside the container.
 - **"/app/data is not writable":** the container was started as a non-root user. Make `./data` writable for that user, e.g. `sudo chown -R 1000:1000 data`.
 - **`error: database … does not exist`** from `mdt serve`: run `make migrate` and `make seed` (or `mdt db upgrade` and `mdt seed`) first.
 - **Port already in use:** set another `PORT` in `.env` and run `make up`.

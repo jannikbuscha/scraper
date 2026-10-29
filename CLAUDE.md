@@ -7,11 +7,11 @@ Working notes for Claude Code and every other contributor. Keep this file curren
 **MDT Portfolio** is the data platform for the paper **"Digital Innovation for Governments under Crisis"** (ICIS 2026 Paper Development Workshop). Research question: how do governments develop digital products and services in war? The case is the Ministry of Digital Transformation of Ukraine (Мінцифри). The platform
 
 1. collects, reproducibly, the ministry's portfolio of projects and digital services and a document corpus for the planned qualitative document analysis, and
-2. offers a web app in which the team views, filters, sorts, comments on and corrects the data, with a complete revision history.
+2. offers a web app in which its user views, filters, sorts, comments on and corrects the data, with a complete revision history.
 
 Guiding principle: **traceability before completeness.** In a scientific paper every value is only as good as its evidence.
 
-The app runs on the data lead's own isolated server. There is **no login**: the author name sent with every write (`X-Author`) is attribution, not authentication.
+The app has **one user**: the data lead provides the server, and one other person uses the app. The server is secured by its environment. So there is **no login and no author name**, nothing has to work for several people at once, and the app has no security layer of its own (decision D-15, `PLAN.md` §12). Every write through the app is recorded with the fixed actor `user`.
 
 `paper.docx` in the repository root is the paper draft. Never modify it and never add copies of it to the repository.
 
@@ -23,7 +23,7 @@ The app runs on the data lead's own isolated server. There is **no login**: the 
 |---|---|---|
 | 0 | Exploration and plan: `PLAN.md`, drafts of `docs/SOURCES.md` and `docs/CODEBOOK.md` | done |
 | 0b | Hands-on source checks and fixture capture | open: the development environment cannot reach the source hosts (`PLAN.md` §2.2) |
-| 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; all gates and CI green; adversarial review findings fixed |
+| 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; adversarial review findings fixed; simplified the same day for one user without concurrent editing or a security layer (D-15); all local gates, the E2E suite and a Docker start are green on the simplified state (CI ran green before the simplification) |
 | **2** | **Data acquisition:** collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | **next**, after the data lead's go; needs network access to the source hosts (Phase 0b) |
 | 3 | Analysis: document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | planned |
 | 4 | Operations: releases with git tags, backups, schedules, documentation | planned |
@@ -34,7 +34,7 @@ Definition of Done for v1 (assignment §11):
 1. On a fresh server, `docker compose up -d` starts the app at http://127.0.0.1:8080 (configurable).
 2. The 19 projects and "Євроінтеграція" (European Integration, out of scope) are visible and can be filtered and sorted by all vocabulary fields.
 3. A complete collector run is idempotent: a second run creates neither duplicates nor empty revisions; runs and errors are visible in the UI.
-4. A manual change creates a revision with author and note; diff and restore work; concurrent editing leads to the conflict dialog.
+4. A manual change creates a revision with a note; diff and restore work. *(Changed by the data lead on 2026-10-29, D-15: the app has one user, so author names and concurrent editing with the conflict dialog are no longer required.)*
 5. Collectors do not overwrite manual values; deviations appear as proposals.
 6. Comments (threads, open/resolved) work on all entities and can be filtered.
 7. Timeline and dashboard distinguish the periods; all exports and a release with a git tag work.
@@ -51,7 +51,7 @@ From the assignment, §2:
 
 In practice:
 - This applies to seeds, fixtures, examples and test data as well. `seed/` holds only values from the assignment (see `seed/README.md`); `codebook/` holds only the codebook draft (see `codebook/README.md`).
-- Every write records an author and a provenance per field (`field_meta`); collectors write only unlocked fields and turn other differences into proposals (Phase 2).
+- Every write records its channel (`ui`, `restore`, `seed`, `import`, `collector`, …) in the revision and a provenance per field (`field_meta`). Names exist only for the automatic channels (`seed`, `import:<file>`, `collector:<name>`); writes through the app are recorded as `user`, with `src = manual`. Collectors write only unlocked fields and turn other differences into proposals (Phase 2).
 - Delete is soft (trash). A hard purge is planned only as a CLI command with explicit confirmation (`mdt purge`, `PLAN.md` §6.4).
 
 ## Collection rules (assignment §5; collectors arrive in Phase 2)
@@ -69,12 +69,12 @@ In practice:
 - After each phase: all tests green, clean commits (Conventional Commits), and a short status report to the data lead **in German** with three parts: *fertig* (done), *offen* (open), *Entscheidungen* (decisions the data lead has to make).
 - **No `git push` without the data lead's approval.**
 - If a source behaves differently than described, document it (`docs/SOURCES.md`) and propose an alternative instead of improvising silently.
-- Open team decisions are D-1 to D-14 in `PLAN.md` §12; the proposed defaults apply until the team decides.
+- Team decisions are D-1 to D-15 in `PLAN.md` §12; for the open ones the proposed defaults apply until the team decides.
 
 ## Stack
 
-- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI served by uvicorn, Pydantic v2 (pydantic-settings), SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py and nh3 for comments, openpyxl for XLSX exports. Lint and types: ruff, mypy. Tests: pytest; the HTTP tests use Starlette's `TestClient` (dev dependency `httpx2`).
-- **Frontend** (`frontend/`): React 19, TypeScript (strict, ~6.0), Vite, Mantine, TanStack Router, Query and Table, jsdiff, DOMPurify, dayjs. Lint and types: ESLint 9 (eslint-plugin-react, needed for `react/no-danger`, does not support ESLint 10), tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests in `frontend/e2e/`.
+- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI served by uvicorn, Pydantic v2 (pydantic-settings), SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py for comments, openpyxl for XLSX exports. Lint and types: ruff, mypy. Tests: pytest; the HTTP tests use Starlette's `TestClient` (dev dependency `httpx2`).
+- **Frontend** (`frontend/`): React 19, TypeScript (strict, ~6.0), Vite, Mantine, TanStack Router, Query and Table, jsdiff, dayjs. Lint and types: ESLint 9 (eslint-plugin-react does not support ESLint 10), tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests in `frontend/e2e/`.
 - **Operations:** one container and one process (FastAPI serves `/api` and the built frontend); multi-stage Dockerfile (node:22-alpine builds the frontend, python:3.13-slim runs the app); docker compose; Makefile; GitHub Actions CI.
 - Later phases add a polite HTTP client built on httpx, plus BeautifulSoup/lxml, trafilatura and APScheduler (`PLAN.md` §3.2).
 
@@ -89,7 +89,7 @@ In practice:
 ├── docker/entrypoint.sh   container start: mdt db upgrade → mdt seed → mdt serve
 ├── docs/
 │   ├── DATA_MODEL.md      contract: entities, fields, revisions, provenance, derived fields
-│   ├── API.md             contract: HTTP API, query grammar, exports, security headers
+│   ├── API.md             contract: HTTP API, query grammar, exports, runtime
 │   ├── UI.md              contract: routes, pages, components, frontend tests
 │   ├── CODEBOOK.md        vocabularies and coding rules
 │   └── SOURCES.md         source register
@@ -131,7 +131,7 @@ Direct commands:
 - **Inside the container the app always listens on 0.0.0.0:8080.** `HOST` and `PORT` in `.env` only choose the host interface and port that docker compose publishes (default 127.0.0.1:8080). Compose pins `HOST`, `PORT` and all paths inside the container, so a `.env` with local development values cannot redirect them.
 - The entrypoint starts as root only to hand `./data` to the unprivileged user `app` (UID/GID 1000, build arguments `APP_UID`/`APP_GID`), then re-executes itself as `app` and runs `mdt db upgrade`, `mdt seed` and `mdt serve`.
 - Run CLI commands in the running container as that user: `docker compose exec -u app app mdt check`. Without `-u app`, `exec` runs as root and can leave root-owned files in `./data`. One-off commands: `docker compose run --rm app mdt check` (the entrypoint drops privileges itself).
-- Configuration: `.env` (template `.env.example`, every variable commented). Keep `127.0.0.1` in `ALLOWED_HOSTS`; the health check uses it.
+- Configuration: `.env` (template `.env.example`, every variable commented).
 - `make up` and `make docker-build` record the git commit in the image label `org.opencontainers.image.revision` (and the environment variable `GIT_COMMIT`), with `-dirty` if tracked files have uncommitted changes.
 - uv is pinned to 0.11.32 in the Dockerfile and in `.github/workflows/ci.yml`; change both together.
 
@@ -141,9 +141,9 @@ Direct commands:
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `build:`, `ci:`, `chore:`; dataset releases later `data: release <name>`). Small, focused commits.
 - **Contracts:** `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md` are binding. Every interface change (fields, endpoints, parameters, behaviour) updates the affected contract document in the same change.
 - **Tests run offline** against fixtures (collector fixtures in `backend/tests/fixtures/<collector>/`). No test may depend on network access.
-- **One write path:** every change of curated data goes through `apply_change` or the other write actions of `docs/DATA_MODEL.md` §6.4, which share its machinery (revision, field provenance, optimistic locking); see `docs/DATA_MODEL.md` §6.
+- **One write path:** every change of curated data goes through `apply_change` or the other write actions of `docs/DATA_MODEL.md` §6.4, which share its machinery (write transaction, revision, field provenance, field locks); see `docs/DATA_MODEL.md` §6.
 - **No LLM calls in the app** (no automatic classification or translation) and no machine translation in the data: a missing English name stays empty.
-- **Security without login:** validate input; render Markdown server-side and sanitise it (nh3), sanitise again in the client (DOMPurify); show document texts as plain text and never render stored HTML; size limits; same-origin writes; Host allowlist; no secrets in the repository (`.env` is gitignored); soft delete only.
+- **No additional security layer** (decision D-15): the server is secured by its environment, so the app has no login, no request guard, no security headers and no HTML sanitising; do not reintroduce them without a new decision. Keep the ordinary input validation the UI relies on, show document texts as plain text (never render stored HTML), keep secrets out of the repository (`.env` is gitignored) and delete only softly.
 - **Time:** timestamps in UTC; publication dates as calendar dates in Europe/Kyiv.
 - **Dependencies** only through the lockfiles `backend/uv.lock` and `frontend/package-lock.json`.
 

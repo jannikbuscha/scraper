@@ -194,7 +194,7 @@
 
 ## S8 — Manual additions
 
-- Upload (PDF/DOCX/HTML/TXT) or URL; provenance `manual:<name>`.
+- Upload (PDF/DOCX/HTML/TXT) or URL; provenance `manual`.
 - Known candidate: the KIIS/UNDP report "Public opinion on state electronic services in Ukraine in 2025", page `https://www.undp.org/node/565986` [search]; press release `https://www.undp.org/ukraine/press-releases/59-ukrainians-use-government-e-services-undp-backed-study-finds` [search]. The URL in the paper's reference list [paper] did not appear in search results; check that it resolves.
 
 ---
