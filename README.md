@@ -22,7 +22,7 @@ Then open **http://127.0.0.1:8080** on the server (from other machines see [Team
 
 - The first start builds the image, creates `data/app.db`, applies the database migrations and loads the seed. Every later start runs the migrations and the seed again; both are idempotent, so existing data and manual changes are kept.
 - `docker compose ps` shows the health status; `docker compose logs -f app` (or `make logs`) follows the logs.
-- `make up` does the same as `docker compose up -d --build`, but first creates `./data` and `./releases` (so they belong to your user, not to root), waits until the health check passes and records the git commit in the image label `org.opencontainers.image.revision`.
+- `make up` does the same as `docker compose up -d --build`, but first creates `./data` (so it belongs to your user, not to root), waits until the health check passes and records the git commit in the image label `org.opencontainers.image.revision`.
 - After `git pull`, rebuild with `make up` (or `docker compose up -d --build`). A plain `docker compose up -d` only builds the image if it does not exist yet.
 - `docker compose down` (or `make down`) stops and removes the container. The data in `./data` stays.
 
@@ -52,7 +52,7 @@ Other common commands (`make help` lists all):
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | Database migrations · seed (idempotent) · recompute derived fields · integrity report |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose |
 
-The command-line tool `mdt` runs from the repository root as `uv run --project backend mdt <command>` (this is what the Makefile does): `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex` (rebuild the full-text search tables) and `serve [--host] [--port] [--reload]`. `uv run --project backend mdt --help` lists them.
+The command-line tool `mdt` runs from the repository root as `uv run --project backend mdt <command>` (this is what the Makefile does): `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex` (rebuild the full-text search tables, in batches, so the app stays usable meanwhile) and `serve [--host] [--port] [--reload]`. `uv run --project backend mdt --help` lists them.
 
 ## Configuration
 
@@ -92,7 +92,7 @@ Ways for the team to reach it, from the simplest to the most comfortable:
 
 ## Data
 
-- All runtime data lives in `./data` on the host (bind mount to `/app/data`): currently the SQLite database `data/app.db`; later raw snapshots, backups and import files. The directory is gitignored and survives rebuilds and `docker compose down`. `./releases` is mounted at `/app/releases` for the dataset releases of Phase 4; if it is missing, a plain `docker compose up -d` lets Docker create it as root, while `make up` creates it as your user.
+- All runtime data lives in `./data` on the host (bind mount to `/app/data`): currently the SQLite database `data/app.db`; later raw snapshots, backups and import files. The directory is gitignored and survives rebuilds and `docker compose down`. `./releases` is mounted at `/app/releases` for the dataset releases of Phase 4. It is part of the repository (until Phase 4 it holds only a README), so it exists in every clone and belongs to your user; Docker would create a missing directory as root.
 - On every start the container hands `./data` to the user that runs the app (UID/GID 1000). If your host user has other IDs (`id -u`, `id -g`), set `APP_UID` and `APP_GID` in `.env` before building, so the files stay yours on the host.
 - Automatic daily backups arrive in Phase 4. Until then: `docker compose stop`, copy the whole `data/` directory, `docker compose start`. Do not copy `app.db` alone while the app is running.
 - CLI commands inside the running container: `docker compose exec -u app app mdt check` (keep `-u app`, otherwise files created in `./data` may belong to root). One-off commands: `docker compose run --rm app mdt check`.
@@ -118,6 +118,7 @@ Every table can be exported as CSV ("for analysis tools") or XLSX ("for Excel, e
 - **"/app/data is not writable":** the container was started as a non-root user. Make `./data` writable for that user, e.g. `sudo chown -R 1000:1000 data`.
 - **`error: database … does not exist`** from `mdt serve`: run `make migrate` and `make seed` (or `mdt db upgrade` and `mdt seed`) first.
 - **Port already in use:** set another `PORT` in `.env` and run `make up`.
+- **`git pull` fails with "unable to create file releases/…: Permission denied":** Docker created `./releases` as root, in a checkout from before the directory was part of the repository. Run `sudo chown -R "$(id -u):$(id -g)" releases` once, then `git pull` again.
 
 ## Documentation
 

@@ -23,8 +23,8 @@ The app runs on the data lead's own isolated server. There is **no login**: the 
 |---|---|---|
 | 0 | Exploration and plan: `PLAN.md`, drafts of `docs/SOURCES.md` and `docs/CODEBOOK.md` | done |
 | 0b | Hands-on source checks and fixture capture | open: the development environment cannot reach the source hosts (`PLAN.md` §2.2) |
-| **1** | **Skeleton:** repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | **in progress**: backend, frontend and Docker setup built and integrated; the E2E suite and the final review are open |
-| 2 | Data acquisition: collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | planned |
+| 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; all gates and CI green; adversarial review findings fixed |
+| **2** | **Data acquisition:** collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | **next**, after the data lead's go; needs network access to the source hosts (Phase 0b) |
 | 3 | Analysis: document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | planned |
 | 4 | Operations: releases with git tags, backups, schedules, documentation | planned |
 
@@ -69,7 +69,7 @@ In practice:
 - After each phase: all tests green, clean commits (Conventional Commits), and a short status report to the data lead **in German** with three parts: *fertig* (done), *offen* (open), *Entscheidungen* (decisions the data lead has to make).
 - **No `git push` without the data lead's approval.**
 - If a source behaves differently than described, document it (`docs/SOURCES.md`) and propose an alternative instead of improvising silently.
-- Open team decisions are D-1 to D-12 in `PLAN.md` §12; the proposed defaults apply until the team decides.
+- Open team decisions are D-1 to D-14 in `PLAN.md` §12; the proposed defaults apply until the team decides.
 
 ## Stack
 
@@ -99,7 +99,7 @@ In practice:
 ├── frontend/              Vite app (src/, e2e/); build output frontend/dist (gitignored)
 ├── .github/workflows/ci.yml
 ├── data/                  runtime data, gitignored: app.db; later raw/, backups/, import/, logs/
-└── releases/              frozen dataset releases (Phase 4; committed and tagged; not in the repository yet, `make up` creates the empty directory for the bind mount)
+└── releases/              frozen dataset releases (Phase 4; committed and tagged); until then only README.md, which keeps the bind-mount directory in every clone
 ```
 
 ## Commands
@@ -116,7 +116,7 @@ In practice:
 | `make e2e` | Build the frontend, then run the Playwright smoke tests |
 | `make check` | All quality gates: lint, typecheck, unit tests, frontend build, E2E |
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | `mdt db upgrade` · `mdt seed` · `mdt recompute` · `mdt check` on the local database |
-| `uv run --project backend mdt reindex` | Rebuild both full-text search tables (no make target) |
+| `uv run --project backend mdt reindex` | Rebuild both full-text search tables in batches; the app stays usable (no make target) |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose: build and start (waits until healthy) · stop · follow logs · build the image |
 
 Direct commands:
@@ -127,7 +127,7 @@ Direct commands:
 
 ## Docker and configuration
 
-- `docker compose up -d` (or `make up`) starts the single service `app` at http://127.0.0.1:8080. Data lives in `./data` on the host (bind mount to `/app/data`); `./releases` is mounted at `/app/releases`. `make up` creates both directories first; with a plain `docker compose up -d`, Docker creates missing ones as root (the entrypoint re-owns `./data`, not `./releases`).
+- `docker compose up -d` (or `make up`) starts the single service `app` at http://127.0.0.1:8080. Data lives in `./data` on the host (bind mount to `/app/data`); `./releases` is mounted at `/app/releases`. The Docker daemon creates a missing bind-mount directory as root, so every bind-mount source is either part of the repository (`./releases` through `releases/README.md`; keep that file) or handed to the user `app` by the entrypoint (`./data`, gitignored; `make up` also creates it first, as your user). `backend/tests/test_docker_layout.py` and the CI Docker job check this.
 - **Inside the container the app always listens on 0.0.0.0:8080.** `HOST` and `PORT` in `.env` only choose the host interface and port that docker compose publishes (default 127.0.0.1:8080). Compose pins `HOST`, `PORT` and all paths inside the container, so a `.env` with local development values cannot redirect them.
 - The entrypoint starts as root only to hand `./data` to the unprivileged user `app` (UID/GID 1000, build arguments `APP_UID`/`APP_GID`), then re-executes itself as `app` and runs `mdt db upgrade`, `mdt seed` and `mdt serve`.
 - Run CLI commands in the running container as that user: `docker compose exec -u app app mdt check`. Without `-u app`, `exec` runs as root and can leave root-owned files in `./data`. One-off commands: `docker compose run --rm app mdt check` (the entrypoint drops privileges itself).

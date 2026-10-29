@@ -269,19 +269,20 @@ Python package and CLI name: **`mdt`** (Ministry of Digital Transformation).
 
 ### 4.4 Derived fields (rules)
 
-Derived values are stored in a `derived` table (one row per project or service). They are recomputed in the same transaction as any change to the subject's events, and in bulk with `mdt recompute`. They are never editable, are not part of curated revisions, are exported with a `derived_` prefix, and are explained in the codebook. Cut-off dates: **MINISTRY = 2019-08-29**, **INVASION = 2022-02-24**. Events marked `disputed` are ignored.
+Derived values are stored in a `derived` table (one row per project or service). They are recomputed in the same transaction as any change to the subject's events, and in bulk with `mdt recompute`. They are never editable, are not part of curated revisions, are exported with a `derived_` prefix, and are explained in the codebook. Cut-off dates: **MINISTRY = 2019-08-29**, **INVASION = 2022-02-24**. Events marked `disputed` are ignored. This section summarises the rules; the binding algorithm is `docs/DATA_MODEL.md` §8.3.
 
-1. **`launch`:** the earliest `launch` event by `date_start`, otherwise the earliest `beta_launch`. The output keeps the interval, precision, basis and the event ID, so the UI can show "2020-06 (month, stated in source)".
+1. **`launch`:** the candidates are the dated `launch` events, or, if there are none, the dated `beta_launch` events. The **launch interval** [s, e] = [earliest start, earliest end] over the candidates decides period and trajectory; the displayed launch is the candidate with the earliest end, shown with precision, basis and event ID, e.g. "2020-06 (month, stated in source)".
 2. **`existed_by`:** the earliest `first_archived` event (`archive_upper_bound`). It is displayed as an upper bound ("≤ 2021-05-14, archive") and **never as a start date**.
 3. **`period`:**
    - From the launch interval [s, e]: e < MINISTRY → `pre_ministry`; s ≥ MINISTRY and e < INVASION → `pre_invasion`; s ≥ INVASION → `full_scale_war`; an interval that straddles a cut-off → `unknown` (reason `imprecise_date`). Example: a launch known only as "2022" cannot be assigned.
    - Without a launch, using only the archive bound u: u < MINISTRY → `pre_ministry` (certain, because the launch is ≤ u); otherwise `unknown` (reason `archive_bound_only`). The fact that the item existed before the invasion is still recorded (`existed_before_invasion = true` when u < INVASION).
    - No date at all → `unknown` (reason `no_date`).
-4. **`war_trajectory`:**
+4. **`war_trajectory`** (rules applied in this order):
+   - `unknown` (reason `conflicting_dates`): launch s ≥ INVASION, but the item existed before the invasion (archive bound u < INVASION).
    - `new_in_war`: launch s ≥ INVASION.
    - `adapted_in_war`: existed before the invasion (launch e < INVASION, **or archive bound u < INVASION**) and at least one modification event with s ≥ INVASION.
-   - `prewar_unchanged`: existed before the invasion and every modification event has e < INVASION (or there is none).
-   - `unknown`: anything else, with a reason (no date, launch straddles a cut-off, or a modification date straddles the cut-off).
+   - `prewar_unchanged`: existed before the invasion and every modification event is dated with e < INVASION (or there is none).
+   - `unknown`: anything else, with a reason: an undated or straddling modification event (`imprecise_modification_date`), a launch interval that straddles the invasion (`imprecise_date`), only an archive bound on or after the invasion (`archive_bound_only`), or no date (`no_date`).
    - "Modification" means event types with `counts_as_modification = true` in the codebook. Draft: expansion, major_update, rebrand, governance_change, suspension (decision D-2 in §12).
    - **Logic worth noting for the paper:** an archive capture *before* the invasion is enough to prove pre-war existence, but a capture *after* it never proves that something is new. `prewar_unchanged` means "no modification recorded in the sources up to release X"; it reflects absence of evidence.
 5. **`portfolio_entry`** (➕ proposed): the earliest start of a Participation of the focal organisation (the ministry) in the roles initiator, owner or operator. It separates **the launch of an initiative** from **its entry into the ministry's portfolio**. Example from the Phase 0 leads: a government decision transfers the Innovation Development Fund "into the management of the ministry" [search]. According to the search summary, this fund is the legal entity behind the Ukrainian Startup Fund [search-summary]. If confirmed, USF's wartime event is a governance change rather than a launch. `war_trajectory` can be computed on either basis; the default (launch) and the alternative (portfolio entry) are decision D-10.
@@ -717,6 +718,8 @@ Phase 1 does not depend on the source checks and can start right after approval;
 | D-10 | Basis for `period`/`war_trajectory` at project level: launch of the initiative or entry into the ministry's portfolio? | Compute both; launch as default, portfolio entry as an alternative view |
 | D-11 | Add `unit_type` to Project (product/service, platform, programme, strategy/policy area, organisation)? | Yes (R16); the vocabulary draft is in CODEBOOK |
 | D-12 | Add the Digital State UA catalogue and the Diia service guide as sources (after 0b)? | Yes if 0b confirms structured access; as cross-check sources, not as the portfolio definition |
+| D-13 | Enforce the coding rules of CODEBOOK §2.3 and §2.8 in the app: "verified" only with evidence that quotes the source verbatim; an excluded document needs a screening reason, and only excluded documents carry one? | Yes (enforced since the Phase 1 review). Side effect: excluding documents needs the reason in the same change, so a single-field bulk edit cannot exclude |
+| D-14 | Full-text search over comments: also match status words and resolver names (`open`, a person's name), as now (DATA_MODEL §10), or comment text only? | Comment text only (status and author have their own filters); a small change with a reindex. Until decided, the current behaviour stays |
 <!-- DECISIONS:END -->
 
 ---
@@ -764,7 +767,7 @@ Phase 1 does not depend on the source checks and can start right after approval;
 
 **N6 — Dating rules for the methods section** (§4.4)
 - Archive captures are upper bounds.
-- Dates whose precision straddles 24.02.2022 cannot be assigned to a period.
+- A launch interval that straddles a cut-off date (29.08.2019 or 24.02.2022) leaves the period unknown.
 - `prewar_unchanged` means "no modification recorded up to release X".
 - METHODS.md will provide ready-made wording.
 
@@ -802,6 +805,6 @@ Also asked in the session (in German).
 3. **Existing table:** does the dataset mentioned in the paper exist? Format, columns, who collected it, from which sources and when? If yes: upload it here or put it into `data/import/` on the server; the importer gets a mapping and a dry run.
 4. **Network for Phase 0b:** open the source domains for this cloud environment (list in the session), or run the exploration and fixture capture on the server?
 5. **Team:** names for the author picker; how many people edit at the same time?
-6. **Git:** may the Phase 0 commit be pushed to the working branch `claude/sharp-heisenberg-inzace`? (The cloud container is ephemeral; nothing is pushed without approval.)
-7. **Decisions D-1 to D-12** (§12): can be answered later; the defaults above apply until then.
+6. **Git:** the reply "Ok mach weiter" (2026-10-28) was taken as approval to push to the working branch `claude/sharp-heisenberg-inzace`; a merge into the default branch still needs explicit approval.
+7. **Decisions D-1 to D-14** (§12): can be answered later; the defaults above apply until then.
 <!-- QUESTIONS:END -->
