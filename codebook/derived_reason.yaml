@@ -18,7 +18,7 @@ terms:
   - code: imprecise_date
     label_en: "Imprecise date"
     label_uk: null
-    definition: "The launch date's precision straddles a cut-off date."
+    definition: "The launch interval, taken over all dated launch events or, if there are none, all dated beta-launch events, straddles a cut-off date: it starts before the date and ends on or after it."
     include_note: null
     exclude_note: null
     examples: null
@@ -28,7 +28,7 @@ terms:
   - code: archive_bound_only
     label_en: "Archive bound only"
     label_uk: null
-    definition: "Only an archive upper bound is known, which does not determine the period."
+    definition: "Only an archive upper bound is known (no dated launch or beta-launch event), and it does not decide the value: it lies on or after `MINISTRY_FOUNDED` (`period_reason`) or on or after `FULL_SCALE_INVASION` (`trajectory_reason`)."
     include_note: null
     exclude_note: null
     examples: null
@@ -48,7 +48,7 @@ terms:
   - code: conflicting_dates
     label_en: "Conflicting dates"
     label_uk: null
-    definition: "The launch lies on or after `FULL_SCALE_INVASION`, but an archive bound or the launch interval shows the item existed before it."
+    definition: "The launch interval starts on or after `FULL_SCALE_INVASION`, but an archive bound lies before `FULL_SCALE_INVASION`, so the item existed before the invasion."
     include_note: null
     exclude_note: null
     examples: null

@@ -34,7 +34,7 @@
 
 - `policy_domains`, `beneficiaries`, `wartime_relevance`, `development_mode`, the primary objectives and D1–D4 are coded **from sources**.
 - **Field verification** (`docs/DATA_MODEL.md` §6.4):
-  - a field can be marked `verified` only with an evidence record that targets that field (document or URL with retrieval time, plus a verbatim quote);
+  - a field can be marked `verified` only with an evidence record that targets that field (document or URL with retrieval time, plus a verbatim quote); the app enforces this (`docs/DATA_MODEL.md` §6.4);
   - `disputed` requires a note;
   - any later change of the value resets it to `unverified`.
   - Without evidence the field stays `unverified`, and the rationale field explains the coder's reasoning.
@@ -72,22 +72,22 @@ The coded mode complements the derived `war_trajectory` (§2.7), which only look
 
 ### 2.7 Derived fields (read-only, marked `derived_` in exports)
 
-Cut-off dates as in §1. Disputed events and participations are ignored. The exact algorithm is in `docs/DATA_MODEL.md` §8; in short:
+Cut-off dates as in §1. Disputed events and participations are ignored. An interval *straddles* a cut-off date if it starts before the date and ends on or after it. The rules below and the definitions of `period`, `war_trajectory` and `derived_reason` in §3 use the **launch interval**, not the displayed candidate: launch events dated "2022" and "2022-03" display "2022-03", but their launch interval [2022-01-01, 2022-03-31] straddles `FULL_SCALE_INVASION`. The exact algorithm is in `docs/DATA_MODEL.md` §8; in short:
 
 | Field | Definition |
 |---|---|
 | `launch` | **Launch interval** = [earliest start, earliest end] over the dated `launch` events (or, if there are none, the dated `beta_launch` events); the earliest launch provably lies in it. **Displayed:** the candidate with the earliest end, with precision, basis and event. |
 | `existed_by` | Earliest **end** of the `first_archived` events: an upper bound, displayed as "≤ date (archive)". |
 | `period` | From the launch interval [start, end]: end < `MINISTRY_FOUNDED` → `pre_ministry`; start ≥ `MINISTRY_FOUNDED` and end < `FULL_SCALE_INVASION` → `pre_invasion`; start ≥ `FULL_SCALE_INVASION` → `full_scale_war`; otherwise `unknown`. Without a launch: `existed_by` < `MINISTRY_FOUNDED` → `pre_ministry`, otherwise `unknown`. ⚑ D-3 |
-| `period_reason` | `no_date`, `imprecise_date` (the interval straddles a cut-off), `archive_bound_only` |
+| `period_reason` | `no_date`, `imprecise_date` (the launch interval straddles a cut-off date), `archive_bound_only` |
 | `existed_before_invasion` | true if the launch interval ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION` |
-| `war_trajectory` | Rules in this order: (1) launch start ≥ invasion but existed before it → `unknown` (`conflicting_dates`); (2) launch start ≥ invasion → `new_in_war`; (3) existed before the invasion and a modification event starts on or after it → `adapted_in_war`; (4) existed before the invasion and every modification event ends before it, or there is none → `prewar_unchanged` ("no modification recorded up to release X"); (5) otherwise `unknown`. The deciding event is linked. |
+| `war_trajectory` | Rules in this order: (1) launch interval start ≥ invasion, but an archive bound shows the item existed before it → `unknown` (`conflicting_dates`); (2) launch interval start ≥ invasion → `new_in_war`; (3) existed before the invasion and a modification event starts on or after it → `adapted_in_war`; (4) existed before the invasion and every modification event ends before it, or there is none → `prewar_unchanged` ("no modification on or after the invasion recorded up to release X"); (5) otherwise `unknown`. The deciding event is linked. |
 | `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date`, `conflicting_dates`, `archive_bound_only` (the only date is an archive upper bound on or after the invasion) |
 | `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) as `initiator`, `owner` or `operator`, with the participation linked ⚑ D-10 |
 
 ### 2.8 Screening of documents
 
-- `screening_status`: `unscreened` → `included` / `excluded`, with an exclusion reason (vocabulary `exclusion_reason`) and an optional note.
+- `screening_status`: `unscreened` → `included` / `excluded`, with an exclusion reason (vocabulary `exclusion_reason`) and an optional note. The app requires the reason for `excluded` and allows it only there (`docs/DATA_MODEL.md` §7).
 - Only `included` documents go into the QDA export.
 - Counts per status and reason are reported (PRISMA-style flow).
 
@@ -334,18 +334,18 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 
 | Code | Label | Definition |
 |---|---|---|
-| `pre_ministry` | Before the ministry | Launch ends before `MINISTRY_FOUNDED`, or the archive bound lies before it. |
-| `pre_invasion` | Ministry, before the full-scale invasion | Launch lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day. |
-| `full_scale_war` | Full-scale war | Launch starts on or after `FULL_SCALE_INVASION`. |
-| `unknown` | Unknown | No launch date, an imprecise date that straddles a cut-off, or only an archive bound after `MINISTRY_FOUNDED`; the reason is given in `period_reason`. |
+| `pre_ministry` | Before the ministry | The launch interval ends before `MINISTRY_FOUNDED`, or, without a dated launch or beta-launch event, the archive bound lies before `MINISTRY_FOUNDED`. |
+| `pre_invasion` | Ministry, before the full-scale invasion | The launch interval lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day. |
+| `full_scale_war` | Full-scale war | The launch interval starts on or after `FULL_SCALE_INVASION`. |
+| `unknown` | Unknown | No dated launch, beta-launch or archive event, a launch interval that straddles a cut-off date, or only an archive bound on or after `MINISTRY_FOUNDED`; the reason is given in `period_reason`. |
 
 ### `war_trajectory` (derived values, §2.7)
 
 | Code | Label | Definition |
 |---|---|---|
-| `new_in_war` | New in war | Launched on or after `FULL_SCALE_INVASION`. |
-| `adapted_in_war` | Adapted in war | Existed before the invasion; at least one modification event on or after it. |
-| `prewar_unchanged` | Pre-war, no recorded change | Existed before the invasion; no modification recorded on or after it (up to the release date). |
+| `new_in_war` | New in war | The launch interval starts on or after `FULL_SCALE_INVASION`, and no archive bound lies before `FULL_SCALE_INVASION`. |
+| `adapted_in_war` | Adapted in war | Existed before the invasion: the launch interval ends before `FULL_SCALE_INVASION`, or an archive bound lies before `FULL_SCALE_INVASION` and the launch interval, if any, starts before it. At least one modification event starts on or after `FULL_SCALE_INVASION`. |
+| `prewar_unchanged` | Pre-war, no recorded change | Existed before the invasion (as for `adapted_in_war`). Every modification event is dated and ends before `FULL_SCALE_INVASION`, or there is none: no modification on or after the invasion is recorded up to the release date. |
 | `unknown` | Unknown | Not determinable; the reason is given in `trajectory_reason`. |
 
 ### `derived_reason` (reason codes of derived values)
@@ -353,10 +353,10 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 | Code | Definition |
 |---|---|
 | `no_date` | No dated launch, beta-launch or archive event. |
-| `imprecise_date` | The launch date's precision straddles a cut-off date. |
-| `archive_bound_only` | Only an archive upper bound is known, which does not determine the period. |
+| `imprecise_date` | The launch interval, taken over all dated launch events or, if there are none, all dated beta-launch events, straddles a cut-off date: it starts before the date and ends on or after it. |
+| `archive_bound_only` | Only an archive upper bound is known (no dated launch or beta-launch event), and it does not decide the value: it lies on or after `MINISTRY_FOUNDED` (`period_reason`) or on or after `FULL_SCALE_INVASION` (`trajectory_reason`). |
 | `imprecise_modification_date` | A modification event is undated or straddles `FULL_SCALE_INVASION`. |
-| `conflicting_dates` | The launch lies on or after `FULL_SCALE_INVASION`, but an archive bound or the launch interval shows the item existed before it. |
+| `conflicting_dates` | The launch interval starts on or after `FULL_SCALE_INVASION`, but an archive bound lies before `FULL_SCALE_INVASION`, so the item existed before the invasion. |
 
 **Fixed codes:** the system vocabularies `verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory` and `derived_reason`, as well as the event types `launch`, `beta_launch` and `first_archived`, are used by program logic. Their codes cannot be added to or deactivated; labels and definitions remain editable.
 

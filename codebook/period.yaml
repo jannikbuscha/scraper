@@ -8,7 +8,7 @@ terms:
   - code: pre_ministry
     label_en: "Before the ministry"
     label_uk: null
-    definition: "Launch ends before `MINISTRY_FOUNDED`, or the archive bound lies before it."
+    definition: "The launch interval ends before `MINISTRY_FOUNDED`, or, without a dated launch or beta-launch event, the archive bound lies before `MINISTRY_FOUNDED`."
     include_note: null
     exclude_note: null
     examples: null
@@ -18,7 +18,7 @@ terms:
   - code: pre_invasion
     label_en: "Ministry, before the full-scale invasion"
     label_uk: null
-    definition: "Launch lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day."
+    definition: "The launch interval lies within `MINISTRY_FOUNDED` … `FULL_SCALE_INVASION` − 1 day."
     include_note: null
     exclude_note: null
     examples: null
@@ -28,7 +28,7 @@ terms:
   - code: full_scale_war
     label_en: "Full-scale war"
     label_uk: null
-    definition: "Launch starts on or after `FULL_SCALE_INVASION`."
+    definition: "The launch interval starts on or after `FULL_SCALE_INVASION`."
     include_note: null
     exclude_note: null
     examples: null
@@ -38,7 +38,7 @@ terms:
   - code: unknown
     label_en: "Unknown"
     label_uk: null
-    definition: "No launch date, an imprecise date that straddles a cut-off, or only an archive bound after `MINISTRY_FOUNDED`; the reason is given in `period_reason`."
+    definition: "No dated launch, beta-launch or archive event, a launch interval that straddles a cut-off date, or only an archive bound on or after `MINISTRY_FOUNDED`; the reason is given in `period_reason`."
     include_note: null
     exclude_note: null
     examples: null
