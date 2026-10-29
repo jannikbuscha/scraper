@@ -143,6 +143,11 @@ jobs:
           echo
           curl -fsS -o "${RUNNER_TEMP}/index.html" http://127.0.0.1:8080/
           grep -qi '<!doctype html' "${RUNNER_TEMP}/index.html"
+          # A client-side route gets the app too, and the app's entry script is served.
+          curl -fsS -o "${RUNNER_TEMP}/route.html" http://127.0.0.1:8080/projects
+          grep -qi '<!doctype html' "${RUNNER_TEMP}/route.html"
+          asset="$(grep -o -m 1 '/assets/index-[^"]*\.js' "${RUNNER_TEMP}/index.html")"
+          curl -fsS -o /dev/null "http://127.0.0.1:8080${asset}"
       - name: Check that the start left no root-owned files in the checkout
         # The Docker daemon runs as root and creates a missing bind-mount source as root.
         # ./releases is part of the repository and the entrypoint hands ./data to the user

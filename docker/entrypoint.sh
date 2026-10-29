@@ -34,7 +34,7 @@ if [ "$(id -u)" = "0" ]; then
         -exec chown -h "$APP_USER:$APP_USER" {} +; then
         log "warning: could not change the owner of every file in $DATA_DIR"
     fi
-    exec setpriv --reuid="$APP_USER" --regid="$APP_USER" --init-groups --inh-caps=-all \
+    exec setpriv --reuid="$APP_USER" --regid="$APP_USER" --init-groups \
         env HOME="/home/$APP_USER" "$0" "$@"
 fi
 

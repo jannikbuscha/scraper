@@ -9,8 +9,8 @@
 # Ports: inside the container the app ALWAYS listens on 0.0.0.0:8080. HOST and
 # PORT (from the shell or from .env, which Compose reads for ${...} substitution)
 # only choose the host interface and port that 8080 is published on. The default
-# 127.0.0.1:8080 makes the app reachable from the server itself only. There is no
-# login: read "Team access" in README.md before changing HOST.
+# 127.0.0.1:8080 makes the app reachable from the server itself only (README.md,
+# "Access").
 #
 # Requires Docker Compose v2.24 or newer (env_file with "required: false").
 
@@ -45,10 +45,6 @@ services:
       CODEBOOK_DIR: /app/codebook
       SEED_DIR: /app/seed
       FRONTEND_DIST: /app/frontend/dist
-      # Host-header allowlist (protection against DNS rebinding), comma-separated.
-      # Add the host name the team uses (e.g. behind a reverse proxy) in .env.
-      # Keep 127.0.0.1: the health check below uses it.
-      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
     volumes:
       # All runtime data (SQLite database; later raw snapshots, backups, imports).
       # Gitignored; if it is missing, the Docker daemon creates it as root and the
@@ -68,8 +64,6 @@ services:
       timeout: 5s
       start_period: 60s
       retries: 3
-    security_opt:
-      - no-new-privileges:true
     logging:
       driver: json-file
       options:
