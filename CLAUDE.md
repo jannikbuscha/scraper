@@ -23,7 +23,7 @@ The app runs on the data lead's own isolated server. There is **no login**: the 
 |---|---|---|
 | 0 | Exploration and plan: `PLAN.md`, drafts of `docs/SOURCES.md` and `docs/CODEBOOK.md` | done |
 | 0b | Hands-on source checks and fixture capture | open: the development environment cannot reach the source hosts (`PLAN.md` §2.2) |
-| **1** | **Skeleton:** repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | **in progress** |
+| **1** | **Skeleton:** repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | **in progress**: backend, frontend and Docker setup built and integrated; the E2E suite and the final review are open |
 | 2 | Data acquisition: collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | planned |
 | 3 | Analysis: document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | planned |
 | 4 | Operations: releases with git tags, backups, schedules, documentation | planned |
@@ -73,8 +73,8 @@ In practice:
 
 ## Stack
 
-- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI, Pydantic v2, SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py and nh3 for comments. Lint and types: ruff, mypy. Tests: pytest.
-- **Frontend** (`frontend/`): React, TypeScript (strict), Vite, Mantine, TanStack Router, Query and Table, jsdiff, DOMPurify, dayjs. Lint and types: ESLint, tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests.
+- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI served by uvicorn, Pydantic v2 (pydantic-settings), SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py and nh3 for comments, openpyxl for XLSX exports. Lint and types: ruff, mypy. Tests: pytest; the HTTP tests use Starlette's `TestClient` (dev dependency `httpx2`).
+- **Frontend** (`frontend/`): React 19, TypeScript (strict, ~6.0), Vite, Mantine, TanStack Router, Query and Table, jsdiff, DOMPurify, dayjs. Lint and types: ESLint 9 (eslint-plugin-react, needed for `react/no-danger`, does not support ESLint 10), tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests in `frontend/e2e/`.
 - **Operations:** one container and one process (FastAPI serves `/api` and the built frontend); multi-stage Dockerfile (node:22-alpine builds the frontend, python:3.13-slim runs the app); docker compose; Makefile; GitHub Actions CI.
 - Later phases add a polite HTTP client built on httpx, plus BeautifulSoup/lxml, trafilatura and APScheduler (`PLAN.md` §3.2).
 
@@ -96,10 +96,10 @@ In practice:
 ├── codebook/              one YAML file per vocabulary + parameters.yaml (cut-off dates)
 ├── seed/                  projects.yaml: 19 + 1 projects and the focal organisation
 ├── backend/               uv project: package mdt (src/mdt), alembic.ini, migrations/, tests/
-├── frontend/              Vite app; build output frontend/dist (gitignored)
+├── frontend/              Vite app (src/, e2e/); build output frontend/dist (gitignored)
 ├── .github/workflows/ci.yml
 ├── data/                  runtime data, gitignored: app.db; later raw/, backups/, import/, logs/
-└── releases/              frozen dataset releases (Phase 4; committed and tagged)
+└── releases/              frozen dataset releases (Phase 4; committed and tagged; not in the repository yet, `make up` creates the empty directory for the bind mount)
 ```
 
 ## Commands
@@ -116,17 +116,18 @@ In practice:
 | `make e2e` | Build the frontend, then run the Playwright smoke tests |
 | `make check` | All quality gates: lint, typecheck, unit tests, frontend build, E2E |
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | `mdt db upgrade` · `mdt seed` · `mdt recompute` · `mdt check` on the local database |
+| `uv run --project backend mdt reindex` | Rebuild both full-text search tables (no make target) |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose: build and start (waits until healthy) · stop · follow logs · build the image |
 
 Direct commands:
 - Backend quality gates: `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q`
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e`
-- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does).
+- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex`, `serve [--host] [--port] [--reload]`. `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
 - E2E needs Chromium: where `/opt/pw-browsers` exists, the Makefile sets `PLAYWRIGHT_BROWSERS_PATH` to it; elsewhere run `cd frontend && npx playwright install chromium` once.
 
 ## Docker and configuration
 
-- `docker compose up -d` (or `make up`) starts the single service `app` at http://127.0.0.1:8080. Data lives in `./data` on the host (bind mount to `/app/data`); `./releases` is mounted at `/app/releases`.
+- `docker compose up -d` (or `make up`) starts the single service `app` at http://127.0.0.1:8080. Data lives in `./data` on the host (bind mount to `/app/data`); `./releases` is mounted at `/app/releases`. `make up` creates both directories first; with a plain `docker compose up -d`, Docker creates missing ones as root (the entrypoint re-owns `./data`, not `./releases`).
 - **Inside the container the app always listens on 0.0.0.0:8080.** `HOST` and `PORT` in `.env` only choose the host interface and port that docker compose publishes (default 127.0.0.1:8080). Compose pins `HOST`, `PORT` and all paths inside the container, so a `.env` with local development values cannot redirect them.
 - The entrypoint starts as root only to hand `./data` to the unprivileged user `app` (UID/GID 1000, build arguments `APP_UID`/`APP_GID`), then re-executes itself as `app` and runs `mdt db upgrade`, `mdt seed` and `mdt serve`.
 - Run CLI commands in the running container as that user: `docker compose exec -u app app mdt check`. Without `-u app`, `exec` runs as root and can leave root-owned files in `./data`. One-off commands: `docker compose run --rm app mdt check` (the entrypoint drops privileges itself).
@@ -140,7 +141,7 @@ Direct commands:
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `build:`, `ci:`, `chore:`; dataset releases later `data: release <name>`). Small, focused commits.
 - **Contracts:** `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md` are binding. Every interface change (fields, endpoints, parameters, behaviour) updates the affected contract document in the same change.
 - **Tests run offline** against fixtures (collector fixtures in `backend/tests/fixtures/<collector>/`). No test may depend on network access.
-- **One write path:** every change of curated data goes through `apply_change` (revision, field provenance, optimistic locking); see `docs/DATA_MODEL.md` §6.
+- **One write path:** every change of curated data goes through `apply_change` or the other write actions of `docs/DATA_MODEL.md` §6.4, which share its machinery (revision, field provenance, optimistic locking); see `docs/DATA_MODEL.md` §6.
 - **No LLM calls in the app** (no automatic classification or translation) and no machine translation in the data: a missing English name stays empty.
 - **Security without login:** validate input; render Markdown server-side and sanitise it (nh3), sanitise again in the client (DOMPurify); show document texts as plain text and never render stored HTML; size limits; same-origin writes; Host allowlist; no secrets in the repository (`.env` is gitignored); soft delete only.
 - **Time:** timestamps in UTC; publication dates as calendar dates in Europe/Kyiv.

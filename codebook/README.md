@@ -13,8 +13,9 @@ One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus `pa
 - **`sort_order`:** the order in CODEBOOK.md, in steps of 10.
 - **`active`:** `true` for all terms, including the candidate beneficiaries.
 - **`multi`:** `true` for the vocabularies of multi-valued fields (`ministry_category`, `policy_domain`, `beneficiary`, `channel`).
+- **`fixed_codes`:** `true` for the system vocabularies that program logic uses (`verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory`, `derived_reason`): their terms cannot be added or deactivated in the app; labels and definitions stay editable.
 - **`attributes`:**
-  - `event_type`: `counts_as_modification` (true/false) exactly as in the CODEBOOK.md table. The derived `war_trajectory` reads it (decision D-2).
+  - `event_type`: `counts_as_modification` (true/false) exactly as in the CODEBOOK.md table. The derived `war_trajectory` reads it (decision D-2). `fixed: true` marks `launch`, `beta_launch` and `first_archived`, which program logic uses (`docs/DATA_MODEL.md` §7); this attribute can only be changed here, not in the app.
   - `policy_domain`: `cofog`, the COFOG division number ("01" to "10"). The label is the COFOG division name without the number. The labels still have to be checked against the official COFOG publication (decision D-7).
   - `beneficiary`: `candidate: true` for the candidate codes; `paper_basis` (CODEBOOK.md column "Basis in the paper") for the codes grounded in the paper.
   - `participation_role`: `draft_addition: true` for `coordinator`.
@@ -38,4 +39,4 @@ Cut-off dates and time zones, each with its source under `sources`:
 - `mdt seed` loads the vocabularies into the database. It is idempotent: terms are matched by `vocabulary` + `code`, and a field changed by a person in the app is never overwritten.
 - From then on **the database holds the working copy**. Terms are edited on the Codebook page of the app, and every change creates a revision.
 - Codes are stable: a code is never renamed or deleted, only deactivated (`active: false`) and, where applicable, linked to its replacement (`replaced_by`).
-- **Each release regenerates `codebook/`** (and `docs/CODEBOOK.md`) from the database. After the first release these files show the curated state, not this initial draft. Edit vocabularies in the app, not here.
+- **Each release regenerates `codebook/`** (and `docs/CODEBOOK.md`) from the database (releases arrive in Phase 4). After the first release these files show the curated state, not this initial draft. Edit vocabularies in the app, not here; a changed YAML value reaches the database only for fields that no person has changed (the seed rule of `docs/DATA_MODEL.md` §9).

@@ -1,7 +1,7 @@
 # Codebook (draft)
 
 > **Status:** Phase 0 draft, 2026-10-28, for team review.
-> **Generation:** from Phase 1 on, this file is generated from the vocabulary tables (`codebook/*.yaml` → database → `docs/CODEBOOK.md`), and every release contains a frozen copy.
+> **Generation:** the vocabulary files `codebook/*.yaml` were derived from this draft (`codebook/README.md`); `mdt seed` loads them into the database, which holds the working copy (Codebook page of the app). From the first release on (Phase 4), this file and `codebook/` are regenerated from the database (`codebook/*.yaml` → database → `docs/CODEBOOK.md`), and every release contains a frozen copy.
 > **Codes** are stable identifiers. Labels and definitions may change; a code is never renamed or deleted, only deactivated (`active = false`) and, where applicable, linked to its replacement (`replaced_by`). Every change creates a revision.
 > **Examples** come only from the paper's own assignments or, later, from collected and verified data. None comes from model knowledge.
 > **Labels:** [paper] from paper.docx · [user] from the assignment · [search] seen in search results · ⚑ needs a team decision (see `PLAN.md` §12).
@@ -82,7 +82,7 @@ Cut-off dates as in §1. Disputed events and participations are ignored. The exa
 | `period_reason` | `no_date`, `imprecise_date` (the interval straddles a cut-off), `archive_bound_only` |
 | `existed_before_invasion` | true if the launch interval ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION` |
 | `war_trajectory` | Rules in this order: (1) launch start ≥ invasion but existed before it → `unknown` (`conflicting_dates`); (2) launch start ≥ invasion → `new_in_war`; (3) existed before the invasion and a modification event starts on or after it → `adapted_in_war`; (4) existed before the invasion and every modification event ends before it, or there is none → `prewar_unchanged` ("no modification recorded up to release X"); (5) otherwise `unknown`. The deciding event is linked. |
-| `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date`, `conflicting_dates` |
+| `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date`, `conflicting_dates`, `archive_bound_only` (the only date is an archive upper bound on or after the invasion) |
 | `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) as `initiator`, `owner` or `operator`, with the participation linked ⚑ D-10 |
 
 ### 2.8 Screening of documents
