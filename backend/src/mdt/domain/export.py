@@ -1,16 +1,13 @@
-"""Exports of a list view as CSV or XLSX (docs/API.md §1.4 and §5).
+"""Exports of a list view as CSV or XLSX (docs/API.md §5).
 
-:func:`start_export` validates the request, takes the single export slot (``429 busy``
-while another export runs), opens a dedicated read session and checks the row count
-(``400 export_too_large`` over :data:`MAX_EXPORT_ROWS`). The returned
-:class:`ExportJob` then streams CSV (:meth:`ExportJob.iter_csv`) or writes XLSX in
-openpyxl's write-only mode (:meth:`ExportJob.write_xlsx`); both release the slot and the
-session when they finish, and :meth:`ExportJob.close` does so on any other path.
+:func:`start_export` validates the request and opens a dedicated read session. The
+returned :class:`ExportJob` then streams CSV (:meth:`ExportJob.iter_csv`) or writes XLSX
+in openpyxl's write-only mode (:meth:`ExportJob.write_xlsx`); both release the session
+when they finish, and :meth:`ExportJob.close` does so on any other path.
 
-Spreadsheet safety: XLSX string values are always string cells (never formulas or
-errors), with illegal characters replaced and over-long strings truncated. CSV string
-cells that start with ``= + - @``, tab, CR or LF get a leading apostrophe; number,
-boolean and date columns are never changed.
+CSV cells hold the values verbatim. XLSX string values are always string cells (never
+formulas or errors), with characters that XLSX cannot hold replaced and over-long
+strings truncated.
 """
 
 from __future__ import annotations
@@ -18,7 +15,6 @@ from __future__ import annotations
 import csv
 import io
 import json
-import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -35,7 +31,7 @@ from sqlalchemy.orm import Session
 
 from mdt.db.models import VocabularyTerm
 from mdt.domain.dates import parse_partial_date
-from mdt.domain.errors import BusyError, ExportTooLargeError, ValidationError
+from mdt.domain.errors import ValidationError
 from mdt.domain.labels import format_number, ref_infos
 from mdt.domain.listquery import (
     QueryParams,
@@ -51,7 +47,6 @@ from mdt.domain.records import api_value, load_links, table_of
 from mdt.domain.registry import EntityTypeSpec, FieldSpec
 from mdt.domain.serialize import derived_payload, derived_rows, generic_spec, virtual_values
 
-MAX_EXPORT_ROWS: Final = 200_000
 FORMATS: Final = ("csv", "xlsx")
 MEDIA_TYPES: Final = {
     "csv": "text/csv; charset=utf-8",
@@ -61,16 +56,12 @@ XLSX_MAX_CHARS: Final = 32_767
 TRUNCATION_SUFFIX: Final = " [truncated]"
 #: Texts that openpyxl would store as an error value instead of a string.
 XLSX_ERROR_VALUES: Final = frozenset(ERROR_CODES)
-#: First characters that spreadsheet programs read as a formula (CSV only).
-FORMULA_PREFIXES: Final = ("=", "+", "-", "@", "\t", "\r", "\n")
 LIST_SEPARATOR: Final = "; "
 CHUNK_SIZE: Final = 500
 ID_COLUMN: Final = "id"
 
 ColumnKind = Literal["string", "number", "bool", "date"]
 Item = Mapping[str, Any]
-
-_SLOT = threading.Lock()
 
 
 @dataclass(frozen=True)
@@ -413,18 +404,14 @@ def _vocabularies(spec: EntityTypeSpec, names: Sequence[str]) -> set[str]:
 
 
 def csv_cell(kind: ColumnKind, value: Any) -> str:
-    """A CSV cell: booleans ``true``/``false``, numbers as numbers, and string cells
-    starting with a formula character prefixed with an apostrophe."""
+    """A CSV cell: booleans ``true``/``false``, numbers as numbers, text verbatim."""
     if value is None:
         return ""
     if kind == "bool":
         return "true" if value else "false"
     if kind == "number":
         return format_number(value)
-    text = str(value)
-    if kind == "string" and text.startswith(FORMULA_PREFIXES):
-        return "'" + text
-    return text
+    return str(value)
 
 
 def xlsx_text(text: str) -> str:
@@ -470,9 +457,8 @@ def export_filename(entity_type: str, file_format: str, now: datetime) -> str:
 
 
 class ExportJob:
-    """A started export. It holds the export slot and its own read session (one
-    snapshot for the count and every row) until the output is produced or
-    :meth:`close` is called."""
+    """A started export. It holds its own read session (one snapshot for every row)
+    until the output is produced or :meth:`close` is called."""
 
     def __init__(
         self,
@@ -482,7 +468,6 @@ class ExportJob:
         sort: Sequence[SortKey],
         columns: Sequence[Column],
         file_format: str,
-        total: int,
         started_at: datetime,
         needs: ExportNeeds,
     ) -> None:
@@ -493,22 +478,18 @@ class ExportJob:
         self.columns = tuple(columns)
         self._needs = needs
         self.format = file_format
-        self.total = total
         self.filename = export_filename(spec.name, file_format, started_at)
         self.media_type = MEDIA_TYPES[file_format]
         self._closed = False
         self._used = False
 
     def close(self) -> None:
-        """Release the session and the export slot (idempotent)."""
+        """Release the session (idempotent)."""
         if self._closed:
             return
         self._closed = True
-        try:
-            self._session.rollback()
-            self._session.close()
-        finally:
-            _SLOT.release()
+        self._session.rollback()
+        self._session.close()
 
     def _start(self) -> None:
         if self._closed or self._used:
@@ -582,9 +563,8 @@ def _file_format(raw: str | None) -> str:
 def start_export(session: Session, entity_type: str, params: QueryParams) -> ExportJob:
     """Validate an export request (filters, sort, ``cols``, ``format``) and start the job.
 
-    Raises :class:`BusyError` while another export runs and
-    :class:`ExportTooLargeError` over :data:`MAX_EXPORT_ROWS` rows. The job uses its own
-    session on the same engine, so it may outlive the request's session.
+    The job uses its own session on the same engine, so it may outlive the request's
+    session.
     """
     spec = generic_spec(entity_type)
     pairs = param_pairs(params)
@@ -592,34 +572,21 @@ def start_export(session: Session, entity_type: str, params: QueryParams) -> Exp
     scope = parse_scope(spec, pairs)
     sort = parse_sort_param(spec, pairs, scope)
     names = column_names(spec, last_param(pairs, "cols"))
-    if not _SLOT.acquire(blocking=False):
-        raise BusyError()
     job_session = Session(bind=session.get_bind(), info=dict(session.info))
     try:
         labels = _Labels()
         labels.load(job_session, _vocabularies(spec, names))
-        selection = select_scope(spec, scope)
-        total = 0
-        if selection is not None:
-            total = int(job_session.execute(selection.count()).scalar_one())
-        if total > MAX_EXPORT_ROWS:
-            raise ExportTooLargeError(
-                f"The export would have {total} rows; at most {MAX_EXPORT_ROWS} are allowed"
-            )
-        columns = build_columns(spec, names, labels)
         return ExportJob(
             job_session,
             spec,
-            selection,
+            select_scope(spec, scope),
             sort,
-            columns,
+            build_columns(spec, names, labels),
             file_format,
-            total,
             datetime.now(UTC),
             export_needs(spec, names),
         )
     except BaseException:
         job_session.rollback()
         job_session.close()
-        _SLOT.release()
         raise

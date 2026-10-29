@@ -1,4 +1,4 @@
-"""Exports over HTTP (API §5): status, headers, content, limits and the export slot."""
+"""Exports over HTTP (API §5): status, headers and content."""
 
 from __future__ import annotations
 
@@ -6,10 +6,8 @@ import csv
 import io
 import re
 
-import pytest
 from openpyxl import load_workbook
 
-from mdt.api.headers import SECURITY_HEADERS
 from mdt.domain.export import start_export
 from tests.api.helpers import ApiClient, error_of
 from tests.conftest import Db
@@ -31,8 +29,6 @@ def test_csv_export_of_all_projects(client: ApiClient) -> None:
         r'attachment; filename="project-[0-9]{8}-[0-9]{6}\.csv"',
         response.headers["content-disposition"],
     )
-    for name, value in SECURITY_HEADERS:
-        assert response.headers[name] == value
     rows = csv_rows(response.content)
     header, data = rows[0], rows[1:]
     assert header[0] == "id" and "slug" in header and "paper_cluster_label" in header
@@ -51,10 +47,10 @@ def test_csv_export_follows_filters_sort_and_columns(client: ApiClient) -> None:
     assert {row[1] for row in rows[1:]} == {"true"}
 
 
-def test_csv_cells_cannot_start_formulas(client: ApiClient) -> None:
+def test_csv_cells_hold_the_values_verbatim(client: ApiClient) -> None:
     client.create_project(name_en="=1+1", notes="@SUM(A1)")
     response = client.get(EXPORT, {"cols": "name_en,notes", "f.name_en": "eq:=1+1"})
-    assert csv_rows(response.content)[1] == ["'=1+1", "'@SUM(A1)"]
+    assert csv_rows(response.content)[1] == ["=1+1", "@SUM(A1)"]
 
 
 def test_xlsx_export(client: ApiClient) -> None:
@@ -90,23 +86,11 @@ def test_export_parameters_are_validated(client: ApiClient) -> None:
     assert client.get("/api/entities/comment/export").status_code == 404
 
 
-def test_exports_over_the_row_limit_are_refused(
-    client: ApiClient, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr("mdt.domain.export.MAX_EXPORT_ROWS", 5)
-    response = client.get(EXPORT)
-    assert (response.status_code, error_of(response)["code"]) == (400, "export_too_large")
-    assert client.get(EXPORT, {"f.in_paper_scope": "eq:false"}).status_code == 200
-
-
-def test_one_export_at_a_time(client: ApiClient, api_db: Db) -> None:
+def test_exports_do_not_wait_for_each_other(client: ApiClient, api_db: Db) -> None:
     with api_db.session() as session:
         job = start_export(session, "project", {})
         try:
-            response = client.get(EXPORT)
-            assert (response.status_code, error_of(response)["code"]) == (429, "busy")
+            assert client.get(EXPORT).status_code == 200
+            assert client.get(EXPORT, {"format": "xlsx"}).status_code == 200
         finally:
             job.close()
-    assert client.get(EXPORT).status_code == 200
-    assert client.get(EXPORT, {"format": "xlsx"}).status_code == 200
-    assert client.get(EXPORT).status_code == 200  # the slot is free again after each export

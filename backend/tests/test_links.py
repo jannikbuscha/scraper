@@ -10,12 +10,11 @@ from sqlalchemy import select
 from mdt.db.models import DocumentLink
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
-from mdt.domain.errors import ConflictError, ReferenceDeletedError, ValidationError
+from mdt.domain.errors import ReferenceDeletedError, ValidationError
 from mdt.domain.revisions import apply_change, restore_version, soft_delete
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     assert_matches_latest_snapshot,
     create_project,
     create_service,
@@ -66,7 +65,7 @@ def test_links_are_stored_snapshotted_and_restored(db: Db) -> None:
                     },
                 ],
             },
-            ALICE,
+            USER,
         ).entity_id
         expected: list[dict[str, Any]] = sorted(
             [
@@ -98,13 +97,12 @@ def test_links_are_stored_snapshotted_and_restored(db: Db) -> None:
             "document",
             document_id,
             {"links": [{"subject_id": project_id, "state": "rejected"}]},
-            BOB,
-            expected_version=1,
+            USER,
         )
         assert [link["state"] for link in link_rows(db, document_id)] == ["rejected"]
         revision = revisions_of(session, document_id)[-1]
         assert set(revision.diff["fields"]) == {"links"}
-        restore_version(session, "document", document_id, 1, BOB, expected_version=2)
+        restore_version(session, "document", document_id, 1, USER)
         assert link_rows(db, document_id) == expected
     assert_matches_latest_snapshot(db, "document", document_id)
 
@@ -143,8 +141,7 @@ def test_collectors_create_automatic_links_with_match_details(db: Db) -> None:
             "document",
             document_id,
             {"links": [{"subject_id": project_id, "state": "confirmed", "origin": "manual"}]},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         [link] = link_rows(db, document_id)
         assert (link["origin"], link["state"], link["match_count"]) == ("auto", "confirmed", 2)
@@ -165,7 +162,7 @@ def test_link_subjects_are_checked(db: Db) -> None:
                         {"subject_id": "prj_01JBX3ABCDEFGHJKMNPQRSTVWX", "state": "suggested"}
                     ],
                 },
-                ALICE,
+                USER,
             )
         assert caught.value.details == {
             "links[0].subject_id": ["refers to a record that does not exist"]
@@ -181,54 +178,30 @@ def test_link_subjects_are_checked(db: Db) -> None:
                         {"subject_id": "org_01JBX3ABCDEFGHJKMNPQRSTVWX", "state": "suggested"}
                     ],
                 },
-                ALICE,
+                USER,
             )
         document_id = apply_change(
             session,
             "document",
             None,
             {**base, "links": [{"subject_id": project_id, "state": "suggested"}]},
-            ALICE,
+            USER,
         ).entity_id
-        soft_delete(session, "project", project_id, ALICE, expected_version=1)
+        soft_delete(session, "project", project_id, USER)
         # A kept link to a deleted subject does not block other changes ...
-        apply_change(
-            session, "document", document_id, {"title": "Renamed"}, ALICE, expected_version=1
-        )
+        apply_change(session, "document", document_id, {"title": "Renamed"}, USER)
         # ... but a new link to a deleted subject does.
-        other = apply_change(session, "document", None, base, ALICE).entity_id
+        other = apply_change(session, "document", None, base, USER).entity_id
         with pytest.raises(ReferenceDeletedError) as reference:
             apply_change(
                 session,
                 "document",
                 other,
                 {"links": [{"subject_id": project_id, "state": "suggested"}]},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert reference.value.details is not None
         assert reference.value.details["field"] == "links"
-
-
-def test_conflict_payload_labels_link_subjects(db: Db) -> None:
-    with db.session() as session:
-        project_id = create_project(session, name_en="Linked project").entity_id
-        document_id = apply_change(
-            session,
-            "document",
-            None,
-            {
-                "title": "Example document",
-                "links": [{"subject_id": project_id, "state": "suggested"}],
-            },
-            ALICE,
-        ).entity_id
-        apply_change(session, "document", document_id, {"title": "x"}, BOB, expected_version=1)
-        with pytest.raises(ConflictError) as caught:
-            apply_change(
-                session, "document", document_id, {"title": "y"}, ALICE, expected_version=1
-            )
-        assert caught.value.payload["refs"][project_id]["label"] == "Linked project"
 
 
 def test_restore_brings_back_links_as_recorded(db: Db) -> None:
@@ -253,9 +226,9 @@ def test_restore_brings_back_links_as_recorded(db: Db) -> None:
             COLLECTOR,
         ).entity_id
         recorded = link_rows(db, document_id)
-        apply_change(session, "document", document_id, {"links": []}, ALICE, expected_version=1)
+        apply_change(session, "document", document_id, {"links": []}, USER)
         assert link_rows(db, document_id) == []
-        restore_version(session, "document", document_id, 1, BOB, expected_version=2)
+        restore_version(session, "document", document_id, 1, USER)
         assert link_rows(db, document_id) == recorded
         assert recorded[0]["origin"] == "auto"
     assert_matches_latest_snapshot(db, "document", document_id)

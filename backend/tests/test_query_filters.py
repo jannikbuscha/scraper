@@ -16,7 +16,7 @@ from mdt.domain.comments import create_comment, delete_comment, resolve_comment
 from mdt.domain.query import list_entities
 from mdt.domain.revisions import soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_project, create_service
+from tests.helpers import USER, create_event, create_project, create_service
 from tests.read_helpers import (
     assert_consistent,
     create,
@@ -65,7 +65,7 @@ def build(session: Any) -> dict[str, str]:
     ).entity_id
     ids["GAMMA"] = create_project(session, slug="gamma", name_en="Gamma 100%").entity_id
     deleted = create_project(session, slug="deleted-project", name_en="Deleted project")
-    soft_delete(session, "project", deleted.entity_id, ALICE, expected_version=1)
+    soft_delete(session, "project", deleted.entity_id, USER)
     ids["DELETED"] = deleted.entity_id
 
     ids["S_ALPHA"] = create_service(session, ids["ALPHA"], name_en="Alpha service").entity_id
@@ -122,13 +122,13 @@ def build(session: Any) -> dict[str, str]:
         session, "indicator", subject_id=ids["GAMMA"], metric="Count", value=3
     ).entity_id
 
-    create_comment(session, ids["ALPHA"], "On the name", ALICE, field="name_en")
-    root = create_comment(session, ids["ALPHA"], "Entity-level thread", ALICE)
-    create_comment(session, ids["ALPHA"], "A reply", ALICE, parent_id=root.entity_id)
-    resolved = create_comment(session, ids["ALPHA"], "Resolved thread", ALICE)
-    resolve_comment(session, resolved.entity_id, ALICE, expected_version=1)
-    gone = create_comment(session, ids["BETA"], "Deleted thread", ALICE)
-    delete_comment(session, gone.entity_id, ALICE, expected_version=1)
+    create_comment(session, ids["ALPHA"], "On the name", USER, field="name_en")
+    root = create_comment(session, ids["ALPHA"], "Entity-level thread", USER)
+    create_comment(session, ids["ALPHA"], "A reply", USER, parent_id=root.entity_id)
+    resolved = create_comment(session, ids["ALPHA"], "Resolved thread", USER)
+    resolve_comment(session, resolved.entity_id, USER)
+    gone = create_comment(session, ids["BETA"], "Deleted thread", USER)
+    delete_comment(session, gone.entity_id, USER)
     return ids
 
 
@@ -168,7 +168,7 @@ CASES: list[tuple[str, dict[str, str], set[str]]] = [
     ("project", {"f.aliases": "empty:true"}, {"BETA", "GAMMA"}),
     ("project", {"f.description_en": "contains:з\u2019явилася"}, {"ALPHA"}),
     ("project", {"f.description_en": "contains:З\u02bcЯВ"}, {"ALPHA"}),
-    ("project", {"f.created_by": "eq:alice example"}, {"ALPHA", "BETA", "GAMMA"}),
+    ("project", {"f.created_by": "eq:USER"}, {"ALPHA", "BETA", "GAMMA"}),
     ("project", {"f.slug": "contains:ta"}, {"BETA"}),
     ("document", {"f.url": "contains:/report"}, {"D1"}),
     ("document", {"f.canonical_url": "eq:https://example.org/report"}, {"D1"}),

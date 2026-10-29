@@ -11,7 +11,6 @@ import pytest
 from mdt.domain.errors import BadFilterError, BadSortError, ValidationError
 from mdt.domain.listquery import (
     EMPTY_TOKEN,
-    MAX_FILTER_VALUES,
     FieldFilter,
     Scope,
     operators_for,
@@ -195,13 +194,6 @@ def test_empty_list_is_a_bad_filter(raw: str) -> None:
         flt("project", field, raw)
 
 
-def test_list_limit() -> None:
-    values = ",".join(f"code_{index}" for index in range(MAX_FILTER_VALUES))
-    assert len(flt("project", "status", f"in:{values}").values) == MAX_FILTER_VALUES
-    with pytest.raises(BadFilterError):
-        flt("project", "status", f"in:{values},one_more")
-
-
 # --------------------------------------------------------------------------------------
 # empty:, booleans, dates and numbers
 # --------------------------------------------------------------------------------------
@@ -306,7 +298,6 @@ def test_integer_field_bounds_within_64_bits(
         "eq:9223372036854775808",
         "range:-9223372036854775809..",
         "range:..99999999999999999999",
-        "eq:" + "9" * 5000,  # more digits than int() converts
     ],
 )
 def test_integer_field_bounds_beyond_64_bits_are_bad_filters(raw: str) -> None:
@@ -397,8 +388,6 @@ def test_search_text() -> None:
     assert scope.match == '"Дія"* AND "портал"*'
     scope = parse_list_query(PROJECT, {"q": " - . "}).scope
     assert scope.matches_nothing
-    with pytest.raises(ValidationError):
-        parse_list_query(PROJECT, {"q": "x" * 201})
 
 
 def test_scope_without_drops_one_filter() -> None:

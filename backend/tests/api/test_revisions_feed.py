@@ -1,10 +1,10 @@
-"""Recent changes, revision authors and revisions by ID (API §3.2, §3.4)."""
+"""Recent changes and revisions by ID (API §3.2, §3.4)."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from tests.api.helpers import ALICE, BOB, ApiClient, error_of
+from tests.api.helpers import USER, ApiClient, error_of
 
 ITEM_KEYS = {
     "id", "entity_type", "entity_id", "entity_label", "version", "at", "author", "channel",
@@ -20,26 +20,26 @@ def test_recent_changes_newest_first(client: ApiClient) -> None:
     seeded_total = feed(client)["total"]
     assert seeded_total > 20  # vocabulary terms, the organisation and the projects
     project = client.create_project()
-    client.update("project", project, {"notes": "Example"}, note="Second", author=BOB)
+    client.update("project", project, {"notes": "Example"}, note="Second")
     page = feed(client, page_size=2)
     assert page["total"] == seeded_total + 2
     assert (page["page"], page["page_size"]) == (1, 2)
     newest, older = page["items"]
     assert set(newest) == ITEM_KEYS
-    assert (newest["entity_id"], newest["version"], newest["author"]) == (project["id"], 2, BOB)
+    assert (newest["entity_id"], newest["version"], newest["author"]) == (project["id"], 2, USER)
     assert (newest["note"], newest["changed_fields"]) == ("Second", ["notes"])
     assert newest["entity_label"] == project["label"] and newest["context"] is None
-    assert (older["action"], older["author"]) == ("create", ALICE)
+    assert (older["action"], older["author"]) == ("create", USER)
     assert newest["id"] > older["id"]
 
 
 def test_recent_changes_filters(client: ApiClient) -> None:
     project = client.create_project()
-    client.update("project", project, {"notes": "Example"}, author=BOB)
-    client.comment(project["id"], author=BOB)
-    assert {entry["author"] for entry in feed(client, author=BOB)["items"]} == {BOB}
-    both = feed(client, author=f"{ALICE},{BOB}")["total"]
-    assert both == 3
+    client.update("project", project, {"notes": "Example"})
+    client.comment(project["id"])
+    ui = feed(client, channel="ui")
+    assert ui["total"] == 3
+    assert {entry["author"] for entry in ui["items"]} == {USER}
     assert feed(client, entity_type="comment")["total"] == 1
     assert feed(client, entity_type="project,comment", channel="ui")["total"] == 3
     assert feed(client, channel="seed", entity_type="project")["total"] == 20
@@ -55,11 +55,15 @@ def test_recent_changes_filters(client: ApiClient) -> None:
         assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
 
 
-def test_revision_authors(client: ApiClient) -> None:
-    assert client.ok(client.get("/api/revisions/authors")) == {"authors": ["seed"]}
+def test_the_author_filter_and_the_authors_list_are_gone(client: ApiClient) -> None:
     project = client.create_project()
-    client.update("project", project, {"notes": "Example"}, author=BOB)
-    assert client.ok(client.get("/api/revisions/authors")) == {"authors": [ALICE, BOB, "seed"]}
+    # An unknown parameter is ignored like any other.
+    assert feed(client, author="seed")["total"] == feed(client)["total"]
+    response = client.get("/api/revisions/authors")
+    assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
+    assert client.ok(client.get("/api/comments", {"author": "seed"}))["total"] == 0
+    client.comment(project["id"])
+    assert client.ok(client.get("/api/comments", {"author": "seed"}))["total"] == 1
 
 
 def test_revision_by_id(client: ApiClient) -> None:

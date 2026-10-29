@@ -1,13 +1,12 @@
 """Helpers of the HTTP API tests: a client wrapper that writes like the UI, direct ASGI
-calls (to see whether a request body was read) and synthetic records."""
+calls (with a hand-made path) and synthetic records."""
 
 from __future__ import annotations
 
 import itertools
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
-from urllib.parse import quote
 
 import anyio
 from fastapi import FastAPI
@@ -17,15 +16,10 @@ from starlette.types import Message
 
 BASE_URL = "http://127.0.0.1:8080"
 HOST = "127.0.0.1:8080"
-ALICE = "Alice Example"
-BOB = "Bob Example"
+#: The name every write through the API is recorded under.
+USER = "user"
 
 _counter = itertools.count(1)
-
-
-def encode_author(name: str) -> str:
-    """The header value the UI sends: ``encodeURIComponent(name)``."""
-    return quote(name, safe="!~*'()")
 
 
 def unique_slug(prefix: str = "example") -> str:
@@ -54,8 +48,7 @@ def error_of(response: Response) -> dict[str, Any]:
 
 
 class ApiClient:
-    """A TestClient wrapper: reads send ``X-Requested-With``; writes also send
-    ``X-Author`` and a JSON body, like the UI's fetch wrapper."""
+    """A TestClient wrapper: writes send a JSON body, like the UI's fetch wrapper."""
 
     def __init__(self, client: TestClient) -> None:
         self.client = client
@@ -64,30 +57,17 @@ class ApiClient:
         """GET ``path`` with query parameters."""
         return self.client.get(path, params=dict(params) if params else None)
 
-    def write(
-        self,
-        method: str,
-        path: str,
-        body: Any = None,
-        *,
-        author: str = ALICE,
-        headers: Mapping[str, str] | None = None,
-    ) -> Response:
-        """Send a write with the author header and a JSON body (``{}`` if None)."""
-        return self.client.request(
-            method,
-            path,
-            json={} if body is None else body,
-            headers={"X-Author": encode_author(author), **(headers or {})},
-        )
+    def write(self, method: str, path: str, body: Any = None) -> Response:
+        """Send a write with a JSON body (``{}`` if None)."""
+        return self.client.request(method, path, json={} if body is None else body)
 
-    def post(self, path: str, body: Any = None, *, author: str = ALICE) -> Response:
-        """POST JSON as ``author``."""
-        return self.write("POST", path, body, author=author)
+    def post(self, path: str, body: Any = None) -> Response:
+        """POST JSON."""
+        return self.write("POST", path, body)
 
-    def patch(self, path: str, body: Any = None, *, author: str = ALICE) -> Response:
-        """PATCH JSON as ``author``."""
-        return self.write("PATCH", path, body, author=author)
+    def patch(self, path: str, body: Any = None) -> Response:
+        """PATCH JSON."""
+        return self.write("PATCH", path, body)
 
     # Shortcuts ------------------------------------------------------------------------
 
@@ -96,11 +76,9 @@ class ApiClient:
         assert response.status_code == status, (response.status_code, response.text)
         return dict(response.json())
 
-    def create(
-        self, entity_type: str, data: Mapping[str, Any], *, author: str = ALICE
-    ) -> dict[str, Any]:
+    def create(self, entity_type: str, data: Mapping[str, Any]) -> dict[str, Any]:
         """Create an entity; returns the item."""
-        response = self.post(f"/api/entities/{entity_type}", {"data": dict(data)}, author=author)
+        response = self.post(f"/api/entities/{entity_type}", {"data": dict(data)})
         return dict(self.ok(response, 201)["item"])
 
     def create_project(self, **overrides: Any) -> dict[str, Any]:
@@ -118,11 +96,10 @@ class ApiClient:
         changes: Mapping[str, Any],
         *,
         note: str | None = None,
-        author: str = ALICE,
     ) -> dict[str, Any]:
-        """PATCH ``changes`` with the item's version; returns the response body."""
-        body = {"expected_version": item["version"], "changes": dict(changes), "note": note}
-        response = self.patch(f"/api/entities/{entity_type}/{item['id']}", body, author=author)
+        """PATCH ``changes``; returns the response body."""
+        body = {"changes": dict(changes), "note": note}
+        response = self.patch(f"/api/entities/{entity_type}/{item['id']}", body)
         return self.ok(response)
 
     def comment(
@@ -132,7 +109,6 @@ class ApiClient:
         *,
         field: str | None = None,
         parent_id: str | None = None,
-        author: str = ALICE,
     ) -> dict[str, Any]:
         """Create a comment; returns it."""
         body = {
@@ -141,7 +117,7 @@ class ApiClient:
             "parent_id": parent_id,
             "body_md": body_md,
         }
-        return dict(self.ok(self.post("/api/comments", body, author=author), 201)["comment"])
+        return dict(self.ok(self.post("/api/comments", body), 201)["comment"])
 
     def list(self, entity_type: str, **params: Any) -> dict[str, Any]:
         """One page of a list."""
@@ -155,30 +131,15 @@ class ApiClient:
 
 @dataclass
 class AsgiResult:
-    """The response of a direct ASGI call and whether the app read the request body."""
+    """The response of a direct ASGI call."""
 
     status: int
-    headers: dict[str, str]
     body: bytes
-    body_read: bool
 
 
-def call_asgi(
-    app: FastAPI,
-    method: str,
-    path: str,
-    headers: Sequence[tuple[str, str | bytes]] = (),
-    *,
-    body: bytes = b"",
-    query_string: bytes = b"",
-    host: str | None = HOST,
-) -> AsgiResult:
+def call_asgi(app: FastAPI, method: str, path: str) -> AsgiResult:
     """Call the ASGI app with a hand-made scope. ``path`` is the decoded path, as an ASGI
     server passes it (``/%2e%2e/x`` arrives as ``/../x``)."""
-    raw_headers = [] if host is None else [(b"host", host.encode("latin-1"))]
-    for name, value in headers:
-        raw = value if isinstance(value, bytes) else value.encode("latin-1")
-        raw_headers.append((name.lower().encode("latin-1"), raw))
     scope = {
         "type": "http",
         "asgi": {"version": "3.0", "spec_version": "2.4"},
@@ -187,20 +148,17 @@ def call_asgi(
         "scheme": "http",
         "path": path,
         "raw_path": path.encode("utf-8"),
-        "query_string": query_string,
+        "query_string": b"",
         "root_path": "",
-        "headers": raw_headers,
+        "headers": [(b"host", HOST.encode("latin-1"))],
         "client": ("127.0.0.1", 50000),
         "server": ("127.0.0.1", 8080),
         "state": {},
     }
-    read = False
     messages: list[Message] = []
 
     async def receive() -> Message:
-        nonlocal read
-        read = True
-        return {"type": "http.request", "body": body, "more_body": False}
+        return {"type": "http.request", "body": b"", "more_body": False}
 
     async def send(message: Message) -> None:
         messages.append(message)
@@ -211,7 +169,4 @@ def call_asgi(
     anyio.run(call)
     start = next(message for message in messages if message["type"] == "http.response.start")
     content = b"".join(m.get("body", b"") for m in messages if m["type"] == "http.response.body")
-    response_headers = {
-        name.decode("latin-1"): value.decode("latin-1") for name, value in start["headers"]
-    }
-    return AsgiResult(start["status"], response_headers, content, read)
+    return AsgiResult(start["status"], content)

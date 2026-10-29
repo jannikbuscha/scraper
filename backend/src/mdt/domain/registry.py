@@ -1558,7 +1558,8 @@ SAVED_VIEW = EntityTypeSpec(
                 in_list=True,
                 help="The table the view applies to.",
             ),
-            # Query strings can be long (API §1.4 allows 8 KiB); 500 characters would not do.
+            # Query strings can be long (DATA_MODEL §3.5: up to 8 192 characters); 500
+            # characters would not do.
             _field(
                 "query",
                 "string",

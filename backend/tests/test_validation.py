@@ -18,7 +18,7 @@ from mdt.domain.revisions import apply_change, soft_delete
 from mdt.domain.vocab import TermIndex
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
+    USER,
     create_event,
     create_project,
     create_service,
@@ -48,7 +48,7 @@ def term_id(session: Session, vocabulary: str, code: str) -> str:
 
 def test_required_fields_and_one_of_names(db: Db) -> None:
     with db.session() as session, pytest.raises(ValidationError) as caught:
-        apply_change(session, "project", None, {"scope_note": "Synthetic."}, ALICE)
+        apply_change(session, "project", None, {"scope_note": "Synthetic."}, USER)
     assert details_of(caught) == {
         "slug": ["is required"],
         "name_en": ["At least one of name_en/name_uk is required"],
@@ -62,15 +62,13 @@ def test_names_are_checked_after_normalisation(db: Db) -> None:
             create_project(session, name_en="   ", name_uk="")
         created = create_project(session, name_en=None, name_uk="Приклад")
         with pytest.raises(ValidationError):
-            apply_change(
-                session, "project", created.entity_id, {"name_uk": " "}, ALICE, expected_version=1
-            )
+            apply_change(session, "project", created.entity_id, {"name_uk": " "}, USER)
 
 
 def test_scope_note_is_required_on_create_and_when_the_scope_changes(db: Db) -> None:
     with db.session() as session:
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "project", None, project_data(scope_note=None), ALICE)
+            apply_change(session, "project", None, project_data(scope_note=None), USER)
         assert "scope_note" in details_of(caught)
         created = create_project(session)
         with pytest.raises(ValidationError) as caught:
@@ -79,8 +77,7 @@ def test_scope_note_is_required_on_create_and_when_the_scope_changes(db: Db) -> 
                 "project",
                 created.entity_id,
                 {"in_paper_scope": True},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert "scope_note" in details_of(caught)
         changed = apply_change(
@@ -88,14 +85,11 @@ def test_scope_note_is_required_on_create_and_when_the_scope_changes(db: Db) -> 
             "project",
             created.entity_id,
             {"in_paper_scope": True, "scope_note": "Synthetic reason for the scope."},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert changed.changed
         # Other changes need no scope note.
-        apply_change(
-            session, "project", created.entity_id, {"name_en": "x"}, ALICE, expected_version=2
-        )
+        apply_change(session, "project", created.entity_id, {"name_en": "x"}, USER)
 
 
 def test_verified_or_disputed_record_status_needs_a_note(db: Db) -> None:
@@ -108,8 +102,7 @@ def test_verified_or_disputed_record_status_needs_a_note(db: Db) -> None:
                     "project",
                     created.entity_id,
                     {"verification_status": status},
-                    ALICE,
-                    expected_version=1,
+                    USER,
                 )
             assert "note" in details_of(caught)
         result = apply_change(
@@ -117,9 +110,8 @@ def test_verified_or_disputed_record_status_needs_a_note(db: Db) -> None:
             "project",
             created.entity_id,
             {"verification_status": "verified"},
-            ALICE,
+            USER,
             note="Checked against the sources.",
-            expected_version=1,
         )
         assert result.changed
         apply_change(
@@ -127,8 +119,7 @@ def test_verified_or_disputed_record_status_needs_a_note(db: Db) -> None:
             "project",
             created.entity_id,
             {"verification_status": "unverified"},
-            ALICE,
-            expected_version=2,
+            USER,
         )
 
 
@@ -158,21 +149,17 @@ def test_inactive_codes_cannot_be_added_but_may_be_kept(db: Db) -> None:
             "vocabulary_term",
             planned,
             {"active": False},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         domain = term_id(session, "policy_domain", "domain_a")
-        apply_change(
-            session, "vocabulary_term", domain, {"active": False}, ALICE, expected_version=1
-        )
+        apply_change(session, "vocabulary_term", domain, {"active": False}, USER)
         # The stored inactive codes stay; other changes are still possible.
         apply_change(
             session,
             "project",
             created.entity_id,
             {"name_en": "Changed", "policy_domains": ["domain_a", "domain_b"]},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert fields_of(session, "project", created.entity_id)["status"] == "planned"
         with pytest.raises(ValidationError) as caught:
@@ -181,8 +168,7 @@ def test_inactive_codes_cannot_be_added_but_may_be_kept(db: Db) -> None:
                 "project",
                 created.entity_id,
                 {"policy_domains": ["domain_b", "domain_old"]},
-                ALICE,
-                expected_version=2,
+                USER,
             )
         assert details_of(caught) == {"policy_domains[1]": ["is an inactive code"]}
 
@@ -201,7 +187,7 @@ def test_reference_to_a_missing_row(db: Db) -> None:
 def test_reference_to_a_deleted_row(db: Db) -> None:
     with db.session() as session:
         project = create_project(session, name_en="Deleted example")
-        soft_delete(session, "project", project.entity_id, ALICE, expected_version=1)
+        soft_delete(session, "project", project.entity_id, USER)
         with pytest.raises(ReferenceDeletedError) as caught:
             create_service(session, project.entity_id)
         assert caught.value.details == {
@@ -216,14 +202,13 @@ def test_unchanged_reference_to_a_deleted_row_does_not_block_other_changes(db: D
     with db.session() as session:
         project = create_project(session)
         event = create_event(session, project.entity_id, "announced")
-        soft_delete(session, "project", project.entity_id, ALICE, expected_version=1)
+        soft_delete(session, "project", project.entity_id, USER)
         result = apply_change(
             session,
             "event",
             event.entity_id,
             {"description_en": "Changed."},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert result.changed
 
@@ -237,7 +222,7 @@ def test_reference_type_is_checked_by_prefix(db: Db) -> None:
                 "participation",
                 None,
                 {"organization_id": project.entity_id, "subject_id": project.entity_id},
-                ALICE,
+                USER,
             )
         assert "organization_id" in details_of(caught)
 
@@ -265,8 +250,7 @@ def test_parent_service_rules(db: Db) -> None:
                 "service",
                 parent.entity_id,
                 {"parent_service_id": child.entity_id},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught) == {
             "parent_service_id": ["The parent service would create a cycle"]
@@ -277,8 +261,7 @@ def test_parent_service_rules(db: Db) -> None:
                 "service",
                 parent.entity_id,
                 {"parent_service_id": parent.entity_id},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught) == {"parent_service_id": ["A service cannot be its own parent"]}
         with pytest.raises(ValidationError) as caught:
@@ -287,8 +270,7 @@ def test_parent_service_rules(db: Db) -> None:
                 "service",
                 parent.entity_id,
                 {"project_id": other.entity_id},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert "project_id" in details_of(caught)
 
@@ -312,7 +294,7 @@ def test_event_date_rules(db: Db, data: dict[str, Any], problem: str) -> None:
     with db.session() as session:
         project = create_project(session)
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "event", None, {"subject_id": project.entity_id, **data}, ALICE)
+            apply_change(session, "event", None, {"subject_id": project.entity_id, **data}, USER)
         assert details_of(caught) == {"date_basis": [problem]}
 
 
@@ -330,13 +312,13 @@ def test_document_rules(db: Db) -> None:
     with db.session() as session:
         with pytest.raises(ValidationError) as caught:
             apply_change(
-                session, "document", None, {"title": "Example", "published": "2020-05"}, ALICE
+                session, "document", None, {"title": "Example", "published": "2020-05"}, USER
             )
         assert details_of(caught) == {
             "published_basis": ["is required when a publication date is set"]
         }
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "document", None, {"title": "Example", "url": EXAMPLE_URL}, ALICE)
+            apply_change(session, "document", None, {"title": "Example", "url": EXAMPLE_URL}, USER)
         assert details_of(caught) == {"retrieved_at": ["is required when a URL is set"]}
         # Collectors set retrieval times themselves; the rule is for channel ui.
         collected = apply_change(
@@ -362,14 +344,14 @@ def test_screening_reason_belongs_to_excluded_documents(db: Db) -> None:
             ({"screening_reason": "reason_a"}, "is allowed only for excluded documents"),
         ):
             with pytest.raises(ValidationError) as caught:
-                apply_change(session, "document", None, {"title": "Example", **data}, ALICE)
+                apply_change(session, "document", None, {"title": "Example", **data}, USER)
             assert details_of(caught) == {"screening_reason": [problem]}
         document_id = apply_change(
             session,
             "document",
             None,
             {"title": "Example", "screening_status": "excluded", "screening_reason": "reason_a"},
-            ALICE,
+            USER,
         ).entity_id
         # Including it again needs the reason cleared in the same change.
         with pytest.raises(ValidationError) as caught:
@@ -378,8 +360,7 @@ def test_screening_reason_belongs_to_excluded_documents(db: Db) -> None:
                 "document",
                 document_id,
                 {"screening_status": "included"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught) == {
             "screening_reason": ["is allowed only for excluded documents"]
@@ -390,28 +371,24 @@ def test_screening_reason_belongs_to_excluded_documents(db: Db) -> None:
                 "document",
                 document_id,
                 {"screening_reason": None},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         apply_change(
             session,
             "document",
             document_id,
             {"screening_status": "included", "screening_reason": None},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         # Other changes do not touch the screening fields and are not checked against them.
-        apply_change(
-            session, "document", document_id, {"title": "Renamed"}, ALICE, expected_version=2
-        )
+        apply_change(session, "document", document_id, {"title": "Renamed"}, USER)
         assert fields_of(session, "document", document_id)["screening_status"] == "included"
 
 
 def test_participation_end_not_before_start(db: Db) -> None:
     with db.session() as session:
         project = create_project(session)
-        org = apply_change(session, "organization", None, {"name_en": "Example org"}, ALICE)
+        org = apply_change(session, "organization", None, {"name_en": "Example org"}, USER)
         base = {
             "organization_id": org.entity_id,
             "subject_id": project.entity_id,
@@ -419,11 +396,11 @@ def test_participation_end_not_before_start(db: Db) -> None:
         }
         with pytest.raises(ValidationError) as caught:
             apply_change(
-                session, "participation", None, {**base, "start": "2020-05", "end": "2020"}, ALICE
+                session, "participation", None, {**base, "start": "2020-05", "end": "2020"}, USER
             )
         assert details_of(caught) == {"end": ["must not be before the start"]}
         apply_change(
-            session, "participation", None, {**base, "start": "2020-Q2", "end": "2020-04"}, ALICE
+            session, "participation", None, {**base, "start": "2020-Q2", "end": "2020-04"}, USER
         )
 
 
@@ -440,7 +417,7 @@ def test_relation_ends_must_differ(db: Db) -> None:
                     "to_id": project.entity_id,
                     "relation_type": "relates_a",
                 },
-                ALICE,
+                USER,
             )
         assert details_of(caught) == {"to_id": ["must differ from from_id"]}
 
@@ -466,23 +443,23 @@ def test_evidence_targets(db: Db, target: str, valid: bool) -> None:
         project = create_project(session)
         data = {"subject_id": project.entity_id, "target": target, "url": EXAMPLE_URL}
         if valid:
-            assert apply_change(session, "evidence", None, data, ALICE).changed
+            assert apply_change(session, "evidence", None, data, USER).changed
         else:
             with pytest.raises(ValidationError) as caught:
-                apply_change(session, "evidence", None, data, ALICE)
+                apply_change(session, "evidence", None, data, USER)
             assert set(details_of(caught)) == {"target"}
 
 
 def test_evidence_target_must_not_be_a_system_field(db: Db) -> None:
     with db.session() as session:
-        document = apply_change(session, "document", None, {"title": "Example"}, ALICE)
+        document = apply_change(session, "document", None, {"title": "Example"}, USER)
         with pytest.raises(ValidationError):
             apply_change(
                 session,
                 "evidence",
                 None,
                 {"subject_id": document.entity_id, "target": "field:text_hash", "url": EXAMPLE_URL},
-                ALICE,
+                USER,
             )
 
 
@@ -491,10 +468,10 @@ def test_evidence_needs_a_document_or_url_and_a_retrieval_time(db: Db) -> None:
         project = create_project(session)
         base = {"subject_id": project.entity_id, "target": "entity"}
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "evidence", None, base, ALICE)
+            apply_change(session, "evidence", None, base, USER)
         assert set(details_of(caught)) == {"document_id", "url"}
         # Without a document, retrieved_at defaults to now on channel ui ...
-        created = apply_change(session, "evidence", None, {**base, "url": EXAMPLE_URL}, ALICE)
+        created = apply_change(session, "evidence", None, {**base, "url": EXAMPLE_URL}, USER)
         row = load(session, "evidence", created.entity_id)
         assert row["retrieved_at"] == row["created_at"]
         assert "retrieved_at" in row["field_meta"]
@@ -510,8 +487,7 @@ def test_evidence_needs_a_document_or_url_and_a_retrieval_time(db: Db) -> None:
                 "evidence",
                 created.entity_id,
                 {"retrieved_at": None},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert "retrieved_at" in details_of(caught)
 
@@ -524,13 +500,11 @@ def test_evidence_copies_the_target_value_and_has_create_only_fields(db: Db) -> 
             "evidence",
             None,
             {"subject_id": project.entity_id, "target": "field:name_en", "url": EXAMPLE_URL},
-            ALICE,
+            USER,
         )
         row = load(session, "evidence", created.entity_id)
         assert row["value_snapshot"] == "Value at creation"
-        apply_change(
-            session, "project", project.entity_id, {"name_en": "Later"}, ALICE, expected_version=1
-        )
+        apply_change(session, "project", project.entity_id, {"name_en": "Later"}, USER)
         assert load(session, "evidence", created.entity_id)["value_snapshot"] == (
             "Value at creation"
         )
@@ -540,8 +514,7 @@ def test_evidence_copies_the_target_value_and_has_create_only_fields(db: Db) -> 
                 "evidence",
                 created.entity_id,
                 {"target": "entity"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught) == {"target": ["can only be set when the record is created"]}
         with pytest.raises(ValidationError):
@@ -550,8 +523,7 @@ def test_evidence_copies_the_target_value_and_has_create_only_fields(db: Db) -> 
                 "evidence",
                 created.entity_id,
                 {"value_snapshot": "forged"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
 
 
@@ -560,24 +532,24 @@ def test_evidence_for_a_char_range(db: Db) -> None:
         project = create_project(session)
         base = {"subject_id": project.entity_id, "target": "entity", "url": EXAMPLE_URL}
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "evidence", None, {**base, "char_start": 5, "char_end": 2}, ALICE)
+            apply_change(session, "evidence", None, {**base, "char_start": 5, "char_end": 2}, USER)
         assert details_of(caught) == {"char_end": ["must not be before char_start"]}
         with pytest.raises(ValidationError):
-            apply_change(session, "evidence", None, {**base, "char_start": -1}, ALICE)
+            apply_change(session, "evidence", None, {**base, "char_start": -1}, USER)
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "evidence", None, {**base, "quote": "q" * 1001}, ALICE)
+            apply_change(session, "evidence", None, {**base, "quote": "q" * 1001}, USER)
         assert "quote" in details_of(caught)
 
 
 def test_saved_view_rules(db: Db) -> None:
     with db.session() as session:
         base = {"name": "Example view", "entity_type": "project", "query": "f.status=in:active"}
-        assert apply_change(session, "saved_view", None, base, ALICE).changed
+        assert apply_change(session, "saved_view", None, base, USER).changed
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "saved_view", None, {**base, "entity_type": "evidence"}, ALICE)
+            apply_change(session, "saved_view", None, {**base, "entity_type": "evidence"}, USER)
         assert "entity_type" in details_of(caught)
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "saved_view", None, {**base, "query": "?sort=slug"}, ALICE)
+            apply_change(session, "saved_view", None, {**base, "query": "?sort=slug"}, USER)
         assert "query" in details_of(caught)
 
 
@@ -589,26 +561,25 @@ def test_saved_view_rules(db: Db) -> None:
 def test_new_terms_and_their_rules(db: Db) -> None:
     with db.session() as session:
         base = {"vocabulary": "status", "code": "example_status", "label_en": "Example status"}
-        created = apply_change(session, "vocabulary_term", None, base, ALICE)
+        created = apply_change(session, "vocabulary_term", None, base, USER)
         assert created.changed
         with pytest.raises(UniqueViolationError) as caught:
-            apply_change(session, "vocabulary_term", None, base, ALICE)
+            apply_change(session, "vocabulary_term", None, base, USER)
         assert caught.value.details is not None
         assert caught.value.details["field"] == "code"
         assert caught.value.details["existing"]["label"] == "status:example_status"
         with pytest.raises(ValidationError) as caught_validation:
-            apply_change(session, "vocabulary_term", None, {**base, "vocabulary": "nope"}, ALICE)
+            apply_change(session, "vocabulary_term", None, {**base, "vocabulary": "nope"}, USER)
         assert "vocabulary" in details_of(caught_validation)
         with pytest.raises(ValidationError):
-            apply_change(session, "vocabulary_term", None, {**base, "code": "Bad-Code"}, ALICE)
+            apply_change(session, "vocabulary_term", None, {**base, "code": "Bad-Code"}, USER)
         with pytest.raises(ValidationError) as caught_validation:
             apply_change(
                 session,
                 "vocabulary_term",
                 created.entity_id,
                 {"code": "renamed"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught_validation) == {
             "code": ["can only be set when the record is created"]
@@ -623,7 +594,7 @@ def test_fixed_codes(db: Db) -> None:
                 "vocabulary_term",
                 None,
                 {"vocabulary": "period", "code": "example_period", "label_en": "Example"},
-                ALICE,
+                USER,
             )
         with pytest.raises(FixedCodeError):
             apply_change(
@@ -636,21 +607,18 @@ def test_fixed_codes(db: Db) -> None:
                     "label_en": "Example",
                     "attributes": {"fixed": True},
                 },
-                ALICE,
+                USER,
             )
         launch = term_id(session, "event_type", "launch")
         with pytest.raises(FixedCodeError):
-            apply_change(
-                session, "vocabulary_term", launch, {"active": False}, ALICE, expected_version=1
-            )
+            apply_change(session, "vocabulary_term", launch, {"active": False}, USER)
         with pytest.raises(FixedCodeError):
             apply_change(
                 session,
                 "vocabulary_term",
                 launch,
                 {"attributes": {"counts_as_modification": False}},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         # Labels and definitions of fixed codes stay editable.
         assert apply_change(
@@ -658,21 +626,18 @@ def test_fixed_codes(db: Db) -> None:
             "vocabulary_term",
             launch,
             {"label_en": "Example launch label", "definition": "Edited."},
-            ALICE,
-            expected_version=1,
+            USER,
         ).changed
         verified = term_id(session, "verification_status", "verified")
         with pytest.raises(FixedCodeError):
-            apply_change(
-                session, "vocabulary_term", verified, {"active": False}, ALICE, expected_version=1
-            )
+            apply_change(session, "vocabulary_term", verified, {"active": False}, USER)
         # New terms in vocabularies with only some fixed codes are allowed.
         assert apply_change(
             session,
             "vocabulary_term",
             None,
             {"vocabulary": "event_type", "code": "example_event", "label_en": "Example"},
-            ALICE,
+            USER,
         ).changed
 
 
@@ -685,8 +650,7 @@ def test_replaced_by_rules(db: Db) -> None:
                 "vocabulary_term",
                 planned,
                 {"replaced_by": "active"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
         assert details_of(caught) == {"replaced_by": ["is allowed only for inactive terms"]}
         for code, message in (
@@ -700,8 +664,7 @@ def test_replaced_by_rules(db: Db) -> None:
                     "vocabulary_term",
                     planned,
                     {"active": False, "replaced_by": code},
-                    ALICE,
-                    expected_version=1,
+                    USER,
                 )
             assert details_of(caught) == {"replaced_by": [message]}
         result = apply_change(
@@ -709,14 +672,11 @@ def test_replaced_by_rules(db: Db) -> None:
             "vocabulary_term",
             planned,
             {"active": False, "replaced_by": "active"},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert result.changed
         with pytest.raises(ValidationError):
-            apply_change(
-                session, "vocabulary_term", planned, {"active": True}, ALICE, expected_version=2
-            )
+            apply_change(session, "vocabulary_term", planned, {"active": True}, USER)
 
 
 def test_term_attributes_must_be_an_object(db: Db) -> None:
@@ -726,7 +686,7 @@ def test_term_attributes_must_be_an_object(db: Db) -> None:
             "vocabulary_term",
             None,
             {"vocabulary": "status", "code": "x_y", "label_en": "X", "attributes": [1]},
-            ALICE,
+            USER,
         )
     assert details_of(caught) == {"attributes": ["must be an object"]}
 
@@ -745,7 +705,7 @@ def test_slug_is_unique_including_deleted_rows(db: Db) -> None:
             "field": "slug",
             "existing": {"id": first.entity_id, "label": "First example", "deleted": False},
         }
-        soft_delete(session, "project", first.entity_id, ALICE, expected_version=1)
+        soft_delete(session, "project", first.entity_id, USER)
         with pytest.raises(UniqueViolationError) as caught:
             create_project(session, slug="example-unique")
         assert caught.value.details is not None
@@ -757,21 +717,20 @@ def test_slug_is_unique_including_deleted_rows(db: Db) -> None:
                 "project",
                 other.entity_id,
                 {"slug": "example-unique"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
 
 
 def test_organization_slugs_may_be_empty(db: Db) -> None:
     with db.session() as session:
-        apply_change(session, "organization", None, {"name_en": "Example org one"}, ALICE)
-        apply_change(session, "organization", None, {"name_en": "Example org two"}, ALICE)
+        apply_change(session, "organization", None, {"name_en": "Example org one"}, USER)
+        apply_change(session, "organization", None, {"name_en": "Example org two"}, USER)
         apply_change(
-            session, "organization", None, {"name_en": "Example three", "slug": "org-x"}, ALICE
+            session, "organization", None, {"name_en": "Example three", "slug": "org-x"}, USER
         )
         with pytest.raises(UniqueViolationError):
             apply_change(
-                session, "organization", None, {"name_en": "Example four", "slug": "org-x"}, ALICE
+                session, "organization", None, {"name_en": "Example four", "slug": "org-x"}, USER
             )
 
 
@@ -782,32 +741,32 @@ def test_canonical_url_is_unique_among_live_documents(db: Db) -> None:
             "url": "https://example.org/doc",
             "retrieved_at": "2026-10-28T10:00:00Z",
         }
-        first = apply_change(session, "document", None, data, ALICE)
+        first = apply_change(session, "document", None, data, USER)
         with pytest.raises(UniqueViolationError) as caught:
             apply_change(
-                session, "document", None, {**data, "url": "https://EXAMPLE.org/doc/#x"}, ALICE
+                session, "document", None, {**data, "url": "https://EXAMPLE.org/doc/#x"}, USER
             )
         assert caught.value.details is not None
         assert caught.value.details["field"] == "canonical_url"
-        soft_delete(session, "document", first.entity_id, ALICE, expected_version=1)
-        assert apply_change(session, "document", None, data, ALICE).changed
+        soft_delete(session, "document", first.entity_id, USER)
+        assert apply_change(session, "document", None, data, USER).changed
 
 
 def test_evidence_retrieved_at_defaults_to_now_on_channel_ui_only(db: Db) -> None:
     with db.session() as session:
         project = create_project(session)
-        document = apply_change(session, "document", None, {"title": "Example"}, ALICE)
+        document = apply_change(session, "document", None, {"title": "Example"}, USER)
         base = {
             "subject_id": project.entity_id,
             "target": "entity",
             "document_id": document.entity_id,
         }
-        cited = apply_change(session, "evidence", None, base, ALICE).entity_id
+        cited = apply_change(session, "evidence", None, base, USER).entity_id
         row = load(session, "evidence", cited)
         assert row["retrieved_at"] == row["created_at"]
         imported = apply_change(session, "evidence", None, base, Actor.importer("x.csv")).entity_id
         assert load(session, "evidence", imported)["retrieved_at"] is None
         explicit = apply_change(
-            session, "evidence", None, {**base, "retrieved_at": "2026-01-02T03:04:05Z"}, ALICE
+            session, "evidence", None, {**base, "retrieved_at": "2026-01-02T03:04:05Z"}, USER
         ).entity_id
         assert load(session, "evidence", explicit)["retrieved_at"] == "2026-01-02T03:04:05.000000Z"

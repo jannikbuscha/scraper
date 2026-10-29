@@ -20,12 +20,11 @@ from mdt.domain.feeds import (
     entity_revision,
     entity_revisions,
     recent_changes,
-    revision_authors,
     revision_by_id,
 )
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, BOB, create_project, create_service, revisions_of
+from tests.helpers import USER, create_project, create_service, revisions_of
 from tests.read_helpers import term_id, update
 
 FEED_KEYS = {
@@ -56,20 +55,20 @@ def history(db: Db) -> dict[str, Any]:
     """A small history: create, update, comment, resolve, term edit, saved view, delete."""
     with db.session() as session:
         project = create_project(session, name_en="Feed project").entity_id
-        update(session, "project", project, BOB, notes="Checked")
-        comment = create_comment(session, project, "Feed comment", ALICE, field="name_en")
-        reply = create_comment(session, project, "Feed reply", BOB, parent_id=comment.entity_id)
-        resolve_comment(session, comment.entity_id, BOB, expected_version=1)
+        update(session, "project", project, USER, notes="Checked")
+        comment = create_comment(session, project, "Feed comment", USER, field="name_en")
+        reply = create_comment(session, project, "Feed reply", USER, parent_id=comment.entity_id)
+        resolve_comment(session, comment.entity_id, USER)
         term = term_id(session, "status", "active")
-        update(session, "vocabulary_term", term, ALICE, definition="Edited definition.")
+        update(session, "vocabulary_term", term, USER, definition="Edited definition.")
         view = apply_change(
             session,
             "saved_view",
             None,
             {"name": "Feed view", "entity_type": "project", "query": "sort=name_en"},
-            ALICE,
+            USER,
         ).entity_id
-        deleted = soft_delete(session, "project", project, BOB, expected_version=2)
+        deleted = soft_delete(session, "project", project, USER)
         return {
             "project": project,
             "comment": comment.entity_id,
@@ -96,7 +95,7 @@ def test_recent_changes_newest_first_with_labels_and_changed_fields(
     assert (newest["entity_id"], newest["action"], newest["author"]) == (
         history["project"],
         "delete",
-        BOB.name,
+        USER.name,
     )
     assert newest["entity_label"] == "Feed project"  # deleted rows keep their label
     assert newest["changed_fields"] == ["deleted"]
@@ -106,11 +105,9 @@ def test_recent_changes_newest_first_with_labels_and_changed_fields(
 
 
 def test_recent_changes_filters(db: Db, history: dict[str, Any]) -> None:
-    bob = feed(db, author=BOB.name)["items"]
-    assert {item["author"] for item in bob} == {BOB.name}
-    assert len(bob) == 4  # update, reply, resolve, delete
-    both = feed(db, author=f"{ALICE.name},{BOB.name}", page_size="500")["total"]
-    assert both == 8
+    ui = feed(db, channel="ui", page_size="500")
+    assert ui["total"] == 8
+    assert {item["author"] for item in ui["items"]} == {"user"}
     project_history = feed(db, entity_id=history["project"])["items"]
     assert [item["action"] for item in project_history] == ["delete", "update", "create"]
     assert project_history[1]["changed_fields"] == ["notes"]
@@ -173,9 +170,6 @@ def test_recent_changes_time_bounds_are_inclusive(db: Db, history: dict[str, Any
         {"action": "edit"},
         {"entity_type": "unknown"},
         {"page_size": "501"},
-        # instants outside the datetime range once converted to UTC
-        {"since": "0001-01-01T00:00:00+14:00"},
-        {"until": "9999-12-31T23:59:59-01:00"},
     ],
 )
 def test_recent_changes_rejects_invalid_parameters(db: Db, params: dict[str, str]) -> None:
@@ -200,11 +194,6 @@ def test_recent_changes_accepts_early_and_late_years(
     assert feed(db, **params)["total"] == expected
 
 
-def test_revision_authors(db: Db, history: dict[str, Any]) -> None:
-    with db.session() as session:
-        assert revision_authors(session) == {"authors": [ALICE.name, BOB.name, "seed"]}
-
-
 # --------------------------------------------------------------------------------------
 # Comment threads of one subject
 # --------------------------------------------------------------------------------------
@@ -215,29 +204,27 @@ def threads(db: Db) -> dict[str, str]:
     with db.session() as session:
         subject = create_project(session, name_en="Thread subject").entity_id
         ids = {"subject": subject}
-        ids["root1"] = create_comment(
-            session, subject, "Root one", ALICE, field="name_en"
-        ).entity_id
-        ids["root2"] = create_comment(session, subject, "Root two", BOB).entity_id
+        ids["root1"] = create_comment(session, subject, "Root one", USER, field="name_en").entity_id
+        ids["root2"] = create_comment(session, subject, "Root two", USER).entity_id
         ids["r1"] = create_comment(
-            session, subject, "Reply 1", BOB, parent_id=ids["root1"]
+            session, subject, "Reply 1", USER, parent_id=ids["root1"]
         ).entity_id
         ids["r2"] = create_comment(
-            session, subject, "Reply 2", ALICE, parent_id=ids["root1"]
+            session, subject, "Reply 2", USER, parent_id=ids["root1"]
         ).entity_id
         ids["root3"] = create_comment(
-            session, subject, "Root three", ALICE, field="status"
+            session, subject, "Root three", USER, field="status"
         ).entity_id
-        resolve_comment(session, ids["root3"], ALICE, expected_version=1)
-        ids["root4"] = create_comment(session, subject, "Root four", ALICE).entity_id
+        resolve_comment(session, ids["root3"], USER)
+        ids["root4"] = create_comment(session, subject, "Root four", USER).entity_id
         ids["r3"] = create_comment(
-            session, subject, "Reply 3", BOB, parent_id=ids["root4"]
+            session, subject, "Reply 3", USER, parent_id=ids["root4"]
         ).entity_id
-        delete_comment(session, ids["root4"], ALICE, expected_version=1)
+        delete_comment(session, ids["root4"], USER)
         ids["r4"] = create_comment(
-            session, subject, "Reply 4", BOB, parent_id=ids["root2"]
+            session, subject, "Reply 4", USER, parent_id=ids["root2"]
         ).entity_id
-        delete_comment(session, ids["r4"], BOB, expected_version=1)
+        delete_comment(session, ids["r4"], USER)
         return ids
 
 
@@ -303,15 +290,15 @@ def comment_feed(db: Db) -> dict[str, str]:
         service = create_service(session, project, name_en="Feed service").entity_id
         term = term_id(session, "status", "planned")
         ids = {"project": project}
-        ids["A"] = create_comment(session, project, "Check the launch date", ALICE).entity_id
-        ids["B"] = create_comment(session, service, "Typo in the name", BOB).entity_id
-        ids["C"] = create_comment(session, term, "Definition unclear", ALICE).entity_id
+        ids["A"] = create_comment(session, project, "Check the launch date", USER).entity_id
+        ids["B"] = create_comment(session, service, "Typo in the name", USER).entity_id
+        ids["C"] = create_comment(session, term, "Definition unclear", USER).entity_id
         ids["reply"] = create_comment(
-            session, project, "I found the source document", BOB, parent_id=ids["A"]
+            session, project, "I found the source document", USER, parent_id=ids["A"]
         ).entity_id
-        ids["D"] = create_comment(session, project, "Obsolete remark", ALICE).entity_id
-        delete_comment(session, ids["D"], ALICE, expected_version=1)
-        resolve_comment(session, ids["B"], BOB, expected_version=1)
+        ids["D"] = create_comment(session, project, "Obsolete remark", USER).entity_id
+        delete_comment(session, ids["D"], USER)
+        resolve_comment(session, ids["B"], USER)
         return ids
 
 
@@ -344,8 +331,6 @@ def test_comment_feed_filters(db: Db, comment_feed: dict[str, str]) -> None:
     assert feed_roots(db, comment_feed, status="resolved") == ["B"]
     assert feed_roots(db, comment_feed, entity_type="project") == ["A"]
     assert feed_roots(db, comment_feed, entity_type="service,vocabulary_term") == ["B", "C"]
-    assert feed_roots(db, comment_feed, author=BOB.name) == ["B", "A"]  # A has Bob's reply
-    assert feed_roots(db, comment_feed, author=ALICE.name) == ["A", "C"]
     assert feed_roots(db, comment_feed, q="source") == ["A"]  # matches the reply
     assert feed_roots(db, comment_feed, q="TYPO") == ["B"]
     assert feed_roots(db, comment_feed, q="- .") == []
@@ -358,13 +343,13 @@ def test_comment_feed_filters(db: Db, comment_feed: dict[str, str]) -> None:
 def test_comment_trash_lists_the_newest_deletion_first(db: Db) -> None:
     with db.session() as session:
         project = create_project(session, name_en="Trash subject").entity_id
-        early = create_comment(session, project, "Deleted first", ALICE).entity_id
-        reply = create_comment(session, project, "A reply", BOB, parent_id=early).entity_id
-        late = create_comment(session, project, "Deleted second", ALICE).entity_id
-        delete_comment(session, early, ALICE, expected_version=1)
-        delete_comment(session, late, ALICE, expected_version=1)
+        early = create_comment(session, project, "Deleted first", USER).entity_id
+        reply = create_comment(session, project, "A reply", USER, parent_id=early).entity_id
+        late = create_comment(session, project, "Deleted second", USER).entity_id
+        delete_comment(session, early, USER)
+        delete_comment(session, late, USER)
         # Activity in the earlier deleted thread after the second deletion.
-        edit_comment(session, reply, "An edited reply", BOB, expected_version=1)
+        edit_comment(session, reply, "An edited reply", USER)
     ids = {"early": early, "late": late}
     # By deletion time, not by last activity (which would put "early" first).
     assert feed_roots(db, ids, deleted="only") == ["late", "early"]
@@ -389,9 +374,9 @@ def moved_service(db: Db) -> dict[str, str]:
         first = create_project(session, name_en="First project").entity_id
         second = create_project(session, name_en="Second project").entity_id
         service = create_service(session, first, name_en="Moved service").entity_id
-        update(session, "service", service, BOB, project_id=second)
-        comment = create_comment(session, service, "Before", ALICE).entity_id
-        edit_comment(session, comment, "After", ALICE, expected_version=1)
+        update(session, "service", service, USER, project_id=second)
+        comment = create_comment(session, service, "Before", USER).entity_id
+        edit_comment(session, comment, "After", USER)
         return {"first": first, "second": second, "service": service, "comment": comment}
 
 

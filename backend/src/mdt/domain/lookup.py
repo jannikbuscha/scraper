@@ -26,7 +26,6 @@ from mdt.domain.fieldsql import Source, label_expression
 from mdt.domain.fts import build_match_query
 from mdt.domain.labels import RefInfo, ref_infos
 from mdt.domain.listquery import (
-    MAX_FILTER_VALUES,
     FieldFilter,
     QueryParams,
     filter_params,
@@ -57,11 +56,8 @@ def lookup(session: Session, params: QueryParams) -> dict[str, Any]:
     pairs = param_pairs(params)
     raw_ids = last_param(pairs, "ids")
     if raw_ids is not None:
-        ids = split_list(raw_ids)
-        if len(ids) > MAX_FILTER_VALUES:
-            raise ValidationError.single("ids", f"must list at most {MAX_FILTER_VALUES} IDs")
         with read_transaction(session):
-            return {"items": _items(session, ids)}
+            return {"items": _items(session, split_list(raw_ids))}
     types = _types(last_param(pairs, "types"))
     limit = parse_int_param("limit", last_param(pairs, "limit"), DEFAULT_LIMIT, 1, MAX_LIMIT)
     filters = _filters_per_type(types, filter_params(pairs))

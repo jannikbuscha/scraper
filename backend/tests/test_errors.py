@@ -6,7 +6,6 @@ import pytest
 
 from mdt.domain import errors
 from mdt.domain.errors import (
-    ConflictError,
     DomainError,
     EntityDeletedError,
     HasDependentsError,
@@ -20,17 +19,11 @@ from mdt.domain.errors import (
 
 API_CODES = {
     "validation_error": 400,
-    "author_required": 400,
-    "author_invalid": 400,
-    "invalid_host": 400,
     "bad_filter": 400,
     "bad_sort": 400,
     "evidence_required": 400,
-    "export_too_large": 400,
-    "cross_origin_forbidden": 403,
     "not_found": 404,
     "method_not_allowed": 405,
-    "conflict": 409,
     "entity_deleted": 409,
     "invalid_state": 409,
     "has_dependents": 409,
@@ -38,12 +31,7 @@ API_CODES = {
     "reference_deleted": 409,
     "not_deletable": 409,
     "fixed_code": 409,
-    "payload_too_large": 413,
-    "uri_too_long": 414,
-    "unsupported_media_type": 415,
-    "busy": 429,
     "internal_error": 500,
-    "database_busy": 503,
 }
 
 
@@ -72,9 +60,9 @@ def test_error_payloads() -> None:
         "message": "Invalid input",
         "details": {"name_en": ["is required"]},
     }
-    assert EntityDeletedError("2026-01-01T00:00:00.000000Z", "Alice").details == {
+    assert EntityDeletedError("2026-01-01T00:00:00.000000Z", "user").details == {
         "deleted_at": "2026-01-01T00:00:00.000000Z",
-        "deleted_by": "Alice",
+        "deleted_by": "user",
     }
     assert InvalidStateError("deleted").details == {"state": "deleted"}
     assert HasDependentsError({"service": 12}).details == {"service": 12}
@@ -86,8 +74,6 @@ def test_error_payloads() -> None:
         "label": "Label",
     }
     assert InternalError("req-1").details == {"request_id": "req-1"}
-    conflict = ConflictError({"action": "patch"})
-    assert conflict.payload == {"action": "patch"} and conflict.status == 409
 
 
 def test_problems_collects_and_raises_together() -> None:

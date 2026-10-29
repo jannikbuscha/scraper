@@ -17,8 +17,7 @@ from mdt.domain.errors import (
 from mdt.domain.revisions import apply_change, set_field_verification, soft_delete
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     assert_matches_latest_snapshot,
     create_evidence,
     create_project,
@@ -35,7 +34,7 @@ def test_verified_needs_matching_live_evidence(db: Db) -> None:
         wrong_field = create_evidence(session, project_id, "slug").entity_id
         wrong_subject = create_evidence(session, other_id, "name_en").entity_id
         deleted = create_evidence(session, project_id, "name_en").entity_id
-        soft_delete(session, "evidence", deleted, ALICE, expected_version=1)
+        soft_delete(session, "evidence", deleted, USER)
         for evidence_id in (None, wrong_field, wrong_subject, deleted, "evd_unknown"):
             with pytest.raises(EvidenceRequiredError):
                 set_field_verification(
@@ -44,16 +43,16 @@ def test_verified_needs_matching_live_evidence(db: Db) -> None:
                     project_id,
                     "name_en",
                     "verified",
-                    ALICE,
+                    USER,
                     evidence_id=evidence_id,
-                    expected_version=1,
                 )
         assert load(session, "project", project_id)["version"] == 1
 
 
 def test_verification_sets_status_evidence_and_lock(db: Db) -> None:
+    importer = Actor.importer("example.xlsx")
     with db.session() as session:
-        project_id = create_project(session).entity_id
+        project_id = create_project(session, importer).entity_id
         evidence_id = create_evidence(session, project_id, "name_en").entity_id
         result = set_field_verification(
             session,
@@ -61,25 +60,25 @@ def test_verification_sets_status_evidence_and_lock(db: Db) -> None:
             project_id,
             "name_en",
             "verified",
-            BOB,
+            USER,
             note="Checked",
             evidence_id=evidence_id,
-            expected_version=1,
         )
         assert result.changed and result.version == 2
         row = load(session, "project", project_id)
+        # The entry keeps the value's provenance; the revision names the verifier.
         assert row["field_meta"]["name_en"] == {
-            "src": "manual:Alice Example",
-            "by": ALICE.by,
+            "src": "import:example.xlsx",
+            "by": importer.by,
             "at": row["updated_at"],
             "locked": True,
             "verified": "verified",
             "evidence_id": evidence_id,
             "restored_from_version": None,
         }
-        assert row["updated_by"] == BOB.by
+        assert row["updated_by"] == USER.by
         revision = revisions_of(session, project_id)[-1]
-        assert (revision.action, revision.note, revision.author) == ("verify", "Checked", BOB.by)
+        assert (revision.action, revision.note, revision.author) == ("verify", "Checked", USER.by)
         assert revision.diff == {
             "meta": {
                 "name_en": {
@@ -95,13 +94,12 @@ def test_verification_sets_status_evidence_and_lock(db: Db) -> None:
             project_id,
             "name_en",
             "verified",
-            BOB,
+            USER,
             evidence_id=evidence_id,
-            expected_version=2,
         )
         assert (again.changed, again.revision_id) == (False, None)
         # A value change resets the verification.
-        apply_change(session, "project", project_id, {"name_en": "New"}, ALICE, expected_version=2)
+        apply_change(session, "project", project_id, {"name_en": "New"}, USER)
         entry = load(session, "project", project_id)["field_meta"]["name_en"]
         assert (entry["verified"], entry["evidence_id"]) == ("unverified", None)
     assert_matches_latest_snapshot(db, "project", project_id)
@@ -117,14 +115,11 @@ def test_disputed_needs_a_note_and_clears_the_evidence(db: Db) -> None:
             project_id,
             "slug",
             "verified",
-            ALICE,
+            USER,
             evidence_id=evidence_id,
-            expected_version=1,
         )
         with pytest.raises(ValidationError) as caught:
-            set_field_verification(
-                session, "project", project_id, "slug", "disputed", BOB, expected_version=2
-            )
+            set_field_verification(session, "project", project_id, "slug", "disputed", USER)
         assert caught.value.details == {"note": ["A note is required when a field is disputed"]}
         set_field_verification(
             session,
@@ -132,9 +127,8 @@ def test_disputed_needs_a_note_and_clears_the_evidence(db: Db) -> None:
             project_id,
             "slug",
             "disputed",
-            BOB,
+            USER,
             note="The source says otherwise.",
-            expected_version=2,
         )
         entry = load(session, "project", project_id)["field_meta"]["slug"]
         assert (entry["verified"], entry["evidence_id"], entry["locked"]) == (
@@ -142,9 +136,7 @@ def test_disputed_needs_a_note_and_clears_the_evidence(db: Db) -> None:
             None,
             True,
         )
-        set_field_verification(
-            session, "project", project_id, "slug", "unverified", BOB, expected_version=3
-        )
+        set_field_verification(session, "project", project_id, "slug", "unverified", USER)
         assert load(session, "project", project_id)["field_meta"]["slug"]["verified"] == (
             "unverified"
         )
@@ -165,9 +157,7 @@ def test_fields_that_cannot_be_verified(db: Db, field: str, status: str, path: s
     with db.session() as session:
         project_id = create_project(session).entity_id
         with pytest.raises(ValidationError) as caught:
-            set_field_verification(
-                session, "project", project_id, field, status, ALICE, expected_version=1
-            )
+            set_field_verification(session, "project", project_id, field, status, USER)
         assert path in (caught.value.details or {})
 
 
@@ -182,7 +172,7 @@ def test_system_fields_cannot_be_verified(db: Db) -> None:
                 "url": "https://example.org/doc",
                 "retrieved_at": "2026-10-28T10:00:00Z",
             },
-            ALICE,
+            USER,
         ).entity_id
         with pytest.raises(ValidationError):
             set_field_verification(
@@ -191,24 +181,19 @@ def test_system_fields_cannot_be_verified(db: Db) -> None:
                 document_id,
                 "canonical_url",
                 "unverified",
-                ALICE,
-                expected_version=1,
+                USER,
             )
 
 
 def test_verification_of_deleted_rows_and_comments(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session).entity_id
-        comment_id = create_comment(session, project_id, "Example comment", ALICE).entity_id
+        comment_id = create_comment(session, project_id, "Example comment", USER).entity_id
         with pytest.raises(ValidationError):
-            set_field_verification(
-                session, "comment", comment_id, "body_md", "unverified", ALICE, expected_version=1
-            )
-        soft_delete(session, "project", project_id, ALICE, expected_version=1)
+            set_field_verification(session, "comment", comment_id, "body_md", "unverified", USER)
+        soft_delete(session, "project", project_id, USER)
         with pytest.raises(EntityDeletedError):
-            set_field_verification(
-                session, "project", project_id, "slug", "unverified", ALICE, expected_version=2
-            )
+            set_field_verification(session, "project", project_id, "slug", "unverified", USER)
 
 
 def test_verification_locks_collector_values(db: Db) -> None:
@@ -216,9 +201,7 @@ def test_verification_locks_collector_values(db: Db) -> None:
     with db.session() as session:
         project_id = apply_change(session, "project", None, project_data(), collector).entity_id
         assert load(session, "project", project_id)["field_meta"]["name_en"]["locked"] is False
-        set_field_verification(
-            session, "project", project_id, "name_en", "unverified", ALICE, expected_version=1
-        )
+        set_field_verification(session, "project", project_id, "name_en", "unverified", USER)
         entry = load(session, "project", project_id)["field_meta"]["name_en"]
         assert entry["locked"] is True and entry["src"] == "collector:example@run_01"
         with pytest.raises(LockedFieldError):
@@ -232,9 +215,8 @@ def _verify(session: Session, project_id: str, evidence_id: str, version: int) -
         project_id,
         "name_en",
         "verified",
-        ALICE,
+        USER,
         evidence_id=evidence_id,
-        expected_version=version,
     )
 
 
@@ -247,17 +229,13 @@ def test_evidence_of_a_verified_field_cannot_be_deleted(db: Db) -> None:
         _verify(session, project_id, evidence_id, 1)
         for cascade in (False, True):
             with pytest.raises(HasDependentsError) as caught:
-                soft_delete(
-                    session, "evidence", evidence_id, BOB, expected_version=1, cascade=cascade
-                )
+                soft_delete(session, "evidence", evidence_id, USER, cascade=cascade)
             assert caught.value.details == {"field_verification": 1}
         assert load(session, "evidence", evidence_id)["deleted_at"] is None
         assert len(revisions_of(session, evidence_id)) == 1
         # Withdrawing the verification frees the evidence.
-        set_field_verification(
-            session, "project", project_id, "name_en", "unverified", BOB, expected_version=2
-        )
-        soft_delete(session, "evidence", evidence_id, BOB, expected_version=1, note="Wrong source")
+        set_field_verification(session, "project", project_id, "name_en", "unverified", USER)
+        soft_delete(session, "evidence", evidence_id, USER, note="Wrong source")
         assert load(session, "evidence", evidence_id)["deleted_at"] is not None
 
 
@@ -268,12 +246,12 @@ def test_evidence_that_no_verification_rests_on_can_be_deleted(db: Db) -> None:
         spare = create_evidence(session, project_id, "name_en").entity_id
         entity_level = create_evidence(session, project_id, "slug", target="entity").entity_id
         _verify(session, project_id, used, 1)
-        soft_delete(session, "evidence", spare, ALICE, expected_version=1)
-        soft_delete(session, "evidence", entity_level, ALICE, expected_version=1)
+        soft_delete(session, "evidence", spare, USER)
+        soft_delete(session, "evidence", entity_level, USER)
         # Re-verifying with other evidence moves the verification; the old row is free.
         replacement = create_evidence(session, project_id, "name_en").entity_id
         _verify(session, project_id, replacement, 2)
-        soft_delete(session, "evidence", used, ALICE, expected_version=1)
+        soft_delete(session, "evidence", used, USER)
         # A disputed field keeps no evidence ID, so nothing blocks the delete.
         set_field_verification(
             session,
@@ -281,11 +259,10 @@ def test_evidence_that_no_verification_rests_on_can_be_deleted(db: Db) -> None:
             project_id,
             "name_en",
             "disputed",
-            ALICE,
+            USER,
             note="Sources differ",
-            expected_version=3,
         )
-        soft_delete(session, "evidence", replacement, ALICE, expected_version=1)
+        soft_delete(session, "evidence", replacement, USER)
 
 
 def test_evidence_of_a_deleted_record_stays_protected(db: Db) -> None:
@@ -293,9 +270,9 @@ def test_evidence_of_a_deleted_record_stays_protected(db: Db) -> None:
         project_id = create_project(session).entity_id
         evidence_id = create_evidence(session, project_id, "name_en").entity_id
         _verify(session, project_id, evidence_id, 1)
-        soft_delete(session, "project", project_id, ALICE, expected_version=2)
+        soft_delete(session, "project", project_id, USER)
         with pytest.raises(HasDependentsError):
-            soft_delete(session, "evidence", evidence_id, ALICE, expected_version=1)
+            soft_delete(session, "evidence", evidence_id, USER)
 
 
 def test_verified_needs_evidence_with_a_verbatim_quote(db: Db) -> None:
@@ -307,9 +284,7 @@ def test_verified_needs_evidence_with_a_verbatim_quote(db: Db) -> None:
             _verify(session, project_id, unquoted, 1)
         assert "quote" in caught.value.message
         assert load(session, "project", project_id)["version"] == 1
-        apply_change(
-            session, "evidence", unquoted, {"quote": "Example quote."}, ALICE, expected_version=1
-        )
+        apply_change(session, "evidence", unquoted, {"quote": "Example quote."}, USER)
         _verify(session, project_id, unquoted, 1)
         assert load(session, "project", project_id)["field_meta"]["name_en"]["verified"] == (
             "verified"
@@ -323,9 +298,7 @@ def test_the_quote_of_evidence_in_use_cannot_be_removed(db: Db) -> None:
         spare = create_evidence(session, project_id, "name_en").entity_id
         _verify(session, project_id, used, 1)
         with pytest.raises(ValidationError) as caught:
-            apply_change(session, "evidence", used, {"quote": None}, ALICE, expected_version=1)
+            apply_change(session, "evidence", used, {"quote": None}, USER)
         assert list(caught.value.details or {}) == ["quote"]
-        apply_change(
-            session, "evidence", used, {"quote": "Other quote."}, ALICE, expected_version=1
-        )
-        apply_change(session, "evidence", spare, {"quote": None}, ALICE, expected_version=1)
+        apply_change(session, "evidence", used, {"quote": "Other quote."}, USER)
+        apply_change(session, "evidence", spare, {"quote": None}, USER)

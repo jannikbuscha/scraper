@@ -7,7 +7,6 @@ dependencies = [
     "alembic",
     "fastapi",
     "markdown-it-py[linkify]",
-    "nh3",
     "openpyxl",
     "pydantic>=2",
     "pydantic-settings",

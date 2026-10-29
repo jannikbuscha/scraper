@@ -23,12 +23,13 @@ def test_saved_views_round_trip(client: ApiClient) -> None:
     assert [item["id"] for item in listed] == [view["id"]]
     assert client.list("saved_view", **{"f.entity_type": "eq:event"})["items"] == []
     renamed = client.update("saved_view", view, {"name": "Example view (renamed)"})["item"]
+    assert renamed["version"] == 2
     url = f"/api/entities/saved_view/{view['id']}"
-    client.ok(client.post(f"{url}/delete", {"expected_version": renamed["version"]}))
+    client.ok(client.post(f"{url}/delete", {}))
     assert client.list("saved_view")["items"] == []
     trash = client.list("saved_view", deleted="only")["items"]
     assert [item["fields"]["name"] for item in trash] == ["Example view (renamed)"]
-    client.ok(client.post(f"{url}/undelete", {"expected_version": renamed["version"] + 1}))
+    client.ok(client.post(f"{url}/undelete", {}))
     assert len(client.list("saved_view")["items"]) == 1
 
 
@@ -78,12 +79,12 @@ def test_vocabulary_term_rules(client: ApiClient) -> None:
     launch = _term(client, "event_type", "launch")
     response = client.patch(
         f"/api/entities/vocabulary_term/{launch['id']}",
-        {"expected_version": launch["version"], "changes": {"active": False}},
+        {"changes": {"active": False}},
     )
     assert (response.status_code, error_of(response)["code"]) == (409, "fixed_code")
     response = client.patch(
         f"/api/entities/vocabulary_term/{launch['id']}",
-        {"expected_version": launch["version"], "changes": {"code": "renamed"}},
+        {"changes": {"code": "renamed"}},
     )
     assert error_of(response)["details"] == {"code": ["can only be set when the record is created"]}
     response = client.post(
@@ -165,5 +166,4 @@ def test_search_finds_entities(client: ApiClient) -> None:
     found = client.list("project", q="zephyr")["items"]
     assert [item["id"] for item in found] == [project["id"]]
     assert client.list("project", q="-")["total"] == 0
-    response = client.get("/api/entities/project", {"q": " ".join(["word"] * 17)})
-    assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
+    assert client.list("project", q=" ".join(["zephyr"] * 17))["total"] == 1

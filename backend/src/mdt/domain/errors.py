@@ -44,30 +44,6 @@ class ValidationError(DomainError):
         return cls({path: [message]})
 
 
-class AuthorRequiredError(DomainError):
-    """400: a write without the X-Author header."""
-
-    code = "author_required"
-    status = 400
-    default_message = "The X-Author header is required for writes"
-
-
-class AuthorInvalidError(DomainError):
-    """400: an X-Author header that is malformed, repeated or reserved."""
-
-    code = "author_invalid"
-    status = 400
-    default_message = "The X-Author header is invalid"
-
-
-class InvalidHostError(DomainError):
-    """400: a Host header outside ALLOWED_HOSTS."""
-
-    code = "invalid_host"
-    status = 400
-    default_message = "Invalid Host header"
-
-
 class BadFilterError(DomainError):
     """400: a malformed or unknown list filter."""
 
@@ -92,22 +68,6 @@ class EvidenceRequiredError(DomainError):
     default_message = "Verification requires an evidence record that targets this field"
 
 
-class ExportTooLargeError(DomainError):
-    """400: an export over MAX_EXPORT_ROWS rows."""
-
-    code = "export_too_large"
-    status = 400
-    default_message = "The export has too many rows"
-
-
-class CrossOriginForbiddenError(DomainError):
-    """403: a request that fails the same-origin checks."""
-
-    code = "cross_origin_forbidden"
-    status = 403
-    default_message = "Cross-origin request refused"
-
-
 class NotFoundError(DomainError):
     """404: an unknown entity type, record or version."""
 
@@ -122,24 +82,6 @@ class MethodNotAllowedError(DomainError):
     code = "method_not_allowed"
     status = 405
     default_message = "Method not allowed"
-
-
-class ConflictError(DomainError):
-    """409: the row changed since ``expected_version``; ``details`` is the payload of
-    docs/DATA_MODEL.md §6.5."""
-
-    code = "conflict"
-    status = 409
-    default_message = "The record was changed by someone else"
-
-    def __init__(self, payload: Mapping[str, Any], message: str | None = None):
-        super().__init__(message, payload)
-
-    @property
-    def payload(self) -> dict[str, Any]:
-        """The conflict payload (DATA_MODEL §6.5)."""
-        assert self.details is not None
-        return self.details
 
 
 class EntityDeletedError(DomainError):
@@ -223,49 +165,6 @@ class LockedFieldError(DomainError):
 
     def __init__(self, fields: Sequence[str]):
         super().__init__(details={"fields": sorted(fields)})
-
-
-class PayloadTooLargeError(DomainError):
-    """413: a request body over the size limit."""
-
-    code = "payload_too_large"
-    status = 413
-    default_message = "The request body is too large"
-
-
-class UriTooLongError(DomainError):
-    """414: a query string over the size limit."""
-
-    code = "uri_too_long"
-    status = 414
-    default_message = "The request URI is too long"
-
-
-class UnsupportedMediaTypeError(DomainError):
-    """415: a write that is not application/json."""
-
-    code = "unsupported_media_type"
-    status = 415
-    default_message = "Content-Type must be application/json"
-
-
-class BusyError(DomainError):
-    """429: another export is running."""
-
-    code = "busy"
-    status = 429
-    default_message = "Another export is running"
-
-
-class DatabaseBusyError(DomainError):
-    """503: the database stayed locked by another writer for longer than the busy
-    timeout (e.g. during a long maintenance command), or every connection was in use.
-    Nothing was written; the request can be repeated (the response has Retry-After)."""
-
-    code = "database_busy"
-    status = 503
-    default_message = "The database is busy. Nothing was changed; please try again in a moment."
-    retry_after_seconds: ClassVar[int] = 5
 
 
 class InternalError(DomainError):

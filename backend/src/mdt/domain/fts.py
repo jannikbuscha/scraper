@@ -16,21 +16,14 @@ from sqlalchemy.orm import Session
 
 from mdt.db.models import DocumentText, SearchKey
 from mdt.db.session import read_transaction, write_transaction
-from mdt.domain.errors import ValidationError
 from mdt.domain.records import load_links, stored_values, table_of
 from mdt.domain.registry import ENTITY_TYPES, FTS_TYPES, EntityTypeSpec
 from mdt.domain.text import normalize_for_search
 
-MAX_QUERY_CHARS = 200
-MAX_QUERY_TOKENS = 16
 #: Records per write unit of ``mdt reindex``.
 REINDEX_BATCH = 200
 
 _TOKEN_RE = re.compile(r'"([^"]*)"|(\S+)')
-#: C0 control characters and DEL. They separate tokens in a query: FTS5's query parser
-#: stops at U+0000 inside a quoted string ("unterminated string"), and the tokenizer
-#: never indexes control characters as part of a word anyway.
-_CONTROL_RE = re.compile(r"[\x00-\x1f\x7f]")
 
 
 def entity_body(spec: EntityTypeSpec, values: Mapping[str, Any]) -> str:
@@ -172,16 +165,13 @@ def _quote(value: str) -> str:
 def build_match_query(q: str) -> str | None:
     """Build an FTS5 MATCH expression from a user query (DATA_MODEL §10).
 
-    Normalised with :func:`normalize_for_search`, control characters count as spaces;
-    ``"…"`` keeps phrases (exact), every other token becomes a prefix query
-    ``"token"*``; tokens without a letter or digit are dropped; tokens are joined with
-    AND. Returns None if nothing searchable remains (the query then matches nothing). At
-    most 200 characters and 16 tokens.
+    Normalised with :func:`normalize_for_search`; ``"…"`` keeps phrases (exact), every
+    other token becomes a prefix query ``"token"*``; tokens without a letter or digit are
+    dropped; tokens are joined with AND. Returns None if nothing searchable remains (the
+    query then matches nothing).
     """
-    if len(q) > MAX_QUERY_CHARS:
-        raise ValidationError.single("q", f"must be at most {MAX_QUERY_CHARS} characters")
     terms: list[str] = []
-    for match in _TOKEN_RE.finditer(_CONTROL_RE.sub(" ", normalize_for_search(q))):
+    for match in _TOKEN_RE.finditer(normalize_for_search(q)):
         phrase, word = match.groups()
         if phrase is not None:
             phrase = " ".join(phrase.split())
@@ -189,6 +179,4 @@ def build_match_query(q: str) -> str | None:
                 terms.append(_quote(phrase))
         elif word is not None and _has_letter_or_digit(word):
             terms.append(_quote(word) + "*")
-    if len(terms) > MAX_QUERY_TOKENS:
-        raise ValidationError.single("q", f"must have at most {MAX_QUERY_TOKENS} search terms")
     return " AND ".join(terms) if terms else None

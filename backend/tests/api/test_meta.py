@@ -6,8 +6,6 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
-from fastapi.testclient import TestClient
-
 from mdt import __version__
 from mdt.db.migrate import head_revision
 from mdt.domain.registry import GROUPS, TABLE_TYPES, generic_types
@@ -22,8 +20,8 @@ def seed_projects() -> list[dict[str, Any]]:
     return load_seed_file(REAL_SEED / "projects.yaml").sections["project"]
 
 
-def test_health(raw_client: TestClient) -> None:
-    response = raw_client.get("/api/health")
+def test_health(client: ApiClient) -> None:
+    response = client.get("/api/health")
     assert response.status_code == 200
     assert response.json() == {
         "status": "ok",
@@ -36,7 +34,6 @@ def test_meta_document(client: ApiClient) -> None:
     meta = client.ok(client.get("/api/meta"))
     assert set(meta) == {
         "app_version",
-        "team_members",
         "focal_org_id",
         "parameters",
         "limits",
@@ -45,14 +42,12 @@ def test_meta_document(client: ApiClient) -> None:
         "entity_types",
     }
     assert meta["app_version"] == __version__
-    assert meta["team_members"] == ["Alice Example", "Bob Example"]
     assert meta["parameters"] == load_parameters(REAL_CODEBOOK).as_api()
     assert meta["limits"] == {
         "max_comment_chars": 10_000,
         "max_note_chars": 2_000,
         "max_page_size": 500,
         "max_bulk_items": 500,
-        "max_export_rows": 200_000,
     }
     assert meta["groups"] == [dict(group) for group in GROUPS]
     files = {vocabulary.name: vocabulary for vocabulary in load_vocabulary_files(REAL_CODEBOOK)}
@@ -160,6 +155,4 @@ def test_lookup_by_prefix_and_by_ids(client: ApiClient) -> None:
 
 def test_lookup_validation(client: ApiClient) -> None:
     response = client.get("/api/lookup", {"limit": "0"})
-    assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
-    response = client.get("/api/lookup", {"q": "x" * 201})
     assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")

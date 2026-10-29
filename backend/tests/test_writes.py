@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import threading
+
 import pytest
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 
 from mdt.db.models import Derived
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
 from mdt.domain.errors import (
-    ConflictError,
     EntityDeletedError,
     LockedFieldError,
     NotFoundError,
@@ -18,8 +20,7 @@ from mdt.domain.errors import (
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     assert_matches_latest_snapshot,
     create_project,
     fields_of,
@@ -56,18 +57,18 @@ def test_create_writes_row_revision_meta_derived_and_fts(db: Db) -> None:
             "project",
             None,
             project_data(slug="example-a", name_uk="Приклад", policy_domains=None),
-            ALICE,
+            USER,
             note="Created for a test",
         )
         assert result.changed and result.version == 1 and result.revision_id is not None
         row = load(session, "project", result.entity_id)
         assert result.entity_id.startswith("prj_")
         ts = row["created_at"]
-        assert (row["version"], row["created_by"], row["updated_by"]) == (1, ALICE.by, ALICE.by)
+        assert (row["version"], row["created_by"], row["updated_by"]) == (1, USER.by, USER.by)
         assert row["updated_at"] == ts
         assert row["policy_domains"] == []
         # Entries only for provided non-empty fields; all with the unit's timestamp.
-        manual = entry("manual:Alice Example", "Alice Example", ts)
+        manual = entry("manual", "user", ts)
         assert row["field_meta"] == {
             "slug": manual,
             "name_en": manual,
@@ -79,7 +80,7 @@ def test_create_writes_row_revision_meta_derived_and_fts(db: Db) -> None:
             1,
             "create",
             "ui",
-            ALICE.by,
+            USER.by,
         )
         assert revision.at == ts and revision.note == "Created for a test"
         assert revision.id == result.revision_id
@@ -123,14 +124,12 @@ def test_create_with_empty_values_records_no_meta(db: Db) -> None:
 
 def test_unknown_type_is_not_found(db: Db) -> None:
     with db.session() as session, pytest.raises(NotFoundError):
-        apply_change(session, "unicorn", None, {}, ALICE)
+        apply_change(session, "unicorn", None, {}, USER)
 
 
 def test_update_of_missing_row_is_not_found(db: Db) -> None:
     with db.session() as session, pytest.raises(NotFoundError):
-        apply_change(
-            session, "project", "prj_01JBX3ABCDEFGHJKMNPQRSTVWX", {}, ALICE, expected_version=1
-        )
+        apply_change(session, "project", "prj_01JBX3ABCDEFGHJKMNPQRSTVWX", {}, USER)
 
 
 @pytest.mark.parametrize(
@@ -146,14 +145,14 @@ def test_update_of_missing_row_is_not_found(db: Db) -> None:
 )
 def test_fields_clients_cannot_write(db: Db, field: str, value: object, message: str) -> None:
     with db.session() as session, pytest.raises(ValidationError) as caught:
-        apply_change(session, "project", None, project_data(**{field: value}), ALICE)
+        apply_change(session, "project", None, project_data(**{field: value}), USER)
     assert caught.value.details == {field: [message]}
 
 
 def test_system_and_computed_document_fields_are_refused_from_clients(db: Db) -> None:
     data = {"title": "Example document", "canonical_url": "https://example.org"}
     with db.session() as session, pytest.raises(ValidationError) as caught:
-        apply_change(session, "document", None, {**data, "text_hash": "abc"}, ALICE)
+        apply_change(session, "document", None, {**data, "text_hash": "abc"}, USER)
     assert caught.value.details == {
         "canonical_url": ["is computed and cannot be set"],
         "text_hash": ["is set by the system"],
@@ -162,12 +161,12 @@ def test_system_and_computed_document_fields_are_refused_from_clients(db: Db) ->
 
 def test_changes_must_be_an_object(db: Db) -> None:
     with db.session() as session, pytest.raises(ValidationError):
-        apply_change(session, "project", None, ["slug"], ALICE)  # type: ignore[arg-type]
+        apply_change(session, "project", None, ["slug"], USER)  # type: ignore[arg-type]
 
 
 def test_note_longer_than_2000_characters_is_refused(db: Db) -> None:
     with db.session() as session, pytest.raises(ValidationError) as caught:
-        apply_change(session, "project", None, project_data(), ALICE, note="n" * 2001)
+        apply_change(session, "project", None, project_data(), USER, note="n" * 2001)
     assert "note" in (caught.value.details or {})
 
 
@@ -184,17 +183,16 @@ def test_update_writes_a_revision_with_field_and_meta_diff(db: Db) -> None:
             "project",
             created.entity_id,
             {"name_en": "Renamed example", "status": "active"},
-            BOB,
+            USER,
             note="Renamed",
-            expected_version=1,
         )
         assert result.changed and result.version == 2
         row = load(session, "project", created.entity_id)
-        assert (row["version"], row["updated_by"], row["created_by"]) == (2, BOB.by, ALICE.by)
+        assert (row["version"], row["updated_by"], row["created_by"]) == (2, USER.by, USER.by)
         ts = row["updated_at"]
-        assert row["field_meta"]["name_en"] == entry("manual:Bob Example", "Bob Example", ts)
-        assert row["field_meta"]["status"] == entry("manual:Bob Example", "Bob Example", ts)
-        assert row["field_meta"]["slug"]["by"] == ALICE.by
+        assert row["field_meta"]["name_en"] == entry("manual", "user", ts)
+        assert row["field_meta"]["status"] == entry("manual", "user", ts)
+        assert row["field_meta"]["slug"]["at"] == row["created_at"]
         revision = revisions_of(session, created.entity_id)[-1]
         assert (revision.version, revision.action, revision.note, revision.at) == (
             2,
@@ -206,14 +204,11 @@ def test_update_writes_a_revision_with_field_and_meta_diff(db: Db) -> None:
             "name_en": ["Example project", "Renamed example"],
             "status": [None, "active"],
         }
+        # The name_en entry changed only its time, which diffs leave out.
         assert revision.diff["meta"] == {
-            "name_en": {
-                "src": ["manual:Alice Example", "manual:Bob Example"],
-                "by": [ALICE.by, BOB.by],
-            },
             "status": {
-                "src": [None, "manual:Bob Example"],
-                "by": [None, BOB.by],
+                "src": [None, "manual"],
+                "by": [None, "user"],
                 "locked": [None, True],
                 "verified": [None, "unverified"],
             },
@@ -236,8 +231,7 @@ def test_no_op_writes_nothing(db: Db) -> None:
                 "official_urls": None,
                 "name_uk": "",
             },
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert (result.changed, result.version, result.revision_id) == (False, 1, None)
         assert load(session, "project", created.entity_id) == before
@@ -252,8 +246,7 @@ def test_reordering_a_list_is_a_change(db: Db) -> None:
             "project",
             created.entity_id,
             {"policy_domains": ["domain_b", "domain_a"]},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert result.changed
         assert fields_of(session, "project", created.entity_id)["policy_domains"] == [
@@ -270,74 +263,33 @@ def test_null_and_empty_list_are_the_same_value(db: Db) -> None:
             "project",
             created.entity_id,
             {"policy_domains": None},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert cleared.changed
         row = load(session, "project", created.entity_id)
         assert row["policy_domains"] == []
-        again = apply_change(
-            session, "project", created.entity_id, {"policy_domains": []}, ALICE, expected_version=2
-        )
+        again = apply_change(session, "project", created.entity_id, {"policy_domains": []}, USER)
         assert not again.changed
 
 
 def test_clearing_a_field_keeps_and_updates_its_entry(db: Db) -> None:
     with db.session() as session:
         created = create_project(session, name_uk="Приклад")
-        apply_change(
-            session, "project", created.entity_id, {"name_uk": None}, BOB, expected_version=1
-        )
+        apply_change(session, "project", created.entity_id, {"name_uk": None}, USER)
         row = load(session, "project", created.entity_id)
         assert row["name_uk"] is None
-        assert row["field_meta"]["name_uk"]["by"] == BOB.by
+        assert row["field_meta"]["name_uk"]["by"] == USER.by
     assert_matches_latest_snapshot(db, "project", created.entity_id)
-
-
-def test_expected_version_is_required_on_channel_ui(db: Db) -> None:
-    with db.session() as session:
-        created = create_project(session)
-        with pytest.raises(ValidationError) as caught:
-            apply_change(session, "project", created.entity_id, {"name_en": "x"}, ALICE)
-        assert caught.value.details == {"expected_version": ["is required"]}
-        with pytest.raises(ValidationError):
-            apply_change(
-                session,
-                "project",
-                created.entity_id,
-                {"name_en": "x"},
-                ALICE,
-                expected_version="1",  # type: ignore[arg-type]
-            )
-
-
-def test_stale_version_is_a_conflict_even_without_differences(db: Db) -> None:
-    with db.session() as session:
-        created = create_project(session)
-        apply_change(
-            session, "project", created.entity_id, {"status": "active"}, BOB, expected_version=1
-        )
-        with pytest.raises(ConflictError):
-            apply_change(
-                session,
-                "project",
-                created.entity_id,
-                {"status": "active"},
-                ALICE,
-                expected_version=1,
-            )
 
 
 def test_writes_to_deleted_rows_are_refused(db: Db) -> None:
     with db.session() as session:
         created = create_project(session)
-        soft_delete(session, "project", created.entity_id, ALICE, expected_version=1)
+        soft_delete(session, "project", created.entity_id, USER)
         with pytest.raises(EntityDeletedError) as caught:
-            apply_change(
-                session, "project", created.entity_id, {"name_en": "x"}, ALICE, expected_version=2
-            )
+            apply_change(session, "project", created.entity_id, {"name_en": "x"}, USER)
         details = caught.value.details or {}
-        assert details["deleted_by"] == ALICE.by and details["deleted_at"]
+        assert details["deleted_by"] == USER.by and details["deleted_at"]
 
 
 def test_older_snapshots_are_never_modified(db: Db) -> None:
@@ -348,8 +300,7 @@ def test_older_snapshots_are_never_modified(db: Db) -> None:
             "project",
             created.entity_id,
             {"aliases": [{"text": "Example", "lang": "en"}, {"text": "Second", "lang": "en"}]},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         first, second = revisions_of(session, created.entity_id)
         assert first.snapshot == created.snapshot
@@ -408,8 +359,7 @@ def test_collector_cannot_change_locked_fields(db: Db) -> None:
             "project",
             created.entity_id,
             {"name_en": "Manual name"},
-            ALICE,
-            expected_version=2,
+            USER,
         )
         with pytest.raises(LockedFieldError) as caught:
             apply_change(
@@ -449,8 +399,7 @@ def test_collector_may_write_system_fields_clients_may_not(db: Db) -> None:
                 "document",
                 document.entity_id,
                 {"source_id": "other"},
-                ALICE,
-                expected_version=1,
+                USER,
             )
 
 
@@ -470,7 +419,7 @@ def test_canonical_url_follows_url_in_the_same_revision(db: Db) -> None:
                 "url": "https://Example.org/a/?utm_source=x#top",
                 "retrieved_at": "2026-10-28T10:00:00Z",
             },
-            ALICE,
+            USER,
         )
         row = load(session, "document", created.entity_id)
         assert row["url"] == "https://Example.org/a/?utm_source=x#top"
@@ -481,16 +430,15 @@ def test_canonical_url_follows_url_in_the_same_revision(db: Db) -> None:
             "document",
             created.entity_id,
             {"url": "https://example.org/b"},
-            BOB,
-            expected_version=1,
+            USER,
         )
         row = load(session, "document", created.entity_id)
         assert row["canonical_url"] == "https://example.org/b"
         assert row["field_meta"]["canonical_url"] == row["field_meta"]["url"]
-        assert row["field_meta"]["canonical_url"]["by"] == BOB.by
+        assert row["field_meta"]["canonical_url"]["by"] == USER.by
         revision = revisions_of(session, created.entity_id)[-1]
         assert set(revision.diff["fields"]) == {"url", "canonical_url"}
-        apply_change(session, "document", created.entity_id, {"url": None}, BOB, expected_version=2)
+        apply_change(session, "document", created.entity_id, {"url": None}, USER)
         assert load(session, "document", created.entity_id)["canonical_url"] is None
     assert_matches_latest_snapshot(db, "document", created.entity_id)
 
@@ -506,7 +454,7 @@ def test_document_retrieved_at_is_normalised(db: Db) -> None:
                 "url": "https://example.org/doc",
                 "retrieved_at": "2026-10-28T12:00:00+02:00",
             },
-            ALICE,
+            USER,
         )
         assert load(session, "document", created.entity_id)["retrieved_at"] == (
             "2026-10-28T10:00:00.000000Z"
@@ -518,7 +466,7 @@ def test_document_retrieved_at_is_normalised(db: Db) -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_integrity_error_on_revision_version_is_a_conflict(db: Db) -> None:
+def test_a_failing_revision_insert_rolls_back_the_whole_write(db: Db) -> None:
     with db.session() as session:
         created = create_project(session)
     with db.engine.begin() as connection:
@@ -526,19 +474,48 @@ def test_integrity_error_on_revision_version_is_a_conflict(db: Db) -> None:
             text(
                 "INSERT INTO revision (entity_type, entity_id, version, at, author, channel,"
                 " action, snapshot, diff) VALUES ('project', :id, 2,"
-                " '2026-01-01T00:00:00.000000Z', 'Alice Example', 'ui', 'update', '{}', '{}')"
+                " '2026-01-01T00:00:00.000000Z', 'user', 'ui', 'update', '{}', '{}')"
             ),
             {"id": created.entity_id},
         )
     with db.session() as session:
-        with pytest.raises(ConflictError) as caught:
-            apply_change(
-                session, "project", created.entity_id, {"name_en": "x"}, BOB, expected_version=1
-            )
-        assert caught.value.payload["action"] == "patch"
+        with pytest.raises(IntegrityError):
+            apply_change(session, "project", created.entity_id, {"name_en": "x"}, USER)
         # Nothing was written: the row is unchanged.
         row = load(session, "project", created.entity_id)
         assert (row["version"], row["name_en"]) == (1, "Example project")
         with read_transaction(session):
             assert session.execute(select(Derived.entity_id)).scalars().all()
     db.check_on_teardown = False  # the injected revision does not match the row
+
+
+# --------------------------------------------------------------------------------------
+# Serialised writers
+# --------------------------------------------------------------------------------------
+
+
+def test_concurrent_writers_are_serialised(db: Db) -> None:
+    """Write units hold the write lock from their first read (BEGIN IMMEDIATE): two
+    writers at once both succeed, one after the other, and each gets its own version."""
+    with db.session() as setup:
+        project_id = create_project(setup).entity_id
+    barrier = threading.Barrier(2)
+    versions: list[int] = []
+
+    def write(name: str) -> None:
+        with db.session() as session:
+            barrier.wait()
+            versions.append(
+                apply_change(session, "project", project_id, {"name_en": name}, USER).version
+            )
+
+    threads = [threading.Thread(target=write, args=(name,)) for name in ("One", "Two")]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(versions) == [2, 3]
+    with db.session() as session:
+        assert load(session, "project", project_id)["version"] == 3
+        assert [revision.version for revision in revisions_of(session, project_id)] == [1, 2, 3]
+    assert_matches_latest_snapshot(db, "project", project_id)

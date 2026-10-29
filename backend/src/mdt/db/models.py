@@ -4,7 +4,7 @@ The FTS5 virtual tables (``fts_entity``, ``fts_document``) and the append-only t
 on ``revision`` are not models; their DDL lives in :mod:`mdt.db.ddl`.
 
 The write path (:mod:`mdt.domain.revisions`) uses the ``__table__`` objects through
-SQLAlchemy Core, so every row update is an explicit compare-and-swap on ``version``.
+SQLAlchemy Core, so every row update explicitly bumps ``version``.
 """
 
 from __future__ import annotations

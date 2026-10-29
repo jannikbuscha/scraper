@@ -5,8 +5,7 @@ The database is built with the REAL codebook and seed files of the repository
 copy, and ``mdt check`` must be clean afterwards. Records that tests create carry
 obviously synthetic values ("Example …", example.org).
 
-``client`` is a TestClient that behaves like the UI's fetch wrapper: it sends
-``X-Requested-With: mdt`` on every request and ``X-Author`` plus JSON on writes.
+``client`` wraps a TestClient that sends JSON bodies like the UI's fetch wrapper.
 """
 
 from __future__ import annotations
@@ -40,9 +39,7 @@ def api_settings(root: Path, **overrides: Any) -> Settings:
     there is no frontend build."""
     values: dict[str, Any] = {
         "focal_org_seed_key": FOCAL_ORG_SEED_KEY,
-        "allowed_hosts": "127.0.0.1,localhost",
         "frontend_dist": root / "no-frontend-build",
-        "team_members": "Alice Example,Bob Example",
         **overrides,
     }
     return make_settings(root, REAL_CODEBOOK, REAL_SEED, **values)
@@ -106,14 +103,7 @@ def app(api_db: Db) -> FastAPI:
 
 
 @pytest.fixture
-def raw_client(app: FastAPI) -> Iterator[TestClient]:
-    """A TestClient without default headers (for the request-guard tests)."""
-    with TestClient(app, base_url=BASE_URL) as client:
-        yield client
-
-
-@pytest.fixture
 def client(app: FastAPI) -> Iterator[ApiClient]:
-    """A client that sends the headers of the UI's fetch wrapper."""
-    with TestClient(app, base_url=BASE_URL, headers={"X-Requested-With": "mdt"}) as test_client:
+    """A client that writes like the UI's fetch wrapper."""
+    with TestClient(app, base_url=BASE_URL) as test_client:
         yield ApiClient(test_client)

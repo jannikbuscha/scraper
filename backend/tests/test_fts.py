@@ -13,10 +13,9 @@ from mdt.db.models import DocumentText, SearchKey
 from mdt.db.session import read_transaction, write_transaction
 from mdt.domain import fts
 from mdt.domain.actor import Actor
-from mdt.domain.errors import ValidationError
 from mdt.domain.revisions import apply_change, soft_delete, undelete
 from tests.conftest import Db
-from tests.helpers import ALICE, create_project, fts_row
+from tests.helpers import USER, create_project, fts_row
 
 RIGHT_QUOTE = "\N{RIGHT SINGLE QUOTATION MARK}"
 MODIFIER = "\N{MODIFIER LETTER APOSTROPHE}"
@@ -81,15 +80,14 @@ def test_index_follows_updates_deletes_and_undeletes(db: Db) -> None:
             "project",
             project_id,
             {"name_en": "Replaced wording"},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert search(session, "Original") == set()
         assert search(session, "Replaced") == {project_id}
-        soft_delete(session, "project", project_id, ALICE, expected_version=2)
+        soft_delete(session, "project", project_id, USER)
         # Deleted entities stay searchable (the trash); queries filter on deleted_at.
         assert search(session, "Replaced") == {project_id}
-        undelete(session, "project", project_id, ALICE, expected_version=3)
+        undelete(session, "project", project_id, USER)
         assert search(session, "Replaced") == {project_id}
         with read_transaction(session):
             keys = session.execute(
@@ -107,7 +105,7 @@ def test_search_keys_are_stable(db: Db) -> None:
             before = session.execute(
                 text("SELECT rowid FROM search_key WHERE entity_id = :id"), {"id": project_id}
             ).scalar()
-        apply_change(session, "project", project_id, {"name_en": "x"}, ALICE, expected_version=1)
+        apply_change(session, "project", project_id, {"name_en": "x"}, USER)
         with read_transaction(session):
             after = session.execute(
                 text("SELECT rowid FROM search_key WHERE entity_id = :id"), {"id": project_id}
@@ -244,36 +242,20 @@ def test_reindex_releases_the_write_lock_between_batches(db: Db) -> None:
         ("AND OR NOT", '"AND"* AND "OR"* AND "NOT"*'),
         ("title:secret", '"title:secret"*'),
         (f"з{RIGHT_QUOTE}явився", f'"з{MODIFIER}явився"*'),
-        # control characters separate tokens (FTS5 stops reading a query at U+0000)
-        ("a\x00b", '"a"* AND "b"*'),
-        ("synth\x00", '"synth"*'),
-        ('"a\x00b"', '"a b"'),
-        ("a\x01b\x7fc", '"a"* AND "b"* AND "c"*'),
-        ("\x00", None),
+        # tabs and line breaks separate tokens, also inside phrases
+        ("a\tb\nc", '"a"* AND "b"* AND "c"*'),
+        ('"a\tb"', '"a b"'),
     ],
 )
 def test_build_match_query(q: str, expected: str | None) -> None:
     assert fts.build_match_query(q) == expected
 
 
-@pytest.mark.parametrize(
-    "q", ["zqxj\x00wvut", "zqxj\x00", '"zqxj\x00wvut"', "zqx\x00wvu kplm", "\x00zqxj"]
-)
-def test_queries_with_control_characters_run(db: Db, q: str) -> None:
+def test_long_queries_are_searched(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session, name_en="Zqxj Wvut Kplm").entity_id
-        assert search(session, q) == {project_id}
-
-
-def test_query_limits() -> None:
-    assert fts.build_match_query("x" * 200) is not None
-    with pytest.raises(ValidationError):
-        fts.build_match_query("x" * 201)
-    assert fts.build_match_query(" ".join(["w"] * 16)) is not None
-    with pytest.raises(ValidationError):
-        fts.build_match_query(" ".join(["w"] * 17))
-    # Dropped punctuation tokens do not count.
-    assert fts.build_match_query(" ".join(["w"] * 16 + ["-"] * 5)) is not None
+        assert search(session, " ".join(["zqxj"] * 40)) == {project_id}
+        assert search(session, "zqxj " + "x" * 300) == set()
 
 
 def test_matching_is_prefix_case_insensitive_and_cyrillic(db: Db) -> None:

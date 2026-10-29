@@ -10,7 +10,7 @@ from mdt.domain.revisions import apply_change, soft_delete
 from mdt.domain.snapshots import changed_fields
 from mdt.domain.vocab import TermIndex
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_project, create_service, project_data
+from tests.helpers import USER, create_event, create_project, create_service, project_data
 
 
 def test_labels_of_every_rule(db: Db) -> None:
@@ -19,58 +19,58 @@ def test_labels_of_every_rule(db: Db) -> None:
         uk_only = create_project(session, name_en=None, name_uk="Приклад").entity_id
         service = create_service(session, project, name_en=None, name_uk="Послуга").entity_id
         org = apply_change(
-            session, "organization", None, {"name_en": "Example org"}, ALICE
+            session, "organization", None, {"name_en": "Example org"}, USER
         ).entity_id
         slug_org = apply_change(
-            session, "organization", None, {"name_uk": "Організація", "slug": "org-slug"}, ALICE
+            session, "organization", None, {"name_uk": "Організація", "slug": "org-slug"}, USER
         ).entity_id
         event = create_event(session, project, "launch", "2013-Q2").entity_id
         undated = create_event(session, service, "announced").entity_id
-        document = apply_change(session, "document", None, {"title": "A title"}, ALICE).entity_id
+        document = apply_change(session, "document", None, {"title": "A title"}, USER).entity_id
         participation = apply_change(
             session,
             "participation",
             None,
             {"organization_id": org, "subject_id": project, "role": "partner"},
-            ALICE,
+            USER,
         ).entity_id
         relation = apply_change(
             session,
             "relation",
             None,
             {"from_id": service, "to_id": project, "relation_type": "relates_a"},
-            ALICE,
+            USER,
         ).entity_id
         indicator = apply_change(
             session,
             "indicator",
             None,
             {"subject_id": project, "metric": "Users", "value": 1500, "unit": "persons"},
-            ALICE,
+            USER,
         ).entity_id
         bare_indicator = apply_change(
             session,
             "indicator",
             None,
             {"subject_id": project, "metric": "Share", "value": 0.25},
-            ALICE,
+            USER,
         ).entity_id
         evidence = apply_change(
             session,
             "evidence",
             None,
             {"subject_id": event, "target": "field:date", "url": "https://example.org/e"},
-            ALICE,
+            USER,
         ).entity_id
         view = apply_change(
             session,
             "saved_view",
             None,
             {"name": "My view", "entity_type": "project", "query": "sort=slug"},
-            ALICE,
+            USER,
         ).entity_id
-        root = create_comment(session, project, "Root", ALICE, field="name_en").entity_id
-        entity_comment = create_comment(session, uk_only, "Root", ALICE).entity_id
+        root = create_comment(session, project, "Root", USER, field="name_en").entity_id
+        entity_comment = create_comment(session, uk_only, "Root", USER).entity_id
         term = TermIndex(session).term("status", "active")
         session.rollback()
         assert term is not None
@@ -121,7 +121,7 @@ def test_labels_of_every_rule(db: Db) -> None:
 def test_ref_infos_include_deleted_rows_and_omit_unknown_ids(db: Db) -> None:
     with db.session() as session:
         project = create_project(session, name_en="Deleted example").entity_id
-        soft_delete(session, "project", project, ALICE, expected_version=1)
+        soft_delete(session, "project", project, USER)
         with read_transaction(session):
             infos = ref_infos(
                 session, [project, "prj_01JBX3ABCDEFGHJKMNPQRSTVWX", None, "nonsense"]
@@ -143,15 +143,14 @@ def test_ref_infos_include_deleted_rows_and_omit_unknown_ids(db: Db) -> None:
 def test_label_falls_back_to_the_slug_and_id(db: Db) -> None:
     with db.session() as session:
         component = apply_change(
-            session, "component", None, {"name_en": "Component"}, ALICE
+            session, "component", None, {"name_en": "Component"}, USER
         ).entity_id
         apply_change(
             session,
             "component",
             component,
             {"name_en": None, "name_uk": "Компонент"},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         with read_transaction(session):
             assert entity_label(session, component) == "Компонент"
@@ -167,8 +166,8 @@ def test_format_number() -> None:
 
 def test_revision_representations(db: Db) -> None:
     with db.session() as session:
-        project = apply_change(session, "project", None, project_data(), ALICE).entity_id
-        soft_delete(session, "project", project, ALICE, note="Gone", expected_version=1)
+        project = apply_change(session, "project", None, project_data(), USER).entity_id
+        soft_delete(session, "project", project, USER, note="Gone")
         with read_transaction(session):
             revision = latest_revision(session, project)
             assert revision is not None

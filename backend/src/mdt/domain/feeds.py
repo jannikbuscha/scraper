@@ -1,6 +1,6 @@
-"""Feeds and histories (docs/API.md §3.2-§3.4): recent changes, revision authors,
-comment threads and the comment feed, per-record revision lists, single revisions and
-diffs. Every public function opens its own read transaction.
+"""Feeds and histories (docs/API.md §3.2-§3.4): recent changes, comment threads and the
+comment feed, per-record revision lists, single revisions and diffs. Every public
+function opens its own read transaction.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from mdt.db.models import Comment, Revision, SavedView, SearchKey, VocabularyTerm
 from mdt.db.session import read_transaction
+from mdt.domain.actor import CHANNELS
 from mdt.domain.clock import normalize_timestamp_input
 from mdt.domain.dates import PartialDateError, parse_iso_date
 from mdt.domain.errors import NotFoundError, ValidationError
@@ -33,9 +34,7 @@ from mdt.domain.registry import COMMENT, ENTITY_TYPES, EntityTypeSpec, type_of_i
 from mdt.domain.search import match_subquery
 from mdt.domain.serialize import diff_ref_ids, record_spec, revision_refs, serialize_comments
 from mdt.domain.snapshots import changed_fields
-from mdt.domain.text import sortkey
 
-CHANNELS: Final = ("seed", "ui", "collector", "import", "restore", "merge", "system")
 ACTIONS: Final = (
     "create",
     "update",
@@ -84,20 +83,17 @@ def _time_bound(name: str, raw: str | None, *, end: bool) -> str | None:
 
 
 # --------------------------------------------------------------------------------------
-# GET /api/revisions and /api/revisions/authors
+# GET /api/revisions
 # --------------------------------------------------------------------------------------
 
 
 def recent_changes(session: Session, params: QueryParams) -> dict[str, Any]:
     """``GET /api/revisions``: revisions of every type (comments, terms and saved views
-    included), newest first, with filters on author, type, channel, action, time,
-    entity and batch."""
+    included), newest first, with filters on type, channel, action, time, entity and
+    batch."""
     pairs = param_pairs(params)
     revision = _table(Revision)
     conditions: list[ColumnElement[bool]] = []
-    authors = split_list(last_param(pairs, "author"))
-    if authors:
-        conditions.append(revision.c.author.in_(authors))
     for name, allowed in (
         ("entity_type", tuple(ENTITY_TYPES)),
         ("channel", CHANNELS),
@@ -208,16 +204,6 @@ def _contexts(session: Session, rows: Sequence[Mapping[str, Any]]) -> dict[str, 
     return result
 
 
-def revision_authors(session: Session) -> dict[str, Any]:
-    """``GET /api/revisions/authors``: every author name that wrote a revision."""
-    revision = _table(Revision)
-    with read_transaction(session):
-        authors = [
-            str(name) for name in session.execute(select(revision.c.author).distinct()).scalars()
-        ]
-    return {"authors": sorted(authors, key=lambda name: (sortkey(name), name))}
-
-
 # --------------------------------------------------------------------------------------
 # GET /api/comments
 # --------------------------------------------------------------------------------------
@@ -323,14 +309,6 @@ def _comment_feed(
                 raise ValidationError.single("entity_type", "contains an unknown entity type")
             prefixes.append(f"{spec.prefix}_")
         conditions.append(or_(*(func.substr(root.c.subject_id, 1, len(p)) == p for p in prefixes)))
-    authors = split_list(last_param(pairs, "author"))
-    if authors:
-        conditions.append(
-            or_(
-                root.c.created_by.in_(authors),
-                _reply_exists(root, lambda r: r.c.created_by.in_(authors)),
-            )
-        )
     q, match = parse_search(last_param(pairs, "q"))
     page, page_size = parse_paging(pairs)
     if q is not None:

@@ -29,7 +29,6 @@ QueryParams = Mapping[str, str] | Iterable[tuple[str, str]]
 
 #: Reserved list token meaning "the field is empty" (API §4.1).
 EMPTY_TOKEN: Final = "~empty"
-MAX_FILTER_VALUES: Final = 200
 DEFAULT_PAGE_SIZE: Final = 50
 MAX_PAGE_SIZE: Final = 500
 MAX_PAGE: Final = 1_000_000
@@ -53,8 +52,6 @@ _EMPTY_TOKEN_OPERATORS: Final = frozenset({"in", "nin", "any", "none", "confirme
 _NUMBER_RE = re.compile(r"^[+-]?(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?$")
 _INT_RE = re.compile(r"^[+-]?[0-9]+$")
 _PAGE_RE = re.compile(r"^[0-9]{1,9}$")
-#: Digits of the largest signed 64-bit integer (9 223 372 036 854 775 807).
-_MAX_INT_DIGITS: Final = 19
 
 
 def param_pairs(params: QueryParams) -> list[tuple[str, str]]:
@@ -197,8 +194,6 @@ def _bad(spec: FieldSpec, message: str) -> BadFilterError:
 def _list_values(spec: FieldSpec, op: str, raw: str) -> tuple[tuple[str, ...], bool]:
     tokens = [token.strip() for token in raw.split(",")]
     tokens = [token for token in tokens if token]
-    if len(tokens) > MAX_FILTER_VALUES:
-        raise _bad(spec, f"at most {MAX_FILTER_VALUES} values are allowed")
     include_empty = EMPTY_TOKEN in tokens
     if include_empty and op not in _EMPTY_TOKEN_OPERATORS:
         raise _bad(spec, f"{EMPTY_TOKEN} is not allowed with this operator")
@@ -230,14 +225,11 @@ def _number(spec: FieldSpec, raw: str) -> int | float:
 
     ``number`` fields are REAL columns: every bound becomes a finite float. Integer
     fields (stored ``int`` fields and the virtual counts) take integers within SQLite's
-    signed 64-bit range; the digits are counted before ``int()`` runs, so a huge value
-    is refused without converting it. Decimal bounds on integer fields stay floats.
+    signed 64-bit range. Decimal bounds on integer fields stay floats.
     """
     if not _NUMBER_RE.fullmatch(raw):
         raise _bad(spec, "the value must be a number")
     if spec.type != "number" and _INT_RE.fullmatch(raw):
-        if len(raw.lstrip("+-").lstrip("0")) > _MAX_INT_DIGITS:
-            raise _bad(spec, "the value is out of range")
         integer = int(raw)
         if not -(2**63) <= integer < 2**63:
             raise _bad(spec, "the value is out of range")

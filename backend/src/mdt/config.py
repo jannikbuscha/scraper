@@ -48,13 +48,6 @@ def _upper_log_level(value: str) -> str:
     return level
 
 
-def split_csv(value: str | None) -> list[str]:
-    """Split a comma-separated setting into stripped, non-empty items."""
-    if not value:
-        return []
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
 class Settings(BaseSettings):
     """Runtime configuration. Field names map to upper-case environment variables."""
 
@@ -72,9 +65,6 @@ class Settings(BaseSettings):
     codebook_dir: Path = Path("codebook")
     seed_dir: Path = Path("seed")
     frontend_dist: Path = Path("frontend/dist")
-    # Comma-separated strings (not JSON lists); see the *_list properties.
-    allowed_hosts: str = "127.0.0.1,localhost"
-    team_members: str = ""
     max_comment_chars: int = Field(default=10_000, ge=1)
     focal_org_seed_key: str = "ministry-of-digital-transformation"
     contact_email: str | None = None
@@ -99,16 +89,6 @@ class Settings(BaseSettings):
     def frontend_dist_path(self) -> Path:
         """Absolute directory of the built frontend."""
         return _resolve(self.frontend_dist)
-
-    @property
-    def allowed_hosts_list(self) -> list[str]:
-        """Host-header allowlist, lower-cased."""
-        return [host.lower() for host in split_csv(self.allowed_hosts)]
-
-    @property
-    def team_members_list(self) -> list[str]:
-        """Names offered by the author picker."""
-        return split_csv(self.team_members)
 
     @property
     def sqlalchemy_url(self) -> str:

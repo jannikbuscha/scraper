@@ -1,14 +1,9 @@
 """The built frontend (docs/API.md §6).
 
-* ``/assets/*``: Starlette ``StaticFiles`` on ``FRONTEND_DIST/assets`` (symlinks are
-  resolved and must stay inside), with ``Cache-Control: public, max-age=31536000,
-  immutable``; a missing asset is 404, never ``index.html``. ``Range`` headers are
-  ignored (``Accept-Ranges: none``): assets are always sent whole.
-* Root files: the regular files directly in ``FRONTEND_DIST`` (no symlinks, no
-  subdirectories) are read once at startup and served by exact name.
-* SPA fallback: every other GET/HEAD outside ``/api/`` returns the bytes of
-  ``index.html`` with ``Cache-Control: no-cache``. The request path is never joined to a
-  filesystem path.
+* ``/assets/*``: Starlette ``StaticFiles`` on ``FRONTEND_DIST/assets``.
+* Root files: the files directly in ``FRONTEND_DIST`` (e.g. ``favicon.svg``), by name.
+* SPA fallback: every other GET/HEAD outside ``/api/`` returns ``index.html`` with
+  ``Cache-Control: no-cache``, so a new build is picked up on the next page load.
 * Other methods on non-API paths are 405; unknown ``/api`` paths are 404.
 * Without ``index.html`` the API still works and non-API paths answer 503 with a hint.
 
@@ -19,28 +14,21 @@ that no API route or mount matched (a known path with a wrong method stays a 405
 from __future__ import annotations
 
 import logging
-import mimetypes
-import os
-from collections.abc import Mapping
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Final
 
 from fastapi import FastAPI
-from starlette.datastructures import Headers
 from starlette.responses import FileResponse, JSONResponse, Response
-from starlette.staticfiles import NotModifiedResponse, PathLike, StaticFiles
+from starlette.staticfiles import StaticFiles
 from starlette.types import Receive, Scope, Send
 
 from mdt.api.errors import envelope, error_response
-from mdt.api.guard import is_api_path
 from mdt.domain.errors import MethodNotAllowedError, NotFoundError
 
 log = logging.getLogger("mdt.api")
 
 INDEX_FILE: Final = "index.html"
 ASSETS_PATH: Final = "/assets"
-ASSET_CACHE_CONTROL: Final = "public, max-age=31536000, immutable"
 NO_CACHE: Final = "no-cache"
 READ_METHODS: Final = ("GET", "HEAD")
 NOT_BUILT_CODE: Final = "frontend_not_built"
@@ -50,91 +38,20 @@ NOT_BUILT_MESSAGE: Final = (
 )
 
 
-@dataclass(frozen=True)
-class RootFile:
-    """A file served from the root of the build."""
-
-    content: bytes
-    media_type: str
-
-
-@dataclass(frozen=True)
-class FrontendBuild:
-    """What was found in ``FRONTEND_DIST`` at startup."""
-
-    root_files: Mapping[str, RootFile] = field(default_factory=dict)
-    assets_dir: Path | None = None
-
-    @property
-    def index(self) -> RootFile | None:
-        """``index.html``, or None without a build."""
-        return self.root_files.get(INDEX_FILE)
-
-
-def _media_type(name: str) -> str:
-    guessed, _ = mimetypes.guess_type(name, strict=False)
-    return guessed or "application/octet-stream"
-
-
-def load_build(dist: Path) -> FrontendBuild:
-    """List the root files (regular files only, read into memory) and the assets
-    directory of a build; a missing directory or ``index.html`` means "no build"."""
-    if not dist.is_dir():
-        return FrontendBuild()
-    root_files: dict[str, RootFile] = {}
-    assets_dir: Path | None = None
-    with os.scandir(dist) as entries:
-        for entry in entries:
-            if entry.is_file(follow_symlinks=False):
-                root_files[entry.name] = RootFile(
-                    Path(entry.path).read_bytes(), _media_type(entry.name)
-                )
-            elif entry.name == ASSETS_PATH.lstrip("/") and entry.is_dir(follow_symlinks=False):
-                assets_dir = Path(entry.path)
-    if INDEX_FILE not in root_files:
-        return FrontendBuild()
-    return FrontendBuild(root_files, assets_dir)
-
-
-class WholeFileResponse(FileResponse):
-    """A ``FileResponse`` that ignores ``Range`` (RFC 9110 lets a server do so) and says
-    ``Accept-Ranges: none``. Content-hashed assets are small and always sent whole, so a
-    malformed or unsatisfiable range never produces Starlette's plain-text 400/416, which
-    would bypass the error envelope (API §1.2)."""
-
-    def __init__(self, path: PathLike, status_code: int, stat_result: os.stat_result) -> None:
-        super().__init__(path, status_code=status_code, stat_result=stat_result)
-        self.headers["accept-ranges"] = "none"
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        headers = scope.get("headers") or []
-        if any(name.lower() == b"range" for name, _ in headers):
-            scope = {**scope, "headers": [(n, v) for n, v in headers if n.lower() != b"range"]}
-        await super().__call__(scope, receive, send)
-
-
-class ImmutableAssets(StaticFiles):
-    """``StaticFiles`` for content-hashed assets: cacheable for a year, sent whole."""
-
-    def file_response(
-        self,
-        full_path: PathLike,
-        stat_result: os.stat_result,
-        scope: Scope,
-        status_code: int = 200,
-    ) -> Response:
-        response: Response = WholeFileResponse(full_path, status_code, stat_result)
-        if self.is_not_modified(response.headers, Headers(scope=scope)):
-            response = NotModifiedResponse(response.headers)
-        response.headers["Cache-Control"] = ASSET_CACHE_CONTROL
-        return response
+def is_api_path(path: str) -> bool:
+    """True for ``/api`` and everything below it."""
+    return path == "/api" or path.startswith("/api/")
 
 
 class FrontendApp:
     """Answers every request that no route matched (see the module docstring)."""
 
-    def __init__(self, build: FrontendBuild) -> None:
-        self.build = build
+    def __init__(self, dist: Path) -> None:
+        self.dist = dist
+        #: Names of the files at the root of the build, read once at startup.
+        self.root_files = (
+            {entry.name for entry in dist.iterdir() if entry.is_file()} if dist.is_dir() else set()
+        )
 
     def response_for(self, method: str, path: str) -> Response:
         """The response for a request that no API route or mount handled."""
@@ -142,29 +59,24 @@ class FrontendApp:
             return error_response(NotFoundError())
         if method not in READ_METHODS:
             return error_response(MethodNotAllowedError(), {"Allow": ", ".join(READ_METHODS)})
-        index = self.build.index
-        if index is None:
+        if INDEX_FILE not in self.root_files:
             return JSONResponse(envelope(NOT_BUILT_CODE, NOT_BUILT_MESSAGE), status_code=503)
         if path == ASSETS_PATH or path.startswith(ASSETS_PATH + "/"):
             return error_response(NotFoundError())
         name = path.removeprefix("/")
-        served = self.build.root_files.get(name) if "/" not in name else None
-        page = served or index
-        return Response(
-            page.content, media_type=page.media_type, headers={"Cache-Control": NO_CACHE}
-        )
+        served = name if name in self.root_files else INDEX_FILE
+        return FileResponse(self.dist / served, headers={"Cache-Control": NO_CACHE})
 
     async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         response = self.response_for(scope["method"], scope["path"])
         await response(scope, receive, send)
 
 
-def install(app: FastAPI, dist: Path) -> FrontendBuild:
+def install(app: FastAPI, dist: Path) -> None:
     """Mount the assets and install the SPA fallback; call after the API routes."""
-    build = load_build(dist)
-    if build.index is None:
+    frontend = FrontendApp(dist)
+    if INDEX_FILE not in frontend.root_files:
         log.warning("no frontend build found; non-API paths answer 503")
-    elif build.assets_dir is not None:
-        app.mount(ASSETS_PATH, ImmutableAssets(directory=build.assets_dir, follow_symlink=False))
-    app.router.default = FrontendApp(build)
-    return build
+    elif (dist / "assets").is_dir():
+        app.mount(ASSETS_PATH, StaticFiles(directory=dist / "assets"))
+    app.router.default = frontend

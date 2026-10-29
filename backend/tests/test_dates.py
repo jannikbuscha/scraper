@@ -162,19 +162,14 @@ def test_timestamp_input_needs_a_zone_and_a_real_time(value: str) -> None:
     ],
 )
 def test_timestamps_before_the_year_1000_keep_four_year_digits(value: str, expected: str) -> None:
-    # strftime("%Y") writes "999" on glibc; the storage format needs "0999".
     result = clock.normalize_timestamp_input(value)
     assert result == expected
     assert clock.is_timestamp(result)
 
 
-@pytest.mark.parametrize(
-    "value",
-    ["0001-01-01T00:00:00+14:00", "9999-12-31T23:59:59-01:00", "0000-01-01T00:00:00Z"],
-)
-def test_timestamps_outside_the_datetime_range_are_invalid(value: str) -> None:
+def test_the_year_zero_is_invalid() -> None:
     with pytest.raises(ValueError):
-        clock.normalize_timestamp_input(value)
+        clock.normalize_timestamp_input("0000-01-01T00:00:00Z")
 
 
 def test_format_timestamp_pads_early_years() -> None:

@@ -29,7 +29,7 @@ def source_of(actor: Actor, restored_src: str | None = None) -> str:
         return f"{actor.name}@{actor.run_id}"
     if channel in ("restore", "merge", "system") and restored_src:
         return restored_src
-    return f"manual:{actor.name}"
+    return "manual"
 
 
 def is_locked(actor: Actor) -> bool:

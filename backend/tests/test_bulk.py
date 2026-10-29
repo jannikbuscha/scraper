@@ -10,8 +10,7 @@ from mdt.domain.errors import NotFoundError, ValidationError
 from mdt.domain.revisions import apply_change, bulk_apply, soft_delete
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     assert_matches_latest_snapshot,
     create_project,
     fields_of,
@@ -25,53 +24,47 @@ def test_results_per_item(db: Db) -> None:
     with db.session() as session:
         updated = create_project(session).entity_id
         unchanged = create_project(session, status="active").entity_id
-        conflicted = create_project(session, policy_domains=["domain_c"]).entity_id
-        apply_change(session, "project", conflicted, {"name_en": "x"}, BOB, expected_version=1)
+        edited = create_project(session, policy_domains=["domain_c"]).entity_id
+        apply_change(session, "project", edited, {"name_en": "x"}, USER)
         deleted = create_project(session).entity_id
-        soft_delete(session, "project", deleted, ALICE, expected_version=1)
+        soft_delete(session, "project", deleted, USER)
         result = bulk_apply(
             session,
             "project",
-            [
-                {"id": updated, "expected_version": 1},
-                {"id": unchanged, "expected_version": 1},
-                {"id": conflicted, "expected_version": 1},
-                {"id": deleted, "expected_version": 2},
-                {"id": MISSING, "expected_version": 1},
-            ],
-            ALICE,
+            [updated, unchanged, edited, deleted, MISSING],
+            USER,
             set_values={"status": "active"},
             add={"policy_domains": ["domain_a"]},
             note="Bulk example",
         )
         by_id = {item.id: item.as_dict() for item in result.results}
-        assert by_id[updated] == {
-            "id": updated,
-            "status": "updated",
-            "version": 2,
-            "current_version": None,
-            "current_values": None,
-            "error": None,
-        }
+        assert by_id[updated] == {"id": updated, "status": "updated", "version": 2, "error": None}
         # Nothing differs for "unchanged" except the added domain.
         assert by_id[unchanged]["status"] == "updated"
-        assert by_id[conflicted]["status"] == "conflict"
-        assert by_id[conflicted]["current_version"] == 2
-        assert by_id[conflicted]["current_values"] == {
-            "status": None,
-            "policy_domains": ["domain_c"],
+        # A record edited before is updated from its current state.
+        assert (by_id[edited]["status"], by_id[edited]["version"]) == ("updated", 3)
+        assert fields_of(session, "project", edited)["policy_domains"] == [
+            "domain_c",
+            "domain_a",
+        ]
+        # A deleted record is left unchanged and reported with its version.
+        assert by_id[deleted] == {
+            "id": deleted,
+            "status": "entity_deleted",
+            "version": 2,
+            "error": None,
         }
-        assert by_id[deleted]["status"] == "entity_deleted"
+        assert fields_of(session, "project", deleted)["status"] != "active"
         assert by_id[MISSING]["status"] == "error"
         assert by_id[MISSING]["error"]["code"] == "not_found"
-        for entity_id in (updated, unchanged):
+        for entity_id in (updated, unchanged, edited):
             revision = revisions_of(session, entity_id)[-1]
             assert (revision.batch_id, revision.note) == (result.batch_id, "Bulk example")
         again = bulk_apply(
             session,
             "project",
-            [{"id": updated, "expected_version": 2}],
-            ALICE,
+            [updated],
+            USER,
             set_values={"status": "active"},
         )
         assert again.results[0].status == "unchanged"
@@ -87,8 +80,8 @@ def test_add_and_remove_keep_order(db: Db) -> None:
         bulk_apply(
             session,
             "project",
-            [{"id": project_id, "expected_version": 1}],
-            ALICE,
+            [project_id],
+            USER,
             add={"policy_domains": ["domain_c", "domain_b", "domain_a"]},
             remove={"beneficiaries": ["group_a", "group_x"]},
         )
@@ -104,8 +97,8 @@ def test_item_errors_do_not_affect_other_items(db: Db) -> None:
         result = bulk_apply(
             session,
             "project",
-            [{"id": good, "expected_version": 1}, {"id": bad, "expected_version": 1}],
-            ALICE,
+            [good, bad],
+            USER,
             set_values={"in_paper_scope": True, "scope_note": "Synthetic reason."},
         )
         assert [item.status for item in result.results] == ["updated", "updated"]
@@ -115,8 +108,8 @@ def test_item_errors_do_not_affect_other_items(db: Db) -> None:
         failing = bulk_apply(
             session,
             "project",
-            [{"id": good, "expected_version": 2}],
-            ALICE,
+            [good],
+            USER,
             set_values={"status": "retired"},
         )
         assert failing.results[0].status == "error"
@@ -145,37 +138,29 @@ def test_invalid_requests_are_refused_as_a_whole(db: Db, kwargs: dict[str, Any],
     with db.session() as session:
         project_id = create_project(session).entity_id
         with pytest.raises(ValidationError) as caught:
-            bulk_apply(
-                session, "project", [{"id": project_id, "expected_version": 1}], ALICE, **kwargs
-            )
+            bulk_apply(session, "project", [project_id], USER, **kwargs)
         assert path in (caught.value.details or {})
         assert len(revisions_of(session, project_id)) == 1
 
 
-def test_invalid_item_lists(db: Db) -> None:
+def test_invalid_id_lists(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session).entity_id
-        item = {"id": project_id, "expected_version": 1}
-        for items, path in (
-            ([], "items"),
-            ([item, item], "items[1].id"),
-            ([{"id": project_id}], "items[0].expected_version"),
-            ([{"expected_version": 1}], "items[0].id"),
-            ([item] * 501, "items"),
-            # expected_version is an integer in [0, 2^63 - 1] like in every other body
-            ([{"id": project_id, "expected_version": -5}], "items[0].expected_version"),
-            ([{"id": project_id, "expected_version": 2**63}], "items[0].expected_version"),
-            ([{"id": project_id, "expected_version": 2**80}], "items[0].expected_version"),
-            ([{"id": f"{project_id}\ud800", "expected_version": 1}], "items[0].id"),
+        for ids, path in (
+            ([], "ids"),
+            ([project_id, project_id], "ids[1]"),
+            ([""], "ids[0]"),
+            ([f"prj_{index:026d}" for index in range(501)], "ids"),
         ):
             with pytest.raises(ValidationError) as caught:
-                bulk_apply(session, "project", items, ALICE, set_values={"status": "active"})
+                bulk_apply(session, "project", ids, USER, set_values={"status": "active"})
             assert path in (caught.value.details or {})
+        assert len(revisions_of(session, project_id)) == 1
 
 
 def test_comments_have_no_bulk_edit(db: Db) -> None:
     with db.session() as session, pytest.raises(NotFoundError):
-        bulk_apply(session, "comment", [], ALICE, set_values={"status": "open"})
+        bulk_apply(session, "comment", [], USER, set_values={"status": "open"})
 
 
 def test_bulk_verification_status_with_note(db: Db) -> None:
@@ -184,8 +169,8 @@ def test_bulk_verification_status_with_note(db: Db) -> None:
         result = bulk_apply(
             session,
             "project",
-            [{"id": project_id, "expected_version": 1}],
-            ALICE,
+            [project_id],
+            USER,
             set_values={"verification_status": "verified"},
             note="Reviewed in bulk.",
         )
@@ -195,38 +180,31 @@ def test_bulk_verification_status_with_note(db: Db) -> None:
 
 def test_bulk_exclusion_needs_a_reason_in_the_same_set(db: Db) -> None:
     with db.session() as session:
-        unscreened = apply_change(session, "document", None, {"title": "Example A"}, ALICE)
+        unscreened = apply_change(session, "document", None, {"title": "Example A"}, USER)
         excluded = apply_change(
             session,
             "document",
             None,
             {"title": "Example B", "screening_status": "excluded", "screening_reason": "reason_a"},
-            ALICE,
+            USER,
         )
-        items = [
-            {"id": unscreened.entity_id, "expected_version": 1},
-            {"id": excluded.entity_id, "expected_version": 1},
-        ]
+        items = [unscreened.entity_id, excluded.entity_id]
         with pytest.raises(ValidationError) as caught:
             bulk_apply(
-                session, "document", items, ALICE, set_values={"screening_status": "excluded"}
+                session, "document", items, USER, set_values={"screening_status": "excluded"}
             )
         assert list(caught.value.details or {}) == ["set.screening_reason"]
         result = bulk_apply(
             session,
             "document",
             items,
-            ALICE,
+            USER,
             set_values={"screening_status": "excluded", "screening_reason": "reason_b"},
         )
         assert [item.status for item in result.results] == ["updated", "updated"]
         # Including keeps the per-record rule: the reason has to go in the same change.
-        items = [
-            {"id": entity, "expected_version": 2}
-            for entity in (unscreened.entity_id, excluded.entity_id)
-        ]
         result = bulk_apply(
-            session, "document", items, ALICE, set_values={"screening_status": "included"}
+            session, "document", items, USER, set_values={"screening_status": "included"}
         )
         assert [item.status for item in result.results] == ["error", "error"]
         assert result.results[0].error is not None
@@ -237,7 +215,7 @@ def test_bulk_exclusion_needs_a_reason_in_the_same_set(db: Db) -> None:
             session,
             "document",
             items,
-            ALICE,
+            USER,
             set_values={"screening_status": "included", "screening_reason": None},
         )
         assert [item.status for item in result.results] == ["updated", "updated"]

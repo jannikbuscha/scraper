@@ -280,6 +280,6 @@ def _seed_update(
     report.updated[spec.name] += 1
     if report.dry_run:
         return
-    result = update_record(unit, row, changes, note=note, expected_version=None, batch_id=None)
+    result = update_record(unit, row, changes, note=note, batch_id=None)
     if result.changed:
         report.revisions += 1

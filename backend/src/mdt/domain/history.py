@@ -32,23 +32,6 @@ def latest_revision(session: Session, entity_id: str) -> Revision | None:
     ).first()
 
 
-def revisions_between(
-    session: Session, entity_id: str, after_version: int, up_to_version: int
-) -> list[Revision]:
-    """Revisions with ``after_version < version <= up_to_version``, oldest first."""
-    return list(
-        session.scalars(
-            select(Revision)
-            .where(
-                Revision.entity_id == entity_id,
-                Revision.version > after_version,
-                Revision.version <= up_to_version,
-            )
-            .order_by(Revision.version)
-        )
-    )
-
-
 def revision_summary(revision: Revision) -> dict[str, Any]:
     """The RevisionSummary representation."""
     return {

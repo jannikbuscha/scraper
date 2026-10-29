@@ -7,7 +7,7 @@ from sqlalchemy import text
 from mdt.domain.check import run_check
 from mdt.domain.revisions import apply_change, set_field_verification
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_evidence, create_project, revision_count
+from tests.helpers import USER, create_event, create_evidence, create_project, revision_count
 
 
 def problems(db: Db) -> list[str]:
@@ -88,7 +88,7 @@ def test_rows_that_differ_from_their_latest_snapshot(db: Db) -> None:
         b = create_project(session).entity_id
         c = create_project(session).entity_id
         d = create_project(session).entity_id
-        apply_change(session, "project", d, {"name_en": "x"}, ALICE, expected_version=1)
+        apply_change(session, "project", d, {"name_en": "x"}, USER)
     tamper(db, "UPDATE project SET name_en = 'Tampered' WHERE id = :id", id=a)
     tamper(db, "UPDATE project SET field_meta = '{}' WHERE id = :id", id=b)
     tamper(db, "UPDATE project SET deleted_by = 'Someone' WHERE id = :id", id=c)
@@ -134,9 +134,8 @@ def test_verified_fields_whose_evidence_is_missing_deleted_or_elsewhere(db: Db) 
             project_id,
             "name_en",
             "verified",
-            ALICE,
+            USER,
             evidence_id=evidence_id,
-            expected_version=1,
         )
         set_field_verification(
             session,
@@ -144,9 +143,8 @@ def test_verified_fields_whose_evidence_is_missing_deleted_or_elsewhere(db: Db) 
             project_id,
             "slug",
             "verified",
-            ALICE,
+            USER,
             evidence_id=slug_evidence,
-            expected_version=2,
         )
         assert run_check(session, db.settings).ok
     tamper(

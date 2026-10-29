@@ -33,7 +33,7 @@ from mdt.domain.vocab import TermIndex
 from tests import synthetic
 from tests.conftest import Db, make_settings, open_db
 from tests.helpers import (
-    ALICE,
+    USER,
     create_event,
     create_evidence,
     create_project,
@@ -303,16 +303,16 @@ def test_event_writes_recompute_old_and_new_subjects(db: Db) -> None:
         event_id = create_event(session, first, "launch", "2013-05").entity_id
         assert stored(session, first).period == "pre_invasion"
         assert stored(session, first).launch_event_id == event_id
-        apply_change(session, "event", event_id, {"date": "2017"}, ALICE, expected_version=1)
+        apply_change(session, "event", event_id, {"date": "2017"}, USER)
         assert stored(session, first).period == "full_scale_war"
-        apply_change(session, "event", event_id, {"subject_id": second}, ALICE, expected_version=2)
+        apply_change(session, "event", event_id, {"subject_id": second}, USER)
         assert stored(session, first).period == "unknown"
         assert stored(session, second).war_trajectory == "new_in_war"
-        soft_delete(session, "event", event_id, ALICE, expected_version=3)
+        soft_delete(session, "event", event_id, USER)
         assert stored(session, second).period_reason == "no_date"
-        undelete(session, "event", event_id, ALICE, expected_version=4)
+        undelete(session, "event", event_id, USER)
         assert stored(session, second).period == "full_scale_war"
-        restore_version(session, "event", event_id, 1, ALICE, expected_version=5)
+        restore_version(session, "event", event_id, 1, USER)
         assert stored(session, first).period == "pre_invasion"
         assert stored(session, second).period == "unknown"
 
@@ -326,16 +326,15 @@ def test_disputed_events_are_ignored(db: Db) -> None:
             "event",
             event_id,
             {"verification_status": "disputed"},
-            ALICE,
+            USER,
             note="Contradicting source.",
-            expected_version=1,
         )
         assert stored(session, project_id).period_reason == "no_date"
         bulk_apply(
             session,
             "event",
-            [{"id": event_id, "expected_version": 2}],
-            ALICE,
+            [event_id],
+            USER,
             set_values={"verification_status": "unverified"},
         )
         assert stored(session, project_id).period == "pre_invasion"
@@ -356,9 +355,8 @@ def test_event_verification_and_services_get_rows(db: Db) -> None:
             event_id,
             "date",
             "verified",
-            ALICE,
+            USER,
             evidence_id=evidence_id,
-            expected_version=1,
         )
         assert stored(session, service_id).launch_event_id == event_id
 
@@ -367,14 +365,14 @@ def test_focal_participations_set_the_portfolio_entry(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session).entity_id
         focal = focal_org_id(session)
-        other = apply_change(session, "organization", None, {"name_en": "Example org"}, ALICE)
+        other = apply_change(session, "organization", None, {"name_en": "Example org"}, USER)
         base = {"subject_id": project_id, "role": "owner", "start": "2014-02"}
         apply_change(
-            session, "participation", None, {**base, "organization_id": other.entity_id}, ALICE
+            session, "participation", None, {**base, "organization_id": other.entity_id}, USER
         )
         assert stored(session, project_id).portfolio_entry_value is None
         participation_id = apply_change(
-            session, "participation", None, {**base, "organization_id": focal}, ALICE
+            session, "participation", None, {**base, "organization_id": focal}, USER
         ).entity_id
         row = stored(session, project_id)
         assert (row.portfolio_entry_value, row.portfolio_entry_participation_id) == (
@@ -387,8 +385,7 @@ def test_focal_participations_set_the_portfolio_entry(db: Db) -> None:
             "participation",
             participation_id,
             {"organization_id": other.entity_id},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert stored(session, project_id).portfolio_entry_value is None
 
@@ -411,8 +408,7 @@ def test_event_type_terms_trigger_a_full_recompute(db: Db) -> None:
             "vocabulary_term",
             announced.id,
             {"attributes": {"counts_as_modification": True}},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         assert stored(session, project_id).war_trajectory == "adapted_in_war"
         with read_transaction(session):

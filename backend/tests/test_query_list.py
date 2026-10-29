@@ -15,7 +15,7 @@ from mdt.domain.errors import NotFoundError, ValidationError
 from mdt.domain.query import list_entities
 from mdt.domain.revisions import soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_project, create_service
+from tests.helpers import USER, create_event, create_project, create_service
 from tests.read_helpers import (
     assert_consistent,
     count_statements,
@@ -48,7 +48,7 @@ def catalog(
                 project = create_project(session, name_en=f"Bulk project {index:02d}")
                 projects.append(project.entity_id)
                 create_event(session, project.entity_id, "launch", f"20{10 + index % 9}")
-                create_comment(session, project.entity_id, f"Note {index}", ALICE)
+                create_comment(session, project.entity_id, f"Note {index}", USER)
                 service = create_service(session, project.entity_id, name_en=f"Bulk svc {index}")
                 create_event(session, service.entity_id, "expansion", "2016-05")
                 documents.append(
@@ -147,13 +147,13 @@ def test_deleted_modes(db: Db) -> None:
     with db.session() as session:
         live = create(session, "component", name_en="Live component").entity_id
         gone = create(session, "component", name_en="Deleted component").entity_id
-        soft_delete(session, "component", gone, ALICE, expected_version=1)
+        soft_delete(session, "component", gone, USER)
         assert ids_of(list_entities(session, "component", {})) == [live]
         assert ids_of(list_entities(session, "component", {"deleted": "only"})) == [gone]
         result = list_entities(session, "component", {"deleted": "include", "sort": "name_en"})
         assert ids_of(result) == [gone, live]
         assert result["items"][0]["deleted_at"] is not None
-        assert result["items"][0]["deleted_by"] == ALICE.name
+        assert result["items"][0]["deleted_by"] == USER.name
 
 
 # --------------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ def test_search_combines_with_filters_and_blank_queries(db: Db) -> None:
 def test_deleted_entities_stay_searchable(db: Db) -> None:
     with db.session() as session:
         gone = create(session, "component", name_en="Searchable component").entity_id
-        soft_delete(session, "component", gone, ALICE, expected_version=1)
+        soft_delete(session, "component", gone, USER)
         assert search(session, "component", "searchable") == []
         assert search(session, "component", "searchable", deleted="only") == [gone]
         assert search(session, "component", "searchable", deleted="include") == [gone]

@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import FastAPI, Request
 from starlette.responses import Response
 
-from mdt.api.deps import RestoreActor, SessionDep, UiActor
+from mdt.api.deps import SessionDep
 from mdt.api.exports import export_response
 from mdt.api.schemas import (
     BulkBody,
@@ -22,6 +22,7 @@ from mdt.api.schemas import (
     VerifyFieldBody,
     VersionPath,
 )
+from mdt.domain.actor import Actor
 from mdt.domain.feeds import entity_diff, entity_revision, entity_revisions
 from mdt.domain.query import facet_values, list_entities
 from mdt.domain.revisions import (
@@ -53,12 +54,10 @@ def get_export(entity_type: str, request: Request, session: SessionDep) -> Respo
     return export_response(session, entity_type, request.query_params)
 
 
-def create_entity(
-    entity_type: str, body: CreateBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def create_entity(entity_type: str, body: CreateBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/entities/{type}`` → ``201 {item, revision_id, warnings}``."""
     generic_spec(entity_type)
-    result = apply_change(session, entity_type, None, body.data, actor, note=body.note)
+    result = apply_change(session, entity_type, None, body.data, Actor.ui(), note=body.note)
     return {
         "item": get_item(session, entity_type, result.entity_id),
         "revision_id": result.revision_id,
@@ -72,19 +71,11 @@ def get_entity(entity_type: str, entity_id: str, session: SessionDep) -> dict[st
 
 
 def patch_entity(
-    entity_type: str, entity_id: str, body: PatchBody, session: SessionDep, actor: UiActor
+    entity_type: str, entity_id: str, body: PatchBody, session: SessionDep
 ) -> dict[str, Any]:
     """``PATCH /api/entities/{type}/{id}``; a no-op returns ``changed: false``."""
     generic_spec(entity_type)
-    result = apply_change(
-        session,
-        entity_type,
-        entity_id,
-        body.changes,
-        actor,
-        note=body.note,
-        expected_version=body.expected_version,
-    )
+    result = apply_change(session, entity_type, entity_id, body.changes, Actor.ui(), note=body.note)
     return {
         "item": get_item(session, entity_type, entity_id),
         "changed": result.changed,
@@ -94,18 +85,12 @@ def patch_entity(
 
 
 def delete_entity(
-    entity_type: str, entity_id: str, body: StateChangeBody, session: SessionDep, actor: UiActor
+    entity_type: str, entity_id: str, body: StateChangeBody, session: SessionDep
 ) -> dict[str, Any]:
     """``POST …/{id}/delete`` (soft delete; ``cascade`` also deletes dependent services)."""
     generic_spec(entity_type)
     result = soft_delete(
-        session,
-        entity_type,
-        entity_id,
-        actor,
-        note=body.note,
-        expected_version=body.expected_version,
-        cascade=body.cascade,
+        session, entity_type, entity_id, Actor.ui(), note=body.note, cascade=body.cascade
     )
     return {
         "item": get_item(session, entity_type, entity_id),
@@ -115,18 +100,12 @@ def delete_entity(
 
 
 def undelete_entity(
-    entity_type: str, entity_id: str, body: StateChangeBody, session: SessionDep, actor: UiActor
+    entity_type: str, entity_id: str, body: StateChangeBody, session: SessionDep
 ) -> dict[str, Any]:
     """``POST …/{id}/undelete`` (``cascade`` also undeletes the rows of the delete batch)."""
     generic_spec(entity_type)
     result = undelete(
-        session,
-        entity_type,
-        entity_id,
-        actor,
-        note=body.note,
-        expected_version=body.expected_version,
-        cascade=body.cascade,
+        session, entity_type, entity_id, Actor.ui(), note=body.note, cascade=body.cascade
     )
     return {
         "item": get_item(session, entity_type, entity_id),
@@ -136,7 +115,7 @@ def undelete_entity(
 
 
 def verify_field(
-    entity_type: str, entity_id: str, body: VerifyFieldBody, session: SessionDep, actor: UiActor
+    entity_type: str, entity_id: str, body: VerifyFieldBody, session: SessionDep
 ) -> dict[str, Any]:
     """``POST …/{id}/verify-field``; setting the current status again writes nothing
     (``revision_id: null``)."""
@@ -147,10 +126,9 @@ def verify_field(
         entity_id,
         body.field,
         body.status,
-        actor,
+        Actor.ui(),
         note=body.note,
         evidence_id=body.evidence_id,
-        expected_version=body.expected_version,
     )
     return {"item": get_item(session, entity_type, entity_id), "revision_id": result.revision_id}
 
@@ -185,7 +163,7 @@ def get_diff(
 
 
 def restore_entity(
-    entity_type: str, entity_id: str, body: RestoreBody, session: SessionDep, actor: RestoreActor
+    entity_type: str, entity_id: str, body: RestoreBody, session: SessionDep
 ) -> dict[str, Any]:
     """``POST …/{id}/restore`` on channel ``restore``; ``dry_run`` only computes
     ``changes``."""
@@ -195,9 +173,8 @@ def restore_entity(
         entity_type,
         entity_id,
         body.version,
-        actor,
+        Actor.restore(),
         note=body.note,
-        expected_version=body.expected_version,
         fields=body.fields,
         dry_run=body.dry_run,
     )
@@ -211,16 +188,14 @@ def restore_entity(
     }
 
 
-def bulk_edit(
-    entity_type: str, body: BulkBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
-    """``POST /api/entities/{type}/bulk``: one write unit per item, shared ``batch_id``."""
+def bulk_edit(entity_type: str, body: BulkBody, session: SessionDep) -> dict[str, Any]:
+    """``POST /api/entities/{type}/bulk``: one write unit per record, shared ``batch_id``."""
     generic_spec(entity_type)
     result = bulk_apply(
         session,
         entity_type,
-        body.items,
-        actor,
+        body.ids,
+        Actor.ui(),
         set_values=body.set_,
         add=body.add,
         remove=body.remove,

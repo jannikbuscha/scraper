@@ -26,8 +26,7 @@ from mdt.domain.writes import ChangeResult
 from tests import synthetic
 from tests.conftest import Db
 
-ALICE = Actor.ui("Alice Example")
-BOB = Actor.ui("Bob Example")
+USER = Actor.ui()
 
 _counter = itertools.count(1)
 
@@ -48,13 +47,13 @@ def project_data(**overrides: Any) -> dict[str, Any]:
     return data
 
 
-def create_project(session: Session, actor: Actor = ALICE, **overrides: Any) -> ChangeResult:
+def create_project(session: Session, actor: Actor = USER, **overrides: Any) -> ChangeResult:
     """Create a project with synthetic values."""
     return apply_change(session, "project", None, project_data(**overrides), actor)
 
 
 def create_service(
-    session: Session, project_id: str, actor: Actor = ALICE, **overrides: Any
+    session: Session, project_id: str, actor: Actor = USER, **overrides: Any
 ) -> ChangeResult:
     """Create a service of ``project_id``."""
     data: dict[str, Any] = {"project_id": project_id, "name_en": "Example service"}
@@ -67,7 +66,7 @@ def create_event(
     subject_id: str,
     event_type: str = "launch",
     date: str | None = None,
-    actor: Actor = ALICE,
+    actor: Actor = USER,
     **overrides: Any,
 ) -> ChangeResult:
     """Create an event; a date gets the matching basis unless one is given."""
@@ -82,7 +81,7 @@ def create_event(
 
 
 def create_evidence(
-    session: Session, subject_id: str, field_name: str, actor: Actor = ALICE, **overrides: Any
+    session: Session, subject_id: str, field_name: str, actor: Actor = USER, **overrides: Any
 ) -> ChangeResult:
     """Create a URL evidence row that targets ``field:<field_name>``."""
     data: dict[str, Any] = {

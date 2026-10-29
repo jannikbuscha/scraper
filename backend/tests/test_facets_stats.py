@@ -14,7 +14,7 @@ from mdt.domain.errors import BadFilterError, NotFoundError
 from mdt.domain.query import entity_stats, facet_values, vocabulary_listing
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, create_event, create_project, create_service
+from tests.helpers import USER, create_event, create_project, create_service
 from tests.read_helpers import (
     assert_consistent,
     create,
@@ -62,14 +62,13 @@ def build(session: Any) -> dict[str, str]:
             policy_domains=domains,
             in_paper_scope=scope,
         ).entity_id
-    soft_delete(session, "project", ids["FD"], ALICE, expected_version=1)
+    soft_delete(session, "project", ids["FD"], USER)
     apply_change(
         session,
         "project",
         ids["FA"],
         {"verification_status": "verified"},
-        ALICE,
-        expected_version=1,
+        USER,
         note="Checked against the example source.",
     )
     create_event(session, ids["FA"], "launch", "2012")
@@ -98,10 +97,10 @@ def build(session: Any) -> dict[str, str]:
     update(session, "vocabulary_term", term_id(session, "paper_cluster", "cluster_b"), sort_order=5)
 
     ids["T_ACTIVE"] = term_id(session, "status", "active")
-    create_comment(session, ids["T_ACTIVE"], "Is this definition precise?", ALICE)
-    create_comment(session, ids["FA"], "Open thread", ALICE)
-    resolved = create_comment(session, ids["FB"], "Resolved thread", ALICE)
-    resolve_comment(session, resolved.entity_id, ALICE, expected_version=1)
+    create_comment(session, ids["T_ACTIVE"], "Is this definition precise?", USER)
+    create_comment(session, ids["FA"], "Open thread", USER)
+    resolved = create_comment(session, ids["FB"], "Resolved thread", USER)
+    resolve_comment(session, resolved.entity_id, USER)
     return ids
 
 

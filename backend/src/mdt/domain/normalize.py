@@ -73,33 +73,6 @@ def has_unpaired_surrogate(value: str) -> bool:
     return _SURROGATE.search(value) is not None
 
 
-def unpaired_surrogate_problems(value: Any, path: str = "") -> dict[str, list[str]]:
-    """``{path: [message]}`` for every string, and every object key, in a parsed JSON
-    value that contains an unpaired surrogate. Paths are dotted (``data.name_en``,
-    ``items[0].id``); a bad key is reported at the object that holds it, so no path
-    repeats the invalid text. An empty result means the value is valid Unicode text."""
-    problems: dict[str, list[str]] = {}
-
-    def visit(item: Any, where: str) -> None:
-        if isinstance(item, str):
-            if has_unpaired_surrogate(item):
-                problems.setdefault(where or "body", []).append(UNPAIRED_SURROGATE_MESSAGE)
-        elif isinstance(item, dict):
-            for key, child in item.items():
-                if isinstance(key, str) and has_unpaired_surrogate(key):
-                    messages = problems.setdefault(where or "body", [])
-                    if _SURROGATE_KEY_MESSAGE not in messages:
-                        messages.append(_SURROGATE_KEY_MESSAGE)
-                    continue
-                visit(child, f"{where}.{key}" if where else str(key))
-        elif isinstance(item, list):
-            for index, child in enumerate(item):
-                visit(child, f"{where}[{index}]")
-
-    visit(value, path)
-    return problems
-
-
 def _check_text(value: str) -> None:
     if has_unpaired_surrogate(value):
         raise ValueProblem(UNPAIRED_SURROGATE_MESSAGE)
@@ -197,10 +170,7 @@ def _normalize_number(spec: FieldSpec, value: Any) -> float | None:
         return None
     if isinstance(value, bool) or not isinstance(value, int | float):
         raise ValueProblem("must be a number")
-    try:
-        result = float(value)
-    except OverflowError as exc:  # a JSON integer beyond the float range (about 1.8e308)
-        raise ValueProblem("must be a finite number") from exc
+    result = float(value)
     if not math.isfinite(result):
         raise ValueProblem("must be a finite number")
     return result

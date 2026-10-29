@@ -113,7 +113,7 @@ def test_serve_flags_take_precedence(environment: Path, monkeypatch: pytest.Monk
         8080,
     )
     assert (defaults["host"], defaults["port"], defaults["reload"]) == ("127.0.0.2", 8181, False)
-    assert flags["workers"] == 1 and flags["proxy_headers"] is False
+    assert flags["workers"] == 1
     assert reload["reload"] is True and reload["reload_dirs"]
 
 

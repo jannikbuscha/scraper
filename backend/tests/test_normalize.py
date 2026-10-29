@@ -15,7 +15,6 @@ from mdt.domain.normalize import (
     is_empty,
     normalize_note,
     normalize_value,
-    unpaired_surrogate_problems,
     values_equal,
 )
 from mdt.domain.registry import ENTITY_TYPES, FieldSpec
@@ -121,8 +120,6 @@ def test_bool_int_number() -> None:
     assert normalized(value, 2.5) == 2.5
     for bad in (float("nan"), float("inf"), "3", True):
         assert "value" in problems_of(value, bad)
-    # a JSON integer beyond the float range is not a finite number (float() overflows)
-    assert problems_of(value, 10**400) == {"value": ["must be a finite number"]}
     assert normalized(value, 10**300) == 1e300
 
 
@@ -130,8 +127,7 @@ SURROGATE = "\ud800"
 
 
 def test_unpaired_surrogates_are_refused_on_every_channel() -> None:
-    # The JSON body check refuses them first over HTTP; normalisation refuses them for
-    # the seed, imports and collectors too.
+    # Normalisation refuses them on every channel (seed, imports and collectors too).
     assert "name_en" in problems_of(PROJECT.field("name_en"), f"a{SURROGATE}b")
     assert "notes" in problems_of(PROJECT.field("notes"), f"line{SURROGATE}")
     assert "official_urls[0]" in problems_of(
@@ -152,20 +148,6 @@ def test_unpaired_surrogates_are_refused_on_every_channel() -> None:
         normalize_note(f"note {SURROGATE}")
     # a surrogate pair written as one character is ordinary text
     assert normalized(PROJECT.field("name_en"), "Smile \U0001f600") == "Smile \U0001f600"
-
-
-def test_unpaired_surrogate_problems_name_every_path() -> None:
-    body = {
-        "data": {"name_en": f"a{SURROGATE}", "aliases": [{"text": "ok"}, {"text": SURROGATE}]},
-        "items": [{"id": f"x{SURROGATE}"}],
-        "set": {f"k{SURROGATE}": "v"},
-        "fine": ["ok", 1, None, True],
-    }
-    problems = unpaired_surrogate_problems(body)
-    assert sorted(problems) == ["data.aliases[1].text", "data.name_en", "items[0].id", "set"]
-    assert SURROGATE not in str(problems)
-    assert unpaired_surrogate_problems({"a": ["b", {"c": "d"}]}) == {}
-    assert list(unpaired_surrogate_problems(SURROGATE)) == ["body"]
 
 
 def test_ref_checks_the_prefix() -> None:

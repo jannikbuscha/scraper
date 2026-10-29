@@ -20,8 +20,7 @@ from mdt.domain.serialize import (
 )
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     create_event,
     create_evidence,
     create_project,
@@ -192,8 +191,7 @@ def test_document_item_text_links_and_scope(db: Db) -> None:
             "document",
             document.entity_id,
             {"links": [{"subject_id": project, "state": "confirmed"}]},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         detail = item(session, "document", document.entity_id)
         listed = list_entities(session, "document", {})["items"][0]
@@ -248,7 +246,7 @@ def test_label_rules_of_the_other_types(db: Db) -> None:
             "saved_view",
             None,
             {"name": "My view", "entity_type": "project", "query": "sort=name_en"},
-            ALICE,
+            USER,
         ).entity_id
         assert label(session, "participation", participation) == (
             "Example focal organisation · Example initiator · Alpha"
@@ -300,11 +298,11 @@ def test_deleted_items_and_deleted_refs(db: Db) -> None:
     with db.session() as session:
         project = create_project(session, name_en="Soon deleted").entity_id
         event = create_event(session, project, "announced").entity_id
-        soft_delete(session, "project", project, BOB, expected_version=1)
+        soft_delete(session, "project", project, USER)
         deleted = item(session, "project", project)
         event_item = item(session, "event", event)
     assert deleted["deleted_at"] is not None
-    assert deleted["deleted_by"] == BOB.name
+    assert deleted["deleted_by"] == USER.name
     assert deleted["version"] == 2
     assert event_item["refs"]["subject_id"]["deleted"] is True
 
@@ -330,20 +328,20 @@ def test_get_item_errors(db: Db) -> None:
 def test_comment_counts_and_open_comments_by_field(db: Db) -> None:
     with db.session() as session:
         project = create_project(session).entity_id
-        create_comment(session, project, "On the English name", ALICE, field="name_en")
-        create_comment(session, project, "Also on the name", BOB, field="name_en")
-        create_comment(session, project, "On the launch", ALICE, field="launch")
-        root = create_comment(session, project, "Entity-level", ALICE)
-        create_comment(session, project, "A reply", BOB, parent_id=root.entity_id)
-        resolved = create_comment(session, project, "Resolved", ALICE, field="status")
-        resolve_comment(session, resolved.entity_id, ALICE, expected_version=1)
-        hidden = create_comment(session, project, "Deleted thread", ALICE)
+        create_comment(session, project, "On the English name", USER, field="name_en")
+        create_comment(session, project, "Also on the name", USER, field="name_en")
+        create_comment(session, project, "On the launch", USER, field="launch")
+        root = create_comment(session, project, "Entity-level", USER)
+        create_comment(session, project, "A reply", USER, parent_id=root.entity_id)
+        resolved = create_comment(session, project, "Resolved", USER, field="status")
+        resolve_comment(session, resolved.entity_id, USER)
+        hidden = create_comment(session, project, "Deleted thread", USER)
         create_comment(
-            session, project, "Reply in a deleted thread", BOB, parent_id=hidden.entity_id
+            session, project, "Reply in a deleted thread", USER, parent_id=hidden.entity_id
         )
-        delete_comment(session, hidden.entity_id, ALICE, expected_version=1)
-        reply = create_comment(session, project, "Deleted reply", BOB, parent_id=root.entity_id)
-        delete_comment(session, reply.entity_id, BOB, expected_version=1)
+        delete_comment(session, hidden.entity_id, USER)
+        reply = create_comment(session, project, "Deleted reply", USER, parent_id=root.entity_id)
+        delete_comment(session, reply.entity_id, USER)
         result = item(session, "project", project)
     assert result["virtual"]["open_comments"] == 4
     # visible comments: 5 roots and replies minus the deleted thread and the deleted reply
@@ -363,11 +361,11 @@ def test_comment_representation(db: Db) -> None:
             session,
             project,
             "See [source](https://example.org/a) <script>alert(1)</script> **bold**",
-            ALICE,
+            USER,
             field="name_en",
         )
-        reply = create_comment(session, project, "Reply", BOB, parent_id=root.entity_id)
-        edit_comment(session, root.entity_id, "Edited **body**", ALICE, expected_version=1)
+        reply = create_comment(session, project, "Reply", USER, parent_id=root.entity_id)
+        edit_comment(session, root.entity_id, "Edited **body**", USER)
         root_comment = get_comment(session, root.entity_id)
         reply_comment = get_comment(session, reply.entity_id)
         with pytest.raises(NotFoundError):
@@ -385,20 +383,19 @@ def test_comment_representation(db: Db) -> None:
     assert reply_comment["edited"] is False
 
 
-def test_comment_body_html_is_sanitised(db: Db) -> None:
+def test_comment_body_html_is_rendered_markdown(db: Db) -> None:
     with db.session() as session:
         project = create_project(session).entity_id
         comment = create_comment(
             session,
             project,
             "[x](javascript:alert(1)) <img src=x onerror=1> [ok](https://example.org)",
-            ALICE,
+            USER,
         )
         html = get_comment(session, comment.entity_id)["body_html"]
     assert 'href="javascript' not in html  # the refused link stays plain text
     assert "<img" not in html
-    assert 'href="https://example.org"' in html
-    assert 'rel="noopener noreferrer nofollow"' in html
+    assert '<a href="https://example.org">ok</a>' in html
 
 
 # --------------------------------------------------------------------------------------

@@ -5,7 +5,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from tests.api.helpers import ALICE, BOB, ApiClient, error_of
+from mdt.domain.comments import render_markdown
+from tests.api.helpers import USER, ApiClient, error_of
 
 COMMENT_KEYS = {
     "id", "subject_id", "subject_type", "subject_label", "field", "parent_id", "body_md",
@@ -53,7 +54,7 @@ def test_threads_on_every_kind_of_entity(client: ApiClient) -> None:
             subject["label"],
         )
         assert root["subject_type"] == subject["type"]
-        reply = client.comment(subject["id"], "Example reply.", parent_id=root["id"], author=BOB)
+        reply = client.comment(subject["id"], "Example reply.", parent_id=root["id"])
         assert (reply["status"], reply["parent_id"]) == (None, root["id"])
         [thread] = threads(client, subject["id"])
         assert thread["root"]["id"] == root["id"]
@@ -86,23 +87,21 @@ def test_resolve_and_reopen(client: ApiClient) -> None:
     project = client.create_project()
     root = client.comment(project["id"])
     url = f"/api/comments/{root['id']}"
-    body = client.ok(client.post(f"{url}/resolve", {"expected_version": 1}, author=BOB))
+    body = client.ok(client.post(f"{url}/resolve", {}))
     assert body["changed"] is True
     comment = body["comment"]
-    assert (comment["status"], comment["resolved_by"], comment["version"]) == ("resolved", BOB, 2)
+    assert (comment["status"], comment["resolved_by"], comment["version"]) == ("resolved", USER, 2)
     assert comment["resolved_at"]
-    # Idempotent: no revision and no version check when the status is already set.
-    again = client.ok(client.post(f"{url}/resolve", {"expected_version": 1}))
+    # Idempotent: no revision when the status is already set.
+    again = client.ok(client.post(f"{url}/resolve", {}))
     assert (again["changed"], again["comment"]["version"]) == (False, 2)
-    reopened = client.ok(client.post(f"{url}/reopen", {"expected_version": 2}))
+    reopened = client.ok(client.post(f"{url}/reopen", {}))
     assert (reopened["changed"], reopened["comment"]["status"]) == (True, "open")
     assert reopened["comment"]["resolved_by"] is None
-    response = client.post(f"{url}/resolve", {"expected_version": 1})
-    assert (response.status_code, error_of(response)["details"]["action"]) == (409, "comment")
     reply = client.comment(project["id"], parent_id=root["id"])
-    response = client.post(f"/api/comments/{reply['id']}/resolve", {"expected_version": 1})
+    response = client.post(f"/api/comments/{reply['id']}/resolve", {})
     assert (response.status_code, error_of(response)["code"]) == (400, "validation_error")
-    response = client.post(f"{url}/resolve", {"expected_version": 3, "note": "x"})
+    response = client.post(f"{url}/resolve", {"note": "x"})
     assert error_of(response)["details"] == {"note": ["Extra inputs are not permitted"]}
 
 
@@ -112,7 +111,7 @@ def test_the_open_comments_quick_filter(client: ApiClient) -> None:
     root = client.comment(commented["id"], field="slug")
     query = {"f.open_comments": "range:1.."}
     assert [item["id"] for item in client.list("project", **query)["items"]] == [commented["id"]]
-    client.ok(client.post(f"/api/comments/{root['id']}/resolve", {"expected_version": 1}))
+    client.ok(client.post(f"/api/comments/{root['id']}/resolve", {}))
     assert client.list("project", **query)["items"] == []
     assert quiet["id"] not in {item["id"] for item in client.list("project", **query)["items"]}
     counted = client.list("project", **{"f.comment_count": "range:1.."})["items"]
@@ -122,9 +121,9 @@ def test_the_open_comments_quick_filter(client: ApiClient) -> None:
 def test_the_comment_feed_and_its_filters(client: ApiClient) -> None:
     things = subjects(client)
     project_root = client.comment(things["project"]["id"], "About the zephyr pipeline.")
-    service_root = client.comment(things["service"]["id"], "Service remark.", author=BOB)
-    client.comment(things["project"]["id"], "Reply.", parent_id=project_root["id"], author=BOB)
-    client.ok(client.post(f"/api/comments/{service_root['id']}/resolve", {"expected_version": 1}))
+    service_root = client.comment(things["service"]["id"], "Service remark.")
+    client.comment(things["project"]["id"], "Reply.", parent_id=project_root["id"])
+    client.ok(client.post(f"/api/comments/{service_root['id']}/resolve", {}))
 
     def feed(**params: Any) -> list[str]:
         body = client.ok(client.get("/api/comments", params))
@@ -141,8 +140,6 @@ def test_the_comment_feed_and_its_filters(client: ApiClient) -> None:
     assert feed(status="resolved") == [service_root["id"]]
     assert feed(entity_type="service") == [service_root["id"]]
     assert set(feed(entity_type="project,service")) == {project_root["id"], service_root["id"]}
-    assert set(feed(author=BOB)) == {project_root["id"], service_root["id"]}
-    assert feed(author=ALICE) == [project_root["id"]]
     assert feed(q="zephyr") == [project_root["id"]]
     assert client.ok(client.get("/api/comments", {"page_size": 1, "page": 2}))["page"] == 2
     response = client.get("/api/comments", {"status": "closed"})
@@ -153,15 +150,12 @@ def test_editing_a_comment(client: ApiClient) -> None:
     project = client.create_project()
     root = client.comment(project["id"], "Example **draft**.")
     url = f"/api/comments/{root['id']}"
-    body = client.ok(
-        client.patch(url, {"expected_version": 1, "body_md": "Example final.", "note": "Typo"})
-    )
+    body = client.ok(client.patch(url, {"body_md": "Example final.", "note": "Typo"}))
     assert (body["comment"]["body_md"], body["comment"]["edited"]) == ("Example final.", True)
-    response = client.patch(url, {"expected_version": 1, "body_md": "Other."}, author=BOB)
-    assert response.status_code == 409
-    payload = error_of(response)["details"]
-    assert (payload["action"], payload["entity_type"]) == ("comment", "comment")
-    response = client.patch(url, {"expected_version": 2, "body_md": "x" * 10_001})
+    assert body["comment"]["version"] == 2
+    again = client.ok(client.patch(url, {"body_md": "Other."}))
+    assert (again["comment"]["body_md"], again["comment"]["version"]) == ("Other.", 3)
+    response = client.patch(url, {"body_md": "x" * 10_001})
     assert "body_md" in error_of(response)["details"]
 
 
@@ -186,8 +180,8 @@ def test_deleting_a_root_hides_its_thread(client: ApiClient) -> None:
     root = client.comment(project["id"])
     reply = client.comment(project["id"], parent_id=root["id"])
     url = f"/api/comments/{root['id']}"
-    deleted = client.ok(client.post(f"{url}/delete", {"expected_version": 1, "note": "Off-topic"}))
-    assert deleted["comment"]["deleted_by"] == ALICE
+    deleted = client.ok(client.post(f"{url}/delete", {"note": "Off-topic"}))
+    assert deleted["comment"]["deleted_by"] == USER
     assert threads(client, project["id"]) == []
     [hidden] = threads(client, project["id"], deleted="only")
     assert [entry["id"] for entry in hidden["replies"]] == [reply["id"]]
@@ -195,7 +189,7 @@ def test_deleting_a_root_hides_its_thread(client: ApiClient) -> None:
     reply = {"subject_id": project["id"], "body_md": "x", "parent_id": root["id"]}
     response = client.post("/api/comments", reply)
     assert "parent_id" in error_of(response)["details"]
-    client.ok(client.post(f"{url}/undelete", {"expected_version": 2}))
+    client.ok(client.post(f"{url}/undelete", {}))
     assert [t["root"]["id"] for t in threads(client, project["id"])] == [root["id"]]
 
 
@@ -203,16 +197,14 @@ def test_comment_history_and_restore(client: ApiClient) -> None:
     project = client.create_project()
     root = client.comment(project["id"], "Version one.")
     url = f"/api/comments/{root['id']}"
-    client.ok(client.patch(url, {"expected_version": 1, "body_md": "Version two."}))
+    client.ok(client.patch(url, {"body_md": "Version two."}))
     history = client.ok(client.get(f"{url}/revisions"))
     assert [entry["version"] for entry in history["items"]] == [2, 1]
     first = client.ok(client.get(f"{url}/revisions/1"))["revision"]
     assert first["snapshot"]["fields"]["body_md"] == "Version one."
     diff = client.ok(client.get(f"{url}/diff", {"from": 1, "to": 2}))["diff"]
     assert diff["fields"]["body_md"] == ["Version one.", "Version two."]
-    restored = client.ok(
-        client.post(f"{url}/restore", {"expected_version": 2, "version": 1, "note": "Back"})
-    )
+    restored = client.ok(client.post(f"{url}/restore", {"version": 1, "note": "Back"}))
     assert restored["comment"]["body_md"] == "Version one."
     latest = client.ok(client.get(f"{url}/revisions"))["items"][0]
     assert (latest["action"], latest["channel"]) == ("restore", "restore")
@@ -225,19 +217,12 @@ def test_comment_history_and_restore(client: ApiClient) -> None:
     }
 
 
-def test_markdown_is_rendered_and_sanitised(client: ApiClient) -> None:
+def test_markdown_is_rendered(client: ApiClient) -> None:
     project = client.create_project()
-    body = (
-        "**Bold** <script>alert(1)</script> [link](javascript:alert(1)) "
-        '[ok](https://example.org "Title") <img src=x onerror=alert(1)> //example.org'
-    )
+    body = "**Bold** <b>raw</b> [ok](https://example.org) and https://example.org/page"
     html = client.comment(project["id"], body)["body_html"]
+    assert html == render_markdown(body)
     assert "<strong>Bold</strong>" in html
-    # Raw HTML is escaped text, unsafe links stay text, protocol-relative hrefs are dropped.
-    assert "<script" not in html
-    assert "&lt;script&gt;" in html
-    assert "<img" not in html
-    assert 'href="javascript:' not in html
-    assert 'href="//' not in html
-    assert '<a href="https://example.org" rel="noopener noreferrer nofollow">ok</a>' in html
-    assert "title=" not in html
+    assert "&lt;b&gt;raw&lt;/b&gt;" in html  # raw HTML is not rendered
+    assert '<a href="https://example.org">ok</a>' in html
+    assert '<a href="https://example.org/page">' in html

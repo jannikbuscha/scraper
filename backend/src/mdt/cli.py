@@ -172,7 +172,4 @@ def serve(
         reload_dirs=[str(BACKEND_DIR / "src")] if reload else None,
         workers=1,
         log_config=_log_config(settings.log_level),
-        # The app needs no client addresses; forwarded headers are never trusted.
-        proxy_headers=False,
-        server_header=False,
     )

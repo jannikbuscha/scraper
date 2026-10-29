@@ -12,12 +12,13 @@ from sqlalchemy import select
 
 from mdt.db.models import VocabularyTerm
 from mdt.db.session import read_transaction
+from mdt.domain.actor import Actor
 from mdt.domain.comments import create_comment
 from mdt.domain.errors import BadSortError
 from mdt.domain.query import list_entities
 from mdt.domain.revisions import soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, BOB, create_event, create_project, create_service
+from tests.helpers import USER, create_event, create_project, create_service
 from tests.read_helpers import assert_consistent, create, create_document, open_copy, update
 
 # slug → (name_en, name_uk, paper_cluster, policy_domains, in_paper_scope, launch)
@@ -71,10 +72,11 @@ def build(session: Any) -> dict[str, str]:
     update(session, "vocabulary_term", term_id, sort_order=30)
     for _ in range(2):
         update(session, "project", ids["s-alfa"], notes=f"Edit {_}")
-    ids["s-bob"] = create_project(session, BOB, slug="s-bob", name_en="By Bob").entity_id
+    importer = Actor.importer("example.xlsx")
+    ids["s-bob"] = create_project(session, importer, slug="s-bob", name_en="By Bob").entity_id
     for count, slug in ((2, "s-hora"), (1, "s-ynei")):
         for index in range(count):
-            create_comment(session, ids[slug], f"Open thread {index}", ALICE)
+            create_comment(session, ids[slug], f"Open thread {index}", USER)
 
     # services: sorted by the label of their project
     for slug in ("s-alfa", "s-hora", "s-english"):
@@ -118,7 +120,7 @@ def build(session: Any) -> dict[str, str]:
     # trash: deleted in this order
     for slug in ("trash-first", "trash-second"):
         result = create_project(session, slug=slug, name_en=slug)
-        soft_delete(session, "project", result.entity_id, ALICE, expected_version=1)
+        soft_delete(session, "project", result.entity_id, USER)
         ids[slug] = result.entity_id
     return ids
 
@@ -270,7 +272,7 @@ def test_virtual_count_and_bool_sorting(catalog: Catalog) -> None:
 
 def test_system_columns_sort(catalog: Catalog) -> None:
     assert catalog.order("project", {"sort": "-version,slug"})[0] == "s-alfa"
-    assert catalog.order("project", {"sort": "-created_by,slug"})[0] == "s-bob"
+    assert catalog.order("project", {"sort": "created_by,slug"})[0] == "s-bob"  # import:… < user
     # s-bob was created after the last edit of s-alfa
     assert catalog.order("project", {"sort": "-updated_at"})[:2] == ["s-bob", "s-alfa"]
 

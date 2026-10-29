@@ -21,7 +21,7 @@ from mdt.domain.seed import SeedFileError, load_seed_file, run_seed
 from mdt.domain.vocab import TermIndex
 from tests import synthetic
 from tests.conftest import Db, make_settings, open_db
-from tests.helpers import ALICE, create_evidence, load, revision_count, revisions_of
+from tests.helpers import USER, create_evidence, load, revision_count, revisions_of
 
 SEED_PROJECTS: list[dict[str, Any]] = [
     {
@@ -129,8 +129,7 @@ def test_human_edits_and_clears_are_never_overwritten(seeded: Db) -> None:
             "project",
             project_id,
             {"name_en": "Edited by a person", "name_uk": None},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         report = run_seed(session, seeded.settings)
         row = load(session, "project", project_id)
@@ -154,12 +153,11 @@ def test_verified_or_restored_seed_values_are_protected(seeded: Db, tmp_path: Pa
             one,
             "name_en",
             "verified",
-            ALICE,
+            USER,
             evidence_id=evidence_id,
-            expected_version=1,
         )
-        apply_change(session, "project", two, {"name_en": "Temporary"}, ALICE, expected_version=1)
-        restore_version(session, "project", two, 1, ALICE, expected_version=2)
+        apply_change(session, "project", two, {"name_en": "Temporary"}, USER)
+        restore_version(session, "project", two, 1, USER)
         assert load(session, "project", two)["field_meta"]["name_en"]["restored_from_version"] == 1
     changed = [
         {**SEED_PROJECTS[0], "name_en": "Seed changed one"},
@@ -231,10 +229,8 @@ def test_deleted_rows_are_skipped_and_renamed_slugs_do_not_duplicate(
     with seeded.session() as session:
         one = project_id_by_key(session, "example-one")
         two = project_id_by_key(session, "example-two")
-        soft_delete(session, "project", one, ALICE, expected_version=1)
-        apply_change(
-            session, "project", two, {"slug": "example-renamed"}, ALICE, expected_version=1
-        )
+        soft_delete(session, "project", one, USER)
+        apply_change(session, "project", two, {"slug": "example-renamed"}, USER)
     changed = [{**SEED_PROJECTS[0], "name_en": "Changed"}, SEED_PROJECTS[1]]
     database = seeded_db(seeded, tmp_path / "changed", changed)
     try:
@@ -311,8 +307,7 @@ def test_corrected_definitions_reach_an_existing_database(db: Db, tmp_path: Path
             "vocabulary_term",
             conflicting.id,
             {"definition": "Edited by a person."},
-            ALICE,
-            expected_version=1,
+            USER,
         )
     codebook = tmp_path / "codebook"
     shutil.copytree(db.settings.codebook_path, codebook)

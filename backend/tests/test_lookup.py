@@ -14,7 +14,7 @@ from mdt.domain.errors import BadFilterError, ValidationError
 from mdt.domain.lookup import lookup
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.conftest import Db
-from tests.helpers import ALICE, create_project, create_service, focal_org_id
+from tests.helpers import USER, create_project, create_service, focal_org_id
 from tests.read_helpers import assert_consistent, create_document, open_copy, update
 
 
@@ -56,7 +56,7 @@ def build(session: Any) -> dict[str, str]:
     for name, fields in projects:
         ids[name] = create_project(session, **fields).entity_id
     deleted = create_project(session, slug="lk-deleted", name_en="Alpha deleted")
-    soft_delete(session, "project", deleted.entity_id, ALICE, expected_version=1)
+    soft_delete(session, "project", deleted.entity_id, USER)
     ids["P5"] = deleted.entity_id
     ids["S1"] = create_service(session, ids["P1"], name_en="Alpha service").entity_id
     ids["S2"] = create_service(session, ids["P1"], name_en="Beta service").entity_id
@@ -75,9 +75,9 @@ def build(session: Any) -> dict[str, str]:
         "saved_view",
         None,
         {"name": "Alpha view", "entity_type": "service", "query": "sort=name_en"},
-        ALICE,
+        USER,
     ).entity_id
-    ids["C1"] = create_comment(session, ids["P2"], "A comment", ALICE, field="name_en").entity_id
+    ids["C1"] = create_comment(session, ids["P2"], "A comment", USER, field="name_en").entity_id
     return ids
 
 
@@ -175,11 +175,6 @@ def test_unknown_types_are_rejected(catalog: Catalog, types: str) -> None:
         catalog.items(types=types, q="alpha")
 
 
-def test_overlong_query_is_rejected(catalog: Catalog) -> None:
-    with pytest.raises(ValidationError):
-        catalog.items(q="x" * 201)
-
-
 def test_ids_lookup_includes_deleted_rows_and_keeps_the_order(catalog: Catalog) -> None:
     ids = catalog.ids
     items = catalog.items(ids=f"{ids['P5']},{ids['P1']},prj_01J00000000000000000000000,{ids['P1']}")
@@ -202,10 +197,10 @@ def test_ids_lookup_labels_any_type_with_contexts(catalog: Catalog) -> None:
     assert items[ids["S3"]]["context"] == "Centre Alpha"
 
 
-def test_ids_lookup_limit(catalog: Catalog) -> None:
-    many = ",".join(f"prj_{index:026d}" for index in range(201))
-    with pytest.raises(ValidationError):
-        catalog.items(ids=many)
+def test_ids_lookup_of_many_ids(catalog: Catalog) -> None:
+    many = [f"prj_{index:026d}" for index in range(600)]
+    items = catalog.items(ids=",".join([*many, catalog.ids["P1"]]))
+    assert [item["id"] for item in items] == [catalog.ids["P1"]]
 
 
 def test_vocabulary_term_lookup(db: Db) -> None:

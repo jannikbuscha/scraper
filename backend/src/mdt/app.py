@@ -1,46 +1,36 @@
 """The web application: :func:`create_app` builds it (``mdt serve`` and tests use it).
 
-Layers, outermost first (docs/API.md §1.1, §6): the security-header middleware, which
-only adds response headers; the request guard, which checks every request from its
-headers before routing and before any body byte is read; Starlette's error middleware;
-the exception handlers; the API routes, the ``/assets`` mount and the SPA fallback.
+FastAPI serves the API routes under ``/api`` and the built frontend (``/assets`` and the
+SPA fallback); the exception handlers turn every error into the error envelope.
 
 Startup creates nothing: migrations and the seed are CLI steps (``mdt db upgrade``,
 ``mdt seed``). :func:`preflight` refuses to start with a clear message when SQLite lacks
-FTS5, ``ALLOWED_HOSTS`` is malformed, the database is missing or not at the current
-schema, or ``codebook/parameters.yaml`` is unusable.
+FTS5, the database is missing or not at the current schema, or
+``codebook/parameters.yaml`` is unusable.
 """
 
 from __future__ import annotations
 
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
 
 from fastapi import FastAPI
 from fastapi.telemetry import TelemetryConfig
 from sqlalchemy import Engine, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
-from starlette.types import ASGIApp
 
 from mdt import __version__
 from mdt.api import comments, entities, frontend, meta, revisions
 from mdt.api.deps import AppContext
 from mdt.api.errors import install_error_handlers
-from mdt.api.guard import HostAllowlist, RequestGuardMiddleware
-from mdt.api.headers import SecurityHeadersMiddleware
-from mdt.api.openapi import contract_openapi
 from mdt.config import Settings, get_settings
 from mdt.db.engine import create_db_engine
 from mdt.db.migrate import head_revision
 from mdt.db.selfcheck import SelfCheckError, check_sqlite
 from mdt.db.session import create_session_factory
 from mdt.domain.vocab import CodebookError, load_parameters
-
-log = logging.getLogger("mdt.api")
 
 #: FastAPI's OpenTelemetry integration stays off: nothing about requests leaves the server.
 TELEMETRY_OFF: TelemetryConfig = {
@@ -54,30 +44,6 @@ TELEMETRY_OFF: TelemetryConfig = {
 
 class StartupError(RuntimeError):
     """The application cannot start; the message tells the operator what to do."""
-
-
-class MdtApp(FastAPI):
-    """FastAPI with the security headers and the request guard outside Starlette's error
-    middleware, so every response carries the headers (500s included) and no request is
-    routed before the guard has checked it."""
-
-    def __init__(self, *, allowed_hosts: HostAllowlist, **kwargs: Any) -> None:
-        self.allowed_hosts = allowed_hosts
-        self._contract_openapi: tuple[dict[str, Any], dict[str, Any]] | None = None
-        super().__init__(**kwargs)
-
-    def build_middleware_stack(self) -> ASGIApp:
-        """Wrap FastAPI's stack in the guard and the security headers."""
-        guarded = RequestGuardMiddleware(super().build_middleware_stack(), self.allowed_hosts)
-        return SecurityHeadersMiddleware(guarded)
-
-    def openapi(self) -> dict[str, Any]:
-        """The generated OpenAPI document, aligned with the error envelope (API §1.2, §6);
-        rebuilt whenever FastAPI regenerates its own document."""
-        generated = super().openapi()
-        if self._contract_openapi is None or self._contract_openapi[0] is not generated:
-            self._contract_openapi = (generated, contract_openapi(generated))
-        return self._contract_openapi[1]
 
 
 def _check_database(settings: Settings, engine: Engine) -> None:
@@ -106,16 +72,11 @@ def _check_database(settings: Settings, engine: Engine) -> None:
         )
 
 
-def preflight(settings: Settings, engine: Engine | None = None) -> HostAllowlist:
-    """Check that the application can start; raise :class:`StartupError` otherwise.
-    Returns the parsed host allowlist."""
+def preflight(settings: Settings, engine: Engine | None = None) -> None:
+    """Check that the application can start; raise :class:`StartupError` otherwise."""
     try:
         check_sqlite()
     except SelfCheckError as exc:
-        raise StartupError(str(exc)) from exc
-    try:
-        allowed_hosts = HostAllowlist.parse(settings.allowed_hosts_list)
-    except ValueError as exc:
         raise StartupError(str(exc)) from exc
     try:
         load_parameters(settings.codebook_path)
@@ -128,7 +89,6 @@ def preflight(settings: Settings, engine: Engine | None = None) -> HostAllowlist
     finally:
         if own_engine:
             checked.dispose()
-    return allowed_hosts
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -136,12 +96,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     engine = create_db_engine(settings.sqlalchemy_url)
     try:
-        allowed_hosts = preflight(settings, engine)
+        preflight(settings, engine)
     except BaseException:
         engine.dispose()
         raise
-    if allowed_hosts.allow_any:
-        log.warning("ALLOWED_HOSTS is '*': the Host check against DNS rebinding is disabled")
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -150,14 +108,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         finally:
             engine.dispose()
 
-    app = MdtApp(
-        allowed_hosts=allowed_hosts,
+    app = FastAPI(
         title="MDT Portfolio API",
         version=__version__,
-        debug=False,
         docs_url=None,
         redoc_url=None,
-        openapi_url="/api/openapi.json",
+        openapi_url=None,
         redirect_slashes=False,
         lifespan=lifespan,
         telemetry=TELEMETRY_OFF,

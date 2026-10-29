@@ -32,14 +32,7 @@ from mdt.domain.fieldmeta import entry_diff, verification_entry
 from mdt.domain.history import get_revision, latest_revision
 from mdt.domain.ids import new_batch_id
 from mdt.domain.labels import ref_info
-from mdt.domain.normalize import (
-    INVALID,
-    UNPAIRED_SURROGATE_MESSAGE,
-    has_unpaired_surrogate,
-    is_empty,
-    normalize_value,
-    values_equal,
-)
+from mdt.domain.normalize import INVALID, is_empty, normalize_value, values_equal
 from mdt.domain.records import (
     Row,
     api_value,
@@ -63,8 +56,6 @@ from mdt.domain.writes import (
     RestoreMeta,
     WriteUnit,
     apply_effects,
-    cas_update,
-    check_version,
     clean_note,
     create_record,
     ensure_live,
@@ -75,13 +66,12 @@ from mdt.domain.writes import (
     require_row,
     snapshot_of,
     update_record,
+    update_row,
     write_state_change,
 )
 
 VERIFICATION_STATUSES = ("unverified", "verified", "disputed")
 MAX_BULK_ITEMS = 500
-#: ``expected_version`` is a JSON integer in [0, 2^63 - 1] in every body (API §3.2).
-MAX_VERSION = 2**63 - 1
 
 
 @dataclass
@@ -95,25 +85,17 @@ class RestoreResult(ChangeResult):
 
 @dataclass
 class BulkItemResult:
-    """Per-item result of a bulk edit (API §3.2)."""
+    """Per-item result of a bulk edit (API §3.2): ``updated``, ``unchanged`` or
+    ``entity_deleted`` (each with the record's ``version``) or ``error``."""
 
     id: str
     status: str
     version: int | None = None
-    current_version: int | None = None
-    current_values: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         """The API representation."""
-        return {
-            "id": self.id,
-            "status": self.status,
-            "version": self.version,
-            "current_version": self.current_version,
-            "current_values": self.current_values,
-            "error": self.error,
-        }
+        return {"id": self.id, "status": self.status, "version": self.version, "error": self.error}
 
 
 @dataclass
@@ -137,7 +119,6 @@ def apply_change(
     actor: Actor,
     *,
     note: str | None = None,
-    expected_version: int | None = None,
     batch_id: str | None = None,
 ) -> ChangeResult:
     """Create (``entity_id=None``) or update a record through the one write path.
@@ -149,9 +130,7 @@ def apply_change(
 
         if entity_id is None:
             return comments.create_comment_from_changes(session, changes, actor, note=note)
-        return comments.edit_comment_from_changes(
-            session, entity_id, changes, actor, note=note, expected_version=expected_version
-        )
+        return comments.edit_comment_from_changes(session, entity_id, changes, actor, note=note)
     spec = entity_spec(entity_type)
     clean = clean_note(note)
     with write_transaction(session):
@@ -163,9 +142,7 @@ def apply_change(
         row = require_row(unit, entity_id)
         ensure_live(row)
         provided = normalize_changes(unit, changes, creating=False)
-        return update_record(
-            unit, row, provided, note=clean, expected_version=expected_version, batch_id=batch_id
-        )
+        return update_record(unit, row, provided, note=clean, batch_id=batch_id)
 
 
 def _create_defaults(
@@ -213,7 +190,6 @@ def set_field_verification(
     *,
     note: str | None = None,
     evidence_id: str | None = None,
-    expected_version: int | None = None,
 ) -> ChangeResult:
     """Set a field's verification status (DATA_MODEL §6.4); the revision has a meta diff
     only. Setting the status that is already set (same evidence) is a no-op."""
@@ -223,7 +199,6 @@ def set_field_verification(
         unit = WriteUnit.open(session, spec, actor)
         row = require_row(unit, entity_id)
         ensure_live(row)
-        check_version(unit, row, expected_version, action="verify", your_changes={})
         links = links_of(unit, row)
         values = stored_values(spec, row, links)
         _check_verifiable(spec, values, field_name, status, clean)
@@ -244,7 +219,7 @@ def set_field_verification(
             )
         meta[field_name] = new_entry
         update = {"field_meta": meta, "updated_at": unit.ts, "updated_by": actor.by}
-        version = cas_update(unit, row, update, action="verify")
+        version = update_row(unit, row, update)
         snapshot = make_snapshot(
             {f.name: values[f.name] for f in spec.tracked_fields}, meta, state_of(spec, row)
         )
@@ -257,7 +232,6 @@ def set_field_verification(
             snapshot=snapshot,
             diff={"meta": {field_name: changes}},
             batch_id=None,
-            conflict_action="verify",
         )
         apply_effects(unit, entity_id, values, values)
         return ChangeResult(spec.name, entity_id, True, version, revision_id, snapshot)
@@ -347,7 +321,6 @@ def soft_delete(
     actor: Actor,
     *,
     note: str | None = None,
-    expected_version: int | None = None,
     cascade: bool = False,
 ) -> ChangeResult:
     """Soft-delete a record (and with ``cascade`` its dependent services, in the same
@@ -365,7 +338,6 @@ def soft_delete(
             raise NotDeletableError()
         if row["deleted_at"] is not None:
             raise InvalidStateError("deleted", "The record is already deleted")
-        check_version(unit, row, expected_version, action="delete", your_changes={})
         if spec.name == "evidence" and verification_rests_on(session, row):
             raise HasDependentsError(
                 {"field_verification": 1},
@@ -440,7 +412,6 @@ def undelete(
     actor: Actor,
     *,
     note: str | None = None,
-    expected_version: int | None = None,
     cascade: bool = False,
 ) -> ChangeResult:
     """Undelete a record; with ``cascade`` also the rows deleted in the same batch."""
@@ -451,7 +422,6 @@ def undelete(
         row = require_row(unit, entity_id)
         if row["deleted_at"] is None:
             raise InvalidStateError("live", "The record is not deleted")
-        check_version(unit, row, expected_version, action="undelete", your_changes={})
         targets = _batch_targets(session, spec, row) if cascade else [(spec, row)]
         if all(target["id"] != entity_id for _, target in targets):
             targets.insert(0, (spec, row))
@@ -482,7 +452,6 @@ def restore_version(
     actor: Actor,
     *,
     note: str | None = None,
-    expected_version: int | None = None,
     fields: Sequence[str] | None = None,
     dry_run: bool = False,
 ) -> RestoreResult:
@@ -493,7 +462,7 @@ def restore_version(
     clean = clean_note(note)
     restorer = actor.as_restore() if actor.channel == "ui" else actor
     if restorer.channel != "restore":
-        raise ValidationError.single("channel", "Restores are made by people (channel restore)")
+        raise ValidationError.single("channel", "Restores are made by the user (channel restore)")
     if fields is not None and (
         isinstance(fields, str) or not all(isinstance(name, str) for name in fields)
     ):
@@ -503,7 +472,6 @@ def restore_version(
         unit = WriteUnit.open(session, spec, restorer)
         row = require_row(unit, entity_id)
         ensure_live(row)
-        check_version(unit, row, expected_version, action="restore", your_changes={})
         revision = get_revision(session, entity_id, version) if isinstance(version, int) else None
         if revision is None:
             raise NotFoundError("Version not found")
@@ -531,10 +499,8 @@ def restore_version(
             row,
             provided,
             note=clean,
-            expected_version=int(row["version"]),
             batch_id=None,
             action="restore",
-            conflict_action="restore",
             restore=RestoreMeta(version=version, revision_id=revision.id, sources=sources),
         )
         return RestoreResult(
@@ -604,38 +570,18 @@ def _restore_plan(
 # --------------------------------------------------------------------------------------
 
 
-def _parse_bulk_items(items: Any, problems: Problems) -> list[tuple[str, int]]:
-    if not isinstance(items, list) or not items:
-        problems.add("items", "must be a non-empty list")
-        return []
-    if len(items) > MAX_BULK_ITEMS:
-        problems.add("items", f"must have at most {MAX_BULK_ITEMS} items")
-        return []
-    parsed: list[tuple[str, int]] = []
+def _check_bulk_ids(ids: Sequence[str], problems: Problems) -> None:
+    if not ids:
+        problems.add("ids", "must be a non-empty list")
+    elif len(ids) > MAX_BULK_ITEMS:
+        problems.add("ids", f"must have at most {MAX_BULK_ITEMS} items")
     seen: set[str] = set()
-    for index, item in enumerate(items):
-        entity_id = item.get("id") if isinstance(item, dict) else None
-        version = item.get("expected_version") if isinstance(item, dict) else None
-        if not isinstance(entity_id, str) or not entity_id:
-            problems.add(f"items[{index}].id", "is required")
-            continue
-        if has_unpaired_surrogate(entity_id):
-            problems.add(f"items[{index}].id", UNPAIRED_SURROGATE_MESSAGE)
-            continue
-        if isinstance(version, bool) or not isinstance(version, int):
-            problems.add(f"items[{index}].expected_version", "must be an integer")
-            continue
-        if not 0 <= version <= MAX_VERSION:
-            problems.add(
-                f"items[{index}].expected_version", f"must be an integer from 0 to {MAX_VERSION}"
-            )
-            continue
-        if entity_id in seen:
-            problems.add(f"items[{index}].id", "is duplicated")
-            continue
+    for index, entity_id in enumerate(ids):
+        if not entity_id:
+            problems.add(f"ids[{index}]", "is required")
+        elif entity_id in seen:
+            problems.add(f"ids[{index}]", "is duplicated")
         seen.add(entity_id)
-        parsed.append((entity_id, version))
-    return parsed
 
 
 def _parse_bulk_operations(
@@ -687,7 +633,7 @@ def _parse_bulk_operations(
 def bulk_apply(
     session: Session,
     entity_type: str,
-    items: Sequence[Mapping[str, Any]],
+    ids: Sequence[str],
     actor: Actor,
     *,
     set_values: Mapping[str, Any] | None = None,
@@ -695,14 +641,14 @@ def bulk_apply(
     remove: Mapping[str, Any] | None = None,
     note: str | None = None,
 ) -> BulkResult:
-    """Apply ``set``/``add``/``remove`` to many records; every item is its own write
-    unit with its own ``expected_version`` and a shared ``batch_id``."""
+    """Apply ``set``/``add``/``remove`` to many records; every record is its own write
+    unit, and all share one ``batch_id``."""
     spec = entity_spec(entity_type)
     if not spec.generic_api:
         raise NotFoundError("Unknown entity type")
     clean = clean_note(note)
     problems = Problems()
-    parsed = _parse_bulk_items(items, problems)
+    _check_bulk_ids(ids, problems)
     operations = _parse_bulk_operations(
         spec, {"set": set_values or {}, "add": add or {}, "remove": remove or {}}, clean, problems
     )
@@ -711,8 +657,8 @@ def bulk_apply(
     problems.raise_if_any()
     batch_id = new_batch_id()
     results = [
-        _bulk_item(session, spec, actor, entity_id, version, operations, clean, batch_id)
-        for entity_id, version in parsed
+        _bulk_item(session, spec, actor, entity_id, operations, clean, batch_id)
+        for entity_id in ids
     ]
     return BulkResult(batch_id=batch_id, results=results)
 
@@ -722,12 +668,10 @@ def _bulk_item(
     spec: EntityTypeSpec,
     actor: Actor,
     entity_id: str,
-    expected_version: int,
     operations: Mapping[str, Mapping[str, Any]],
     note: str | None,
     batch_id: str,
 ) -> BulkItemResult:
-    targeted = [name for op in operations.values() for name in op]
     try:
         with write_transaction(session):
             unit = WriteUnit.open(session, spec, actor)
@@ -735,17 +679,8 @@ def _bulk_item(
             if row is None:
                 return BulkItemResult(entity_id, "error", error=NotFoundError().to_dict())
             if row["deleted_at"] is not None:
-                return BulkItemResult(
-                    entity_id, "entity_deleted", current_version=int(row["version"])
-                )
+                return BulkItemResult(entity_id, "entity_deleted", version=int(row["version"]))
             current = stored_values(spec, row, links_of(unit, row))
-            if row["version"] != expected_version:
-                return BulkItemResult(
-                    entity_id,
-                    "conflict",
-                    current_version=int(row["version"]),
-                    current_values={name: current.get(name) for name in targeted},
-                )
             changes = dict(operations["set"])
             for name, values in operations["add"].items():
                 merged = list(current[name])
@@ -753,15 +688,7 @@ def _bulk_item(
                 changes[name] = merged
             for name, values in operations["remove"].items():
                 changes[name] = [value for value in current[name] if value not in values]
-            result = update_record(
-                unit,
-                row,
-                changes,
-                note=note,
-                expected_version=expected_version,
-                batch_id=batch_id,
-                conflict_action="bulk",
-            )
+            result = update_record(unit, row, changes, note=note, batch_id=batch_id)
             status = "updated" if result.changed else "unchanged"
             return BulkItemResult(entity_id, status, version=result.version)
     except DomainError as exc:

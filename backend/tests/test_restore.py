@@ -26,8 +26,7 @@ from mdt.domain.snapshots import diff_snapshots
 from mdt.domain.vocab import TermIndex
 from tests.conftest import Db
 from tests.helpers import (
-    ALICE,
-    BOB,
+    USER,
     assert_matches_latest_snapshot,
     create_evidence,
     create_project,
@@ -48,24 +47,32 @@ def _two_versions(db: Db) -> str:
             "project",
             project_id,
             {"name_en": "Version two", "status": "active", "notes": "Added later."},
-            BOB,
-            expected_version=1,
+            USER,
         )
     return project_id
 
 
 def test_restore_applies_the_old_values_with_provenance(db: Db) -> None:
-    project_id = _two_versions(db)
     with db.session() as session:
+        importer = Actor.importer("example.xlsx")
+        project_id = create_project(
+            session, importer, name_en="Version one", status="planned"
+        ).entity_id
+        apply_change(
+            session,
+            "project",
+            project_id,
+            {"name_en": "Version two", "status": "active", "notes": "Added later."},
+            USER,
+        )
         first_revision = revisions_of(session, project_id)[0]
         result = restore_version(
             session,
             "project",
             project_id,
             1,
-            BOB,
+            USER,
             note="Back to the first version",
-            expected_version=2,
         )
         assert result.changed and result.version == 3
         assert result.changes == {
@@ -79,28 +86,26 @@ def test_restore_applies_the_old_values_with_provenance(db: Db) -> None:
         ts = row["updated_at"]
         meta = row["field_meta"]
         assert meta["name_en"] == {
-            "src": "manual:Alice Example",  # the source of the restored value
-            "by": BOB.by,
+            "src": "import:example.xlsx",  # the source of the restored value
+            "by": USER.by,
             "at": ts,
             "locked": True,
             "verified": "unverified",
             "evidence_id": None,
             "restored_from_version": 1,
         }
-        assert meta["notes"]["src"] == "manual:Bob Example"  # no entry in version 1
+        assert meta["notes"]["src"] == "manual"  # no entry in version 1
         assert meta["notes"]["restored_from_version"] == 1
         revision = revisions_of(session, project_id)[-1]
         assert (revision.action, revision.channel, revision.author, revision.note) == (
             "restore",
             "restore",
-            BOB.by,
+            USER.by,
             "Back to the first version",
         )
         assert (revision.restored_from, revision.restored_from_version) == (first_revision.id, 1)
         # A later value change clears restored_from_version again.
-        apply_change(
-            session, "project", project_id, {"name_en": "Edited"}, ALICE, expected_version=3
-        )
+        apply_change(session, "project", project_id, {"name_en": "Edited"}, USER)
         assert (
             load(session, "project", project_id)["field_meta"]["name_en"]["restored_from_version"]
             is None
@@ -111,30 +116,23 @@ def test_restore_applies_the_old_values_with_provenance(db: Db) -> None:
 def test_dry_run_and_field_selection(db: Db) -> None:
     project_id = _two_versions(db)
     with db.session() as session:
-        preview = restore_version(
-            session, "project", project_id, 1, BOB, expected_version=2, dry_run=True
-        )
+        preview = restore_version(session, "project", project_id, 1, USER, dry_run=True)
         assert preview.dry_run and not preview.changed and preview.revision_id is None
         assert set(preview.changes) == {"name_en", "notes", "status"}
         assert load(session, "project", project_id)["version"] == 2
-        partial = restore_version(
-            session, "project", project_id, 1, BOB, expected_version=2, fields=["name_en"]
-        )
+        partial = restore_version(session, "project", project_id, 1, USER, fields=["name_en"])
         assert partial.changes == {"name_en": ["Version two", "Version one"]}
         fields = fields_of(session, "project", project_id)
         assert (fields["name_en"], fields["status"]) == ("Version one", "active")
         with pytest.raises(ValidationError):
-            restore_version(
-                session, "project", project_id, 1, BOB, expected_version=3, fields=["unicorn"]
-            )
+            restore_version(session, "project", project_id, 1, USER, fields=["unicorn"])
         with pytest.raises(ValidationError):
             restore_version(
                 session,
                 "project",
                 project_id,
                 1,
-                BOB,
-                expected_version=3,
+                USER,
                 fields="name_en",
             )
 
@@ -142,7 +140,7 @@ def test_dry_run_and_field_selection(db: Db) -> None:
 def test_restoring_the_current_state_is_a_no_op(db: Db) -> None:
     project_id = _two_versions(db)
     with db.session() as session:
-        result = restore_version(session, "project", project_id, 2, BOB, expected_version=2)
+        result = restore_version(session, "project", project_id, 2, USER)
         assert (result.changed, result.revision_id, result.changes) == (False, None, {})
         assert len(revisions_of(session, project_id)) == 2
 
@@ -157,11 +155,10 @@ def test_restore_resets_field_verification(db: Db) -> None:
             project_id,
             "name_en",
             "verified",
-            ALICE,
+            USER,
             evidence_id=evidence.entity_id,
-            expected_version=2,
         )
-        restore_version(session, "project", project_id, 1, BOB, expected_version=3)
+        restore_version(session, "project", project_id, 1, USER)
         entry = load(session, "project", project_id)["field_meta"]["name_en"]
         assert (entry["verified"], entry["evidence_id"], entry["restored_from_version"]) == (
             "unverified",
@@ -173,12 +170,10 @@ def test_restore_resets_field_verification(db: Db) -> None:
 def test_restore_reports_unique_violations(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session, slug="example-restore").entity_id
-        apply_change(
-            session, "project", project_id, {"slug": "example-renamed"}, ALICE, expected_version=1
-        )
+        apply_change(session, "project", project_id, {"slug": "example-renamed"}, USER)
         create_project(session, slug="example-restore")
         with pytest.raises(UniqueViolationError) as caught:
-            restore_version(session, "project", project_id, 1, ALICE, expected_version=2)
+            restore_version(session, "project", project_id, 1, USER)
         assert caught.value.details is not None and caught.value.details["field"] == "slug"
         assert load(session, "project", project_id)["version"] == 2
 
@@ -188,12 +183,10 @@ def test_restore_reports_deleted_references(db: Db) -> None:
         first = create_project(session, name_en="First").entity_id
         second = create_project(session).entity_id
         service_id = create_service(session, first).entity_id
-        apply_change(
-            session, "service", service_id, {"project_id": second}, ALICE, expected_version=1
-        )
-        soft_delete(session, "project", first, ALICE, expected_version=1)
+        apply_change(session, "service", service_id, {"project_id": second}, USER)
+        soft_delete(session, "project", first, USER)
         with pytest.raises(ReferenceDeletedError) as caught:
-            restore_version(session, "service", service_id, 1, ALICE, expected_version=2)
+            restore_version(session, "service", service_id, 1, USER)
         assert caught.value.details == {
             "field": "project_id",
             "id": first,
@@ -205,9 +198,9 @@ def test_restore_reports_deleted_references(db: Db) -> None:
 def test_restore_is_refused_on_deleted_entities(db: Db) -> None:
     project_id = _two_versions(db)
     with db.session() as session:
-        soft_delete(session, "project", project_id, ALICE, expected_version=2)
+        soft_delete(session, "project", project_id, USER)
         with pytest.raises(EntityDeletedError):
-            restore_version(session, "project", project_id, 1, ALICE, expected_version=3)
+            restore_version(session, "project", project_id, 1, USER)
 
 
 def test_restore_accepts_inactive_codes_with_a_warning(db: Db) -> None:
@@ -216,10 +209,8 @@ def test_restore_accepts_inactive_codes_with_a_warning(db: Db) -> None:
         planned = TermIndex(session).term("status", "planned")
         session.rollback()
         assert planned is not None
-        apply_change(
-            session, "vocabulary_term", planned.id, {"active": False}, ALICE, expected_version=1
-        )
-        result = restore_version(session, "project", project_id, 1, ALICE, expected_version=2)
+        apply_change(session, "vocabulary_term", planned.id, {"active": False}, USER)
+        result = restore_version(session, "project", project_id, 1, USER)
         assert [w.as_dict() for w in result.warnings] == [
             {
                 "code": "inactive_code",
@@ -231,9 +222,7 @@ def test_restore_accepts_inactive_codes_with_a_warning(db: Db) -> None:
         # Channel ui still refuses the inactive code.
         other_id = create_project(session).entity_id
         with pytest.raises(ValidationError):
-            apply_change(
-                session, "project", other_id, {"status": "planned"}, ALICE, expected_version=1
-            )
+            apply_change(session, "project", other_id, {"status": "planned"}, USER)
 
 
 def test_restore_keeps_state_and_recomputes_system_fields(db: Db) -> None:
@@ -247,17 +236,16 @@ def test_restore_keeps_state_and_recomputes_system_fields(db: Db) -> None:
                 "url": "https://example.org/one/",
                 "retrieved_at": "2026-10-28T10:00:00Z",
             },
-            ALICE,
+            USER,
         ).entity_id
         apply_change(
             session,
             "document",
             document_id,
             {"url": "https://example.org/two"},
-            ALICE,
-            expected_version=1,
+            USER,
         )
-        result = restore_version(session, "document", document_id, 1, BOB, expected_version=2)
+        result = restore_version(session, "document", document_id, 1, USER)
         assert "canonical_url" not in result.changes  # recomputed, not restored
         row = load(session, "document", document_id)
         assert (row["url"], row["canonical_url"]) == (
@@ -272,16 +260,13 @@ def test_create_only_fields_are_skipped(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session).entity_id
         evidence_id = create_evidence(session, project_id, "slug").entity_id
-        apply_change(
-            session, "evidence", evidence_id, {"quote": "Changed quote."}, ALICE, expected_version=1
-        )
+        apply_change(session, "evidence", evidence_id, {"quote": "Changed quote."}, USER)
         result = restore_version(
             session,
             "evidence",
             evidence_id,
             1,
-            ALICE,
-            expected_version=2,
+            USER,
             fields=["quote", "target", "created_at"],
         )
         assert result.changes == {"quote": ["Changed quote.", "Example quote."]}
@@ -296,8 +281,7 @@ def test_restoring_the_scope_needs_its_note(db: Db) -> None:
             "project",
             project_id,
             {"in_paper_scope": True, "scope_note": "In scope now."},
-            ALICE,
-            expected_version=1,
+            USER,
         )
         with pytest.raises(ValidationError):
             restore_version(
@@ -305,11 +289,10 @@ def test_restoring_the_scope_needs_its_note(db: Db) -> None:
                 "project",
                 project_id,
                 1,
-                ALICE,
-                expected_version=2,
+                USER,
                 fields=["in_paper_scope"],
             )
-        result = restore_version(session, "project", project_id, 1, ALICE, expected_version=2)
+        result = restore_version(session, "project", project_id, 1, USER)
         assert set(result.changes) == {"in_paper_scope", "scope_note"}
 
 
@@ -317,7 +300,7 @@ def test_restore_errors(db: Db) -> None:
     project_id = _two_versions(db)
     with db.session() as session:
         with pytest.raises(NotFoundError):
-            restore_version(session, "project", project_id, 9, ALICE, expected_version=2)
+            restore_version(session, "project", project_id, 9, USER)
         with pytest.raises(ValidationError):
             restore_version(
                 session,
@@ -325,18 +308,15 @@ def test_restore_errors(db: Db) -> None:
                 project_id,
                 1,
                 Actor.collector("example", "run_01"),
-                expected_version=2,
             )
-        with pytest.raises(ValidationError):
-            restore_version(session, "project", project_id, 1, ALICE)  # no expected_version
 
 
 def test_comment_bodies_can_be_restored(db: Db) -> None:
     with db.session() as session:
         project_id = create_project(session).entity_id
-        comment_id = create_comment(session, project_id, "Original text", ALICE).entity_id
-        edit_comment(session, comment_id, "Edited text", ALICE, expected_version=1)
-        result = restore_version(session, "comment", comment_id, 1, BOB, expected_version=2)
+        comment_id = create_comment(session, project_id, "Original text", USER).entity_id
+        edit_comment(session, comment_id, "Edited text", USER)
+        result = restore_version(session, "comment", comment_id, 1, USER)
         assert result.changes == {"body_md": ["Edited text", "Original text"]}
         assert load(session, "comment", comment_id)["body_md"] == "Original text"
         assert revisions_of(session, comment_id)[-1].snapshot["field_meta"] == {}
@@ -362,7 +342,7 @@ def test_fields_missing_from_an_old_snapshot_are_left_unchanged() -> None:
 def test_diff_between_versions(db: Db) -> None:
     project_id = _two_versions(db)
     with db.session() as session:
-        soft_delete(session, "project", project_id, ALICE, expected_version=2)
+        soft_delete(session, "project", project_id, USER)
         diff, not_recorded = diff_versions(session, PROJECT, project_id, 1, 3)
         assert not_recorded == []
         assert diff["fields"] == {
@@ -370,8 +350,9 @@ def test_diff_between_versions(db: Db) -> None:
             "status": ["planned", "active"],
             "notes": [None, "Added later."],
         }
-        assert set(diff["meta"]) == {"name_en", "status", "notes"}
-        assert diff["state"]["deleted_by"] == [None, ALICE.by]
+        # name_en and status kept their source and author; only notes got a new entry.
+        assert set(diff["meta"]) == {"notes"}
+        assert diff["state"]["deleted_by"] == [None, USER.by]
         from_zero, _ = diff_versions(session, PROJECT, project_id, 0, 1)
         assert from_zero == {"fields": revisions_of(session, project_id)[0].diff["fields"]}
         with pytest.raises(ValidationError):

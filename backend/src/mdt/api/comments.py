@@ -7,17 +7,18 @@ from typing import Any
 
 from fastapi import FastAPI, Request
 
-from mdt.api.deps import RestoreActor, SessionDep, UiActor
+from mdt.api.deps import SessionDep
 from mdt.api.schemas import (
     CommentCreateBody,
     CommentEditBody,
     CommentNoteBody,
     CommentRestoreBody,
-    CommentVersionBody,
+    CommentStatusBody,
     FromVersion,
     ToVersion,
     VersionPath,
 )
+from mdt.domain.actor import Actor
 from mdt.domain.comments import (
     create_comment,
     delete_comment,
@@ -44,77 +45,52 @@ def get_one_comment(comment_id: str, session: SessionDep) -> dict[str, Any]:
     return {"comment": get_comment(session, comment_id)}
 
 
-def post_comment(body: CommentCreateBody, session: SessionDep, actor: UiActor) -> dict[str, Any]:
+def post_comment(body: CommentCreateBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments`` → ``201 {comment}``; roots start ``open``."""
     result = create_comment(
-        session, body.subject_id, body.body_md, actor, field=body.field, parent_id=body.parent_id
+        session,
+        body.subject_id,
+        body.body_md,
+        Actor.ui(),
+        field=body.field,
+        parent_id=body.parent_id,
     )
     return {"comment": get_comment(session, result.entity_id)}
 
 
-def patch_comment(
-    comment_id: str, body: CommentEditBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def patch_comment(comment_id: str, body: CommentEditBody, session: SessionDep) -> dict[str, Any]:
     """``PATCH /api/comments/{id}``: edit the Markdown body."""
-    edit_comment(
-        session,
-        comment_id,
-        body.body_md,
-        actor,
-        expected_version=body.expected_version,
-        note=body.note,
-    )
+    edit_comment(session, comment_id, body.body_md, Actor.ui(), note=body.note)
     return {"comment": get_comment(session, comment_id)}
 
 
-def resolve(
-    comment_id: str, body: CommentVersionBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def resolve(comment_id: str, body: CommentStatusBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments/{id}/resolve`` (roots only; idempotent)."""
-    result = resolve_comment(session, comment_id, actor, expected_version=body.expected_version)
+    result = resolve_comment(session, comment_id, Actor.ui())
     return {"comment": get_comment(session, comment_id), "changed": result.changed}
 
 
-def reopen(
-    comment_id: str, body: CommentVersionBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def reopen(comment_id: str, body: CommentStatusBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments/{id}/reopen`` (roots only; idempotent)."""
-    result = reopen_comment(session, comment_id, actor, expected_version=body.expected_version)
+    result = reopen_comment(session, comment_id, Actor.ui())
     return {"comment": get_comment(session, comment_id), "changed": result.changed}
 
 
-def delete(
-    comment_id: str, body: CommentNoteBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def delete(comment_id: str, body: CommentNoteBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments/{id}/delete``; deleting a root hides its thread."""
-    delete_comment(
-        session, comment_id, actor, expected_version=body.expected_version, note=body.note
-    )
+    delete_comment(session, comment_id, Actor.ui(), note=body.note)
     return {"comment": get_comment(session, comment_id)}
 
 
-def undelete(
-    comment_id: str, body: CommentNoteBody, session: SessionDep, actor: UiActor
-) -> dict[str, Any]:
+def undelete(comment_id: str, body: CommentNoteBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments/{id}/undelete``."""
-    undelete_comment(
-        session, comment_id, actor, expected_version=body.expected_version, note=body.note
-    )
+    undelete_comment(session, comment_id, Actor.ui(), note=body.note)
     return {"comment": get_comment(session, comment_id)}
 
 
-def restore(
-    comment_id: str, body: CommentRestoreBody, session: SessionDep, actor: RestoreActor
-) -> dict[str, Any]:
+def restore(comment_id: str, body: CommentRestoreBody, session: SessionDep) -> dict[str, Any]:
     """``POST /api/comments/{id}/restore``: restore the body of an old version."""
-    restore_comment(
-        session,
-        comment_id,
-        body.version,
-        actor,
-        expected_version=body.expected_version,
-        note=body.note,
-    )
+    restore_comment(session, comment_id, body.version, Actor.restore(), note=body.note)
     return {"comment": get_comment(session, comment_id)}
 
 

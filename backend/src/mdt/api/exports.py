@@ -52,9 +52,8 @@ def _xlsx_response(job: ExportJob, headers: dict[str, str]) -> Response:
 
 
 def export_response(session: Session, entity_type: str, params: QueryParams) -> Response:
-    """Start the export (``429 busy`` while another runs, ``400 export_too_large`` over the
-    row limit) and return the download. The export slot is released when the file is
-    complete or the download ends."""
+    """Start the export and return the download. The export's session is released when
+    the file is complete or the download ends."""
     job = start_export(session, entity_type, params)
     headers = _download_headers(job)
     try:

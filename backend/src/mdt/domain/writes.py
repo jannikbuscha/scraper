@@ -1,9 +1,10 @@
 """Write machinery shared by all write actions (docs/DATA_MODEL.md §6.1-§6.3).
 
 Every function here runs inside a write unit opened by :func:`mdt.db.session.write_transaction`
-(``BEGIN IMMEDIATE``). Rows are written with SQLAlchemy Core: inserts, and updates as a
-compare-and-swap on ``version``. JSON values are always new objects, never modified in
-place. Each successful change writes exactly one revision with a full snapshot.
+(``BEGIN IMMEDIATE``), so the row read at its start is the current one until it commits.
+Rows are written with SQLAlchemy Core; every update bumps ``version`` by one. JSON values
+are always new objects, never modified in place. Each successful change writes exactly
+one revision with a full snapshot.
 """
 
 from __future__ import annotations
@@ -23,9 +24,7 @@ from mdt.db.session import schema_revision, session_settings
 from mdt.domain import derived, fts
 from mdt.domain.actor import Actor
 from mdt.domain.clock import utc_now
-from mdt.domain.conflicts import conflict_payload
 from mdt.domain.errors import (
-    ConflictError,
     EntityDeletedError,
     LockedFieldError,
     NotFoundError,
@@ -167,36 +166,6 @@ def ensure_live(row: Row) -> None:
         raise EntityDeletedError(row["deleted_at"], row["deleted_by"])
 
 
-def check_version(
-    unit: WriteUnit,
-    row: Row,
-    expected_version: int | None,
-    *,
-    action: str,
-    your_changes: Mapping[str, Any],
-) -> None:
-    """Optimistic locking: ``expected_version`` is required from clients; a mismatch
-    raises :class:`ConflictError` with the full payload."""
-    if expected_version is None:
-        if unit.actor.is_client:
-            raise ValidationError.single("expected_version", "is required")
-        return
-    if isinstance(expected_version, bool) or not isinstance(expected_version, int):
-        raise ValidationError.single("expected_version", "must be an integer")
-    if expected_version != row["version"]:
-        raise ConflictError(
-            conflict_payload(
-                unit.session,
-                unit.spec,
-                row,
-                links_of(unit, row),
-                action=action,
-                base_version=expected_version,
-                your_changes=your_changes,
-            )
-        )
-
-
 def _write_refusal(spec: FieldSpec, actor: Actor, creating: bool, allow_system: bool) -> str | None:
     if spec.derived:
         return "is derived and cannot be set"
@@ -330,12 +299,10 @@ def insert_revision(
     snapshot: Snapshot,
     diff: Mapping[str, Any],
     batch_id: str | None,
-    conflict_action: str,
     restored_from: int | None = None,
     restored_from_version: int | None = None,
 ) -> int:
-    """Append the revision; a duplicate ``(entity_id, version)`` is a 409 conflict
-    (reported with ``conflict_action``)."""
+    """Append the revision; returns its ID."""
     values = {
         "entity_type": unit.spec.name,
         "entity_id": entity_id,
@@ -354,57 +321,24 @@ def insert_revision(
         "snapshot": snapshot,
         "diff": dict(diff),
     }
-    try:
-        result = unit.session.execute(insert(Revision).values(**values).returning(Revision.id))
-    except IntegrityError as exc:
-        if "revision" not in str(exc.orig):
-            raise
-        row = require_row(unit, entity_id)
-        raise ConflictError(
-            conflict_payload(
-                unit.session,
-                unit.spec,
-                row,
-                links_of(unit, row),
-                action=conflict_action,
-                base_version=version - 1,
-                your_changes={},
-            )
-        ) from exc
+    result = unit.session.execute(insert(Revision).values(**values).returning(Revision.id))
     return int(result.scalar_one())
 
 
-def cas_update(unit: WriteUnit, row: Row, values: Mapping[str, Any], *, action: str) -> int:
-    """``UPDATE … SET …, version = version + 1 WHERE id = :id AND version = :v``.
-
-    Returns the new version; zero affected rows raise :class:`ConflictError`.
-    """
+def update_row(unit: WriteUnit, row: Row, values: Mapping[str, Any]) -> int:
+    """Write ``values`` to the row and bump its version; returns the new version."""
     table = table_of(unit.spec)
+    version = int(row["version"]) + 1
     try:
-        result = unit.session.execute(
-            update(table)
-            .where(table.c.id == row["id"], table.c.version == row["version"])
-            .values(**values, version=table.c.version + 1)
+        unit.session.execute(
+            update(table).where(table.c.id == row["id"]).values(**values, version=version)
         )
     except IntegrityError as exc:
         mapped = unique_from_integrity(exc)
         if mapped is None:
             raise
         raise mapped from exc
-    if result.rowcount != 1:  # type: ignore[attr-defined]
-        fresh = require_row(unit, row["id"])
-        raise ConflictError(
-            conflict_payload(
-                unit.session,
-                unit.spec,
-                fresh,
-                links_of(unit, fresh),
-                action=action,
-                base_version=int(row["version"]),
-                your_changes={},
-            )
-        )
-    return int(row["version"]) + 1
+    return version
 
 
 def unique_from_integrity(exc: IntegrityError) -> UniqueViolationError | None:
@@ -526,7 +460,6 @@ def create_record(
         snapshot=snapshot,
         diff={"fields": fields_diff} if fields_diff else {},
         batch_id=batch_id,
-        conflict_action="comment" if spec.name == "comment" else "patch",
     )
     apply_effects(unit, entity_id, None, new)
     return ChangeResult(
@@ -547,10 +480,8 @@ def update_record(
     provided: dict[str, Any],
     *,
     note: str | None,
-    expected_version: int | None,
     batch_id: str | None,
     action: str = "update",
-    conflict_action: str = "patch",
     restore: RestoreMeta | None = None,
 ) -> ChangeResult:
     """Apply normalised changes to a live row (DATA_MODEL §6.2 step 3).
@@ -560,7 +491,6 @@ def update_record(
     spec, session, actor = unit.spec, unit.session, unit.actor
     entity_id = row["id"]
     ensure_live(row)
-    check_version(unit, row, expected_version, action=conflict_action, your_changes=provided)
     links = links_of(unit, row)
     current = stored_values(spec, row, links)
     new = dict(current)
@@ -629,7 +559,7 @@ def update_record(
         values.update(to_columns(spec.field(name), new[name]))
     if spec.curated:
         values["field_meta"] = meta
-    version = cas_update(unit, row, values, action=conflict_action)
+    version = update_row(unit, row, values)
     if "links" in changed:
         sync_links(session, entity_id, new["links"])
 
@@ -649,7 +579,6 @@ def update_record(
         snapshot=snapshot,
         diff=diff,
         batch_id=batch_id,
-        conflict_action=conflict_action,
         restored_from=restore.revision_id if restore else None,
         restored_from_version=restore.version if restore else None,
     )
@@ -685,7 +614,7 @@ def write_state_change(
         "updated_at": unit.ts,
         "updated_by": unit.actor.by,
     }
-    version = cas_update(unit, row, values, action=action)
+    version = update_row(unit, row, values)
     after_row = {**row, **values, "version": version}
     snapshot = snapshot_of(spec, after_row, links)
     diff, _ = diff_snapshots(spec, before, snapshot)
@@ -698,7 +627,6 @@ def write_state_change(
         snapshot=snapshot,
         diff=diff,
         batch_id=batch_id,
-        conflict_action=action,
     )
     current = stored_values(spec, after_row, links)
     apply_effects(unit, row["id"], current, current)

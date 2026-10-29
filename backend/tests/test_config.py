@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from mdt.config import BACKEND_DIR, REPO_ROOT, Settings, split_csv
+from mdt.config import BACKEND_DIR, REPO_ROOT, Settings
 
 VARIABLES = (
     "HOST",
@@ -18,8 +18,6 @@ VARIABLES = (
     "CODEBOOK_DIR",
     "SEED_DIR",
     "FRONTEND_DIST",
-    "ALLOWED_HOSTS",
-    "TEAM_MEMBERS",
     "MAX_COMMENT_CHARS",
     "FOCAL_ORG_SEED_KEY",
     "CONTACT_EMAIL",
@@ -51,25 +49,10 @@ def test_defaults() -> None:
     assert current.codebook_path == REPO_ROOT / "codebook"
     assert current.seed_path == REPO_ROOT / "seed"
     assert current.frontend_dist_path == REPO_ROOT / "frontend" / "dist"
-    assert current.allowed_hosts_list == ["127.0.0.1", "localhost"]
-    assert current.team_members_list == []
     assert current.max_comment_chars == 10_000
     assert current.focal_org_seed_key == "ministry-of-digital-transformation"
     assert current.contact_email is None
     assert current.log_level == "INFO"
-
-
-def test_comma_separated_lists_are_not_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("ALLOWED_HOSTS", " Example.org, localhost ,, ")
-    monkeypatch.setenv("TEAM_MEMBERS", "Alice Example,Bob Example")
-    current = settings()
-    assert current.allowed_hosts_list == ["example.org", "localhost"]
-    assert current.team_members_list == ["Alice Example", "Bob Example"]
-    monkeypatch.setenv("ALLOWED_HOSTS", "")
-    monkeypatch.setenv("TEAM_MEMBERS", "")
-    empty = settings()
-    assert empty.allowed_hosts_list == [] and empty.team_members_list == []
-    assert split_csv(None) == []
 
 
 def test_paths_resolve_against_the_repository_root(
@@ -106,13 +89,14 @@ def test_log_level_is_case_insensitive(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_env_file_is_read(tmp_path: Path) -> None:
     env_file = tmp_path / ".env"
+    # Unknown variables, such as the former ALLOWED_HOSTS and TEAM_MEMBERS, are ignored.
     env_file.write_text(
-        "PORT=9090\nTEAM_MEMBERS=Alice Example\nUNRELATED=1\nCONTACT_EMAIL=contact@example.org\n",
+        "PORT=9090\nALLOWED_HOSTS=example.org\nTEAM_MEMBERS=Example Person\nUNRELATED=1\n"
+        "CONTACT_EMAIL=contact@example.org\n",
         encoding="utf-8",
     )
     current = Settings(_env_file=env_file)  # type: ignore[call-arg]
     assert current.port == 9090
-    assert current.team_members_list == ["Alice Example"]
     assert current.contact_email == "contact@example.org"
 
 

@@ -26,7 +26,7 @@ from mdt.domain.query import list_entities
 from mdt.domain.revisions import apply_change
 from mdt.domain.writes import ChangeResult
 from tests.conftest import Db, make_settings, open_db
-from tests.helpers import ALICE, load
+from tests.helpers import USER
 
 COLLECTOR = Actor.collector("example", "run_01")
 
@@ -51,22 +51,19 @@ def create_document(
     if text is not None:
         data["text_hash"] = add_document_text(session, text)
         return apply_change(session, "document", None, data, COLLECTOR)
-    return apply_change(session, "document", None, data, ALICE)
+    return apply_change(session, "document", None, data, USER)
 
 
-def create(session: Session, entity_type: str, actor: Actor = ALICE, **fields: Any) -> ChangeResult:
+def create(session: Session, entity_type: str, actor: Actor = USER, **fields: Any) -> ChangeResult:
     """Create any entity with the given fields."""
     return apply_change(session, entity_type, None, fields, actor)
 
 
 def update(
-    session: Session, entity_type: str, entity_id: str, actor: Actor = ALICE, **fields: Any
+    session: Session, entity_type: str, entity_id: str, actor: Actor = USER, **fields: Any
 ) -> ChangeResult:
-    """Change fields of an entity (reads the current version first)."""
-    version = load(session, entity_type, entity_id)["version"]
-    return apply_change(
-        session, entity_type, entity_id, fields, actor, expected_version=int(version)
-    )
+    """Change fields of an entity."""
+    return apply_change(session, entity_type, entity_id, fields, actor)
 
 
 def listing(session: Session, entity_type: str, **params: str) -> dict[str, Any]:

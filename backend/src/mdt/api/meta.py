@@ -14,7 +14,6 @@ from mdt.config import Settings
 from mdt.db.models import Vocabulary
 from mdt.db.session import read_transaction
 from mdt.domain import derived
-from mdt.domain.export import MAX_EXPORT_ROWS
 from mdt.domain.listquery import MAX_PAGE_SIZE
 from mdt.domain.lookup import lookup as lookup_entities
 from mdt.domain.normalize import MAX_NOTE_CHARS
@@ -33,7 +32,7 @@ def health(session: SessionDep) -> dict[str, Any]:
 
 def meta_payload(session: Session, settings: Settings) -> dict[str, Any]:
     """The ``GET /api/meta`` document: registry, groups, limits, vocabulary metadata,
-    cut-off dates, team members and the focal organisation."""
+    cut-off dates and the focal organisation."""
     parameters = load_parameters(settings.codebook_path)
     with read_transaction(session):
         focal_org_id = derived.focal_org_id(session, settings)
@@ -47,7 +46,6 @@ def meta_payload(session: Session, settings: Settings) -> dict[str, Any]:
         }
     return {
         "app_version": __version__,
-        "team_members": settings.team_members_list,
         "focal_org_id": focal_org_id,
         "parameters": parameters.as_api(),
         "limits": {
@@ -55,7 +53,6 @@ def meta_payload(session: Session, settings: Settings) -> dict[str, Any]:
             "max_note_chars": MAX_NOTE_CHARS,
             "max_page_size": MAX_PAGE_SIZE,
             "max_bulk_items": MAX_BULK_ITEMS,
-            "max_export_rows": MAX_EXPORT_ROWS,
         },
         "groups": [dict(group) for group in GROUPS],
         "vocabularies": vocabularies,

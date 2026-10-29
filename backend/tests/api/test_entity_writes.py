@@ -1,30 +1,12 @@
 """Creating and editing entities over HTTP, and Definition of Done 4: a manual change
-creates a revision with author and note; diff and restore work; a stale version leads to
-the conflict payload."""
+creates a revision with author and note; diff and restore work. Writes need no custom
+request header."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from tests.api.helpers import ALICE, BOB, ApiClient, error_of, project_data
-
-CONFLICT_KEYS = {
-    "action",
-    "entity_type",
-    "entity_id",
-    "base_version",
-    "current_version",
-    "base",
-    "current",
-    "base_state",
-    "current_state",
-    "changed_since_base",
-    "your_changes",
-    "conflicting_fields",
-    "meta_changed_since_base",
-    "intervening",
-    "refs",
-}
+from tests.api.helpers import USER, ApiClient, error_of, project_data
 
 
 def revisions(client: ApiClient, entity_type: str, entity_id: str) -> list[dict[str, Any]]:
@@ -43,7 +25,7 @@ def test_create_returns_the_item_and_its_revision(client: ApiClient) -> None:
     assert set(body) == {"item", "revision_id", "warnings"}
     item = body["item"]
     assert item["id"].startswith("prj_") and item["version"] == 1
-    assert (item["created_by"], item["updated_by"]) == (ALICE, ALICE)
+    assert (item["created_by"], item["updated_by"]) == (USER, USER)
     assert item["fields"]["name_uk"] == "Приклад"
     assert item["fields"]["aliases"][0] == {
         "text": "Example",
@@ -53,8 +35,8 @@ def test_create_returns_the_item_and_its_revision(client: ApiClient) -> None:
         "exclude_patterns": [],
     }
     assert item["field_meta"]["slug"] == {
-        "src": f"manual:{ALICE}",
-        "by": ALICE,
+        "src": "manual",
+        "by": USER,
         "at": item["created_at"],
         "locked": True,
         "verified": "unverified",
@@ -69,7 +51,7 @@ def test_create_returns_the_item_and_its_revision(client: ApiClient) -> None:
         "create",
         "Synthetic",
     )
-    assert (revision["author"], revision["channel"]) == (ALICE, "ui")
+    assert (revision["author"], revision["channel"]) == (USER, "ui")
 
 
 def test_detail_items_have_field_comment_counts(client: ApiClient) -> None:
@@ -121,7 +103,7 @@ def test_comments_are_not_served_by_the_generic_endpoints(client: ApiClient) -> 
     assert response.status_code == 404
     response = client.patch(
         f"/api/entities/comment/{comment['id']}",
-        {"expected_version": 1, "changes": {"body_md": "Changed"}},
+        {"changes": {"body_md": "Changed"}},
     )
     assert response.status_code == 404
     assert client.get(f"/api/entities/comment/{comment['id']}/revisions").status_code == 404
@@ -130,9 +112,7 @@ def test_comments_are_not_served_by_the_generic_endpoints(client: ApiClient) -> 
 def test_an_id_of_another_type_is_not_found(client: ApiClient) -> None:
     project = client.create_project()
     assert client.get(f"/api/entities/service/{project['id']}").status_code == 404
-    response = client.patch(
-        f"/api/entities/service/{project['id']}", {"expected_version": 1, "changes": {}}
-    )
+    response = client.patch(f"/api/entities/service/{project['id']}", {"changes": {}})
     assert response.status_code == 404
 
 
@@ -144,20 +124,20 @@ def test_an_id_of_another_type_is_not_found(client: ApiClient) -> None:
 def test_a_manual_change_creates_a_revision_with_author_and_note(client: ApiClient) -> None:
     seeded = client.list("project", sort="slug")["items"][0]
     body = client.update(
-        "project", seeded, {"notes": "Example note from a test."}, note="Why: test", author=BOB
+        "project", seeded, {"notes": "Example note from a test."}, note="Why: test"
     )
     assert body["changed"] is True and isinstance(body["revision_id"], int)
     item = body["item"]
-    assert (item["version"], item["updated_by"]) == (2, BOB)
+    assert (item["version"], item["updated_by"]) == (2, USER)
     assert item["fields"]["notes"] == "Example note from a test."
-    assert item["field_meta"]["notes"]["src"] == f"manual:{BOB}"
+    assert item["field_meta"]["notes"]["src"] == "manual"
     assert item["field_meta"]["notes"]["locked"] is True
     latest = revisions(client, "project", seeded["id"])[0]
     assert latest == {
         "id": body["revision_id"],
         "version": 2,
         "at": item["updated_at"],
-        "author": BOB,
+        "author": USER,
         "channel": "ui",
         "action": "update",
         "note": "Why: test",
@@ -169,7 +149,7 @@ def test_a_manual_change_creates_a_revision_with_author_and_note(client: ApiClie
     full = client.ok(client.get(f"/api/entities/project/{seeded['id']}/revisions/2"))
     diff = full["revision"]["diff"]
     assert diff["fields"] == {"notes": [None, "Example note from a test."]}
-    assert diff["meta"]["notes"]["src"] == [None, f"manual:{BOB}"]
+    assert diff["meta"]["notes"]["src"] == [None, "manual"]
     assert full["revision"]["snapshot"]["fields"]["notes"] == "Example note from a test."
     assert full["revision"]["schema_revision"]
 
@@ -184,19 +164,15 @@ def test_a_no_op_patch_writes_nothing(client: ApiClient) -> None:
 def test_patch_validation(client: ApiClient) -> None:
     project = client.create_project()
     url = f"/api/entities/project/{project['id']}"
-    response = client.patch(url, {"expected_version": 1, "changes": {"slug": "Not A Slug"}})
+    response = client.patch(url, {"changes": {"slug": "Not A Slug"}})
     assert "slug" in error_of(response)["details"]
-    response = client.patch(url, {"expected_version": 1, "changes": {"period": "unknown"}})
+    response = client.patch(url, {"changes": {"period": "unknown"}})
     assert error_of(response)["details"] == {"period": ["is derived and cannot be set"]}
-    response = client.patch(url, {"changes": {"notes": "x"}})
-    assert error_of(response)["details"] == {"expected_version": ["Field required"]}
-    response = client.patch(url, {"expected_version": 1, "changes": {"in_paper_scope": True}})
+    response = client.patch(url, {"changes": {"in_paper_scope": True}})
     assert "scope_note" in error_of(response)["details"]
-    response = client.patch(
-        url, {"expected_version": 1, "changes": {"verification_status": "verified"}}
-    )
+    response = client.patch(url, {"changes": {"verification_status": "verified"}})
     assert "note" in error_of(response)["details"]
-    response = client.patch(url, {"expected_version": 1, "changes": {}, "note": "x" * 2001})
+    response = client.patch(url, {"changes": {}, "note": "x" * 2001})
     assert "note" in error_of(response)["details"]
 
 
@@ -208,7 +184,7 @@ def test_patch_validation(client: ApiClient) -> None:
 def _three_versions(client: ApiClient) -> dict[str, Any]:
     project = client.create_project(name_en="Example one")
     project = client.update("project", project, {"name_en": "Example two"})["item"]
-    return dict(client.update("project", project, {"notes": "Example note"}, author=BOB)["item"])
+    return dict(client.update("project", project, {"notes": "Example note"})["item"])
 
 
 def test_diff_between_two_versions(client: ApiClient) -> None:
@@ -221,7 +197,7 @@ def test_diff_between_two_versions(client: ApiClient) -> None:
         "notes": [None, "Example note"],
     }
     assert "name_en" not in body["diff"]["meta"]  # same source and author, only a new time
-    assert body["diff"]["meta"]["notes"]["src"] == [None, f"manual:{BOB}"]
+    assert body["diff"]["meta"]["notes"]["src"] == [None, "manual"]
     created = client.ok(client.get(url, {"from": 0, "to": 1}))["diff"]["fields"]
     assert created["name_en"] == [None, "Example one"]
     response = client.get(url, {"from": 3, "to": 1})
@@ -233,9 +209,7 @@ def test_diff_between_two_versions(client: ApiClient) -> None:
 def test_restore_previews_and_creates_a_new_revision(client: ApiClient) -> None:
     project = _three_versions(client)
     url = f"/api/entities/project/{project['id']}/restore"
-    preview = client.ok(
-        client.post(url, {"expected_version": 3, "version": 1, "dry_run": True, "note": "x"})
-    )
+    preview = client.ok(client.post(url, {"version": 1, "dry_run": True, "note": "x"}))
     assert preview["changes"] == {
         "name_en": ["Example two", "Example one"],
         "notes": ["Example note", None],
@@ -246,11 +220,7 @@ def test_restore_previews_and_creates_a_new_revision(client: ApiClient) -> None:
         3,
     )
     body = client.ok(
-        client.post(
-            url,
-            {"expected_version": 3, "version": 1, "fields": ["name_en"], "note": "Undo the name"},
-            author=BOB,
-        )
+        client.post(url, {"version": 1, "fields": ["name_en"], "note": "Undo the name"})
     )
     assert body["changed"] is True and body["changes"] == {
         "name_en": ["Example two", "Example one"]
@@ -262,9 +232,9 @@ def test_restore_previews_and_creates_a_new_revision(client: ApiClient) -> None:
         "Example note",
     )
     assert item["field_meta"]["name_en"]["restored_from_version"] == 1
-    assert item["field_meta"]["name_en"]["by"] == BOB
+    assert item["field_meta"]["name_en"]["by"] == USER
     latest = revisions(client, "project", project["id"])[0]
-    assert (latest["action"], latest["channel"], latest["author"]) == ("restore", "restore", BOB)
+    assert (latest["action"], latest["channel"], latest["author"]) == ("restore", "restore", USER)
     assert (latest["restored_from_version"], latest["note"]) == (1, "Undo the name")
     assert [entry["version"] for entry in revisions(client, "project", project["id"])] == [
         4,
@@ -277,78 +247,35 @@ def test_restore_previews_and_creates_a_new_revision(client: ApiClient) -> None:
 def test_restore_errors(client: ApiClient) -> None:
     project = _three_versions(client)
     url = f"/api/entities/project/{project['id']}/restore"
-    response = client.post(url, {"expected_version": 3, "version": 99})
+    response = client.post(url, {"version": 99})
     assert (response.status_code, error_of(response)["code"]) == (404, "not_found")
-    response = client.post(url, {"expected_version": 2, "version": 1})
-    assert (response.status_code, error_of(response)["details"]["action"]) == (409, "restore")
-    response = client.post(url, {"expected_version": 3, "version": 1, "fields": ["nope"]})
+    response = client.post(url, {"version": 1, "fields": ["nope"]})
     assert "fields" in error_of(response)["details"]
 
 
 # --------------------------------------------------------------------------------------
-# DoD 4: concurrent editing
+# Writes without custom headers; deleted records
 # --------------------------------------------------------------------------------------
 
 
-def test_a_stale_version_returns_the_full_conflict_payload(client: ApiClient) -> None:
+def test_writes_need_no_custom_headers(client: ApiClient) -> None:
     project = client.create_project(name_en="Example base")
-    client.update("project", project, {"name_en": "Example theirs"}, note="First", author=ALICE)
-    response = client.patch(
-        f"/api/entities/project/{project['id']}",
-        {"expected_version": 1, "changes": {"name_en": " Example mine ", "notes": "Mine"}},
-        author=BOB,
-    )
-    assert response.status_code == 409
-    error = error_of(response)
-    assert error["code"] == "conflict"
-    payload = error["details"]
-    assert set(payload) == CONFLICT_KEYS
-    assert (payload["action"], payload["entity_type"], payload["entity_id"]) == (
-        "patch",
-        "project",
-        project["id"],
-    )
-    assert (payload["base_version"], payload["current_version"]) == (1, 2)
-    assert payload["base"]["name_en"] == "Example base"
-    assert payload["current"]["name_en"] == "Example theirs"
-    assert (
-        payload["base_state"]
-        == payload["current_state"]
-        == {
-            "deleted_at": None,
-            "deleted_by": None,
-            "merged_into": None,
-        }
-    )
-    assert payload["changed_since_base"] == ["name_en"]
-    assert payload["your_changes"] == {"name_en": "Example mine", "notes": "Mine"}
-    assert payload["conflicting_fields"] == ["name_en"]
-    assert payload["meta_changed_since_base"] == {}
-    [intervening] = payload["intervening"]
-    assert (intervening["author"], intervening["note"], intervening["changed_fields"]) == (
-        ALICE,
-        "First",
-        ["name_en"],
-    )
-    assert client.item("project", project["id"])["version"] == 2
-    # Resolving: resubmit against the current version.
-    body = client.update(
-        "project", {"id": project["id"], "version": 2}, {"name_en": "Example mine"}, author=BOB
-    )
-    assert body["item"]["version"] == 3
+    url = f"/api/entities/project/{project['id']}"
+    first = client.client.patch(url, json={"changes": {"name_en": "Example first"}})
+    second = client.client.patch(url, json={"changes": {"name_en": "Example second"}})
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert second.json()["item"]["version"] == 3
+    latest = revisions(client, "project", project["id"])[0]
+    assert (latest["version"], latest["author"], latest["channel"]) == (3, USER, "ui")
 
 
 def test_writes_to_a_deleted_record_are_refused(client: ApiClient) -> None:
     project = client.create_project()
-    client.ok(client.post(f"/api/entities/project/{project['id']}/delete", {"expected_version": 1}))
-    response = client.patch(
-        f"/api/entities/project/{project['id']}", {"expected_version": 2, "changes": {"notes": "x"}}
-    )
+    client.ok(client.post(f"/api/entities/project/{project['id']}/delete", {}))
+    response = client.patch(f"/api/entities/project/{project['id']}", {"changes": {"notes": "x"}})
     assert response.status_code == 409
     error = error_of(response)
     assert error["code"] == "entity_deleted"
-    assert error["details"]["deleted_by"] == ALICE and error["details"]["deleted_at"]
-    response = client.post(
-        f"/api/entities/project/{project['id']}/restore", {"expected_version": 2, "version": 1}
-    )
+    assert error["details"]["deleted_by"] == USER and error["details"]["deleted_at"]
+    response = client.post(f"/api/entities/project/{project['id']}/restore", {"version": 1})
     assert error_of(response)["code"] == "entity_deleted"
