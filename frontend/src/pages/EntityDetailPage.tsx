@@ -8,7 +8,7 @@ import { useState } from 'react';
 
 import { isApiError } from '../api/client';
 import { useEntity, useMeta } from '../api/queries';
-import type { EntityTypeMeta, Item, Meta, TableEntityType } from '../api/types';
+import type { EntityTypeMeta, Item, Meta } from '../api/types';
 import { AnchorLink } from '../components/AnchorLink';
 import { CommentsPanel, type CommentFocus } from '../components/comments/CommentsPanel';
 import { DeletedBanner } from '../components/detail/DeletedBanner';
@@ -22,10 +22,11 @@ import { detailTab, patchSearch } from '../components/detail/search-params';
 import { UndeleteEntityModal } from '../components/detail/UndeleteEntityModal';
 import { ErrorAlert } from '../components/feedback';
 import { useUrlSearch } from '../hooks/useUrlSearch';
-import { TABLE_PATHS } from '../lib/entity';
+import { isTableType, TABLE_PATHS, type DetailEntityType } from '../lib/entity';
 
 export interface EntityDetailPageProps {
-  type: TableEntityType;
+  /** A table type, or a record-page type (`/records/$id`). */
+  type: DetailEntityType;
   id: string;
 }
 
@@ -45,7 +46,7 @@ export function EntityDetailPage({ type, id }: EntityDetailPageProps) {
       return (
         <Stack gap="xs" align="flex-start">
           <ErrorAlert title="Record not found" error={new Error(`There is no ${type} with the ID “${id}”.`)} />
-          <AnchorLink to={TABLE_PATHS[type]}>Back to the table</AnchorLink>
+          {isTableType(type) && <AnchorLink to={TABLE_PATHS[type]}>Back to the table</AnchorLink>}
         </Stack>
       );
     }
@@ -60,7 +61,7 @@ export function EntityDetailPage({ type, id }: EntityDetailPageProps) {
 }
 
 interface DetailScreenProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   meta: Meta;
   typeMeta: EntityTypeMeta;

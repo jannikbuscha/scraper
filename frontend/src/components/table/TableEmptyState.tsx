@@ -1,16 +1,35 @@
 // Empty table (docs/UI.md §3): explains the active filters, with vocabulary
-// labels and lookup labels for referenced IDs, and offers "Clear filters".
-// A page past the end of the results offers the first page instead.
-import { Button, EmptyState, List } from '@mantine/core';
-import { IconFilterOff, IconTable } from '@tabler/icons-react';
+// labels and lookup labels for referenced IDs; each can be removed on its own
+// (the table header with its filter popovers stays visible above), or all at
+// once with "Clear filters". A page past the end of the results offers the
+// first page instead.
+import { ActionIcon, Button, EmptyState, Group, List, Text } from '@mantine/core';
+import { IconFilterOff, IconTable, IconX } from '@tabler/icons-react';
 
 import { useLookupIds } from '../../api/lookup';
 import type { FieldSpec } from '../../api/types';
 import { useVocabIndex } from '../../hooks/useVocabIndex';
 import { describeFilter, type ValueLabeler } from '../../lib/filter-describe';
-import { activeFilters, clearFilters, getDeletedMode, parseRefFilter, withPage } from '../../lib/query-string';
+import {
+  activeFilters,
+  clearFilters,
+  getDeletedMode,
+  parseRefFilter,
+  setFilter,
+  withDeletedMode,
+  withPage,
+  withQuery,
+  type SearchRecord,
+} from '../../lib/query-string';
 import { termLabel } from '../../lib/vocab';
 import { useTableContext } from './TableContext';
+
+/** One active restriction of the empty result, with the update that removes it. */
+interface ActiveLine {
+  key: string;
+  text: string;
+  remove: (search: SearchRecord) => SearchRecord;
+}
 
 /** IDs named by the ref filters, to label them via lookup. */
 function refFilterIds(filters: readonly [string, string][], byName: ReadonlyMap<string, FieldSpec>): string[] {
@@ -53,13 +72,25 @@ export function TableEmptyState({ total }: { total: number }) {
   const label: ValueLabeler = (field, value) =>
     field.filter === 'ref' ? (lookup.byId.get(value)?.label ?? value) : termLabel(vocab, field.vocabulary, value);
   const deleted = getDeletedMode(search);
-  const lines = [
-    ...(search.q ? [`Search: “${search.q}”`] : []),
-    ...filters.map(([name, raw]) => {
+  const lines: ActiveLine[] = [
+    ...(search.q ? [{ key: 'q', text: `Search: “${search.q}”`, remove: (previous: SearchRecord) => withQuery(previous, '') }] : []),
+    ...filters.map(([name, raw]): ActiveLine => {
       const field = byName.get(name);
-      return field ? describeFilter(field, raw, label) : `${name}: ${raw}`;
+      return {
+        key: `f.${name}`,
+        text: field ? describeFilter(field, raw, label) : `${name}: ${raw}`,
+        remove: (previous) => setFilter(previous, name, null),
+      };
     }),
-    ...(deleted === 'only' ? ['Only deleted rows'] : deleted === 'include' ? ['Deleted rows included'] : []),
+    ...(deleted === 'exclude'
+      ? []
+      : [
+          {
+            key: 'deleted',
+            text: deleted === 'only' ? 'Only deleted rows' : 'Deleted rows included',
+            remove: (previous: SearchRecord) => withDeletedMode(previous, 'exclude'),
+          },
+        ]),
   ];
 
   if (lines.length === 0) {
@@ -71,10 +102,25 @@ export function TableEmptyState({ total }: { total: number }) {
       title={`No ${plural} match the current filters`}
       description="Active filters:"
     >
-      <List size="sm" ta="left" aria-label="Active filters">
+      <List size="sm" ta="left" aria-label="Active filters" listStyleType="none">
         {lines.map((line) => (
-          <List.Item key={line}>
-            <bdi>{line}</bdi>
+          <List.Item key={line.key}>
+            <Group gap={4} wrap="nowrap">
+              <Text span size="sm">
+                <bdi>{line.text}</bdi>
+              </Text>
+              <ActionIcon
+                size="sm"
+                variant="subtle"
+                color="gray"
+                aria-label={`Remove: ${line.text}`}
+                onClick={() => {
+                  setSearch((previous) => line.remove(previous));
+                }}
+              >
+                <IconX size={14} aria-hidden />
+              </ActionIcon>
+            </Group>
           </List.Item>
         ))}
       </List>

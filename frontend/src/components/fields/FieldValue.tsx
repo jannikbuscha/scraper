@@ -11,6 +11,7 @@ import {
   asAliases,
   asStringArray,
   derivedDetails,
+  formatInterval,
   EMPTY_TEXT,
   findRef,
   getFieldValue,
@@ -240,6 +241,7 @@ function DerivedValue({ item, field, children, variant }: { item: Item; field: F
   const details = derivedDetails(item, field.name);
   const lines = [
     'Derived value (read-only).',
+    details.interval && `${field.label} interval over all candidates: ${formatInterval(details.interval)}`,
     details.basis && `Basis: ${termLabel(vocab, 'date_basis', details.basis)}`,
     details.reason && `Reason: ${termLabel(vocab, 'derived_reason', details.reason)}`,
     details.decidedBy && `Decided by: ${details.decidedBy.label}`,

@@ -112,11 +112,67 @@ function termItem(source: VocabTerm, vocabulary: string, version: number, overri
 
 /** Server state of the edited terms; tests change it to simulate a colleague. */
 let items: Record<string, Item>;
+/** What GET /api/vocab returns; tests replace it to simulate a colleague. */
+let vocabularies: Vocabulary[];
+
+const termRevision = (version: number, changed: string[]) => ({
+  id: 70 + version,
+  version,
+  at: `2026-01-0${version}T10:00:00.000000Z`,
+  author: version === 1 ? 'seed' : 'Example Colleague',
+  channel: version === 1 ? ('seed' as const) : ('ui' as const),
+  action: version === 1 ? ('create' as const) : ('update' as const),
+  note: null,
+  changed_fields: changed,
+  restored_from: null,
+  restored_from_version: null,
+  batch_id: null,
+});
+
+/** History of cluster_a (version 3): v2 and v3 changed its definition. */
+function termHistory(url: URL, init: RequestInit | undefined): unknown {
+  const base = '/api/entities/vocabulary_term/voc_a';
+  if (url.pathname === `${base}/revisions`) {
+    const items = [termRevision(3, ['definition']), termRevision(2, ['definition']), termRevision(1, ['label_en'])];
+    return { items, total: 3, page: 1, page_size: 50, refs: {} };
+  }
+  const single = /\/revisions\/(\d+)$/.exec(url.pathname);
+  if (url.pathname.startsWith(`${base}/revisions/`) && single) {
+    const version = Number(single[1]);
+    return {
+      revision: {
+        ...termRevision(version, ['definition']),
+        snapshot: { fields: {}, field_meta: {}, state: {} },
+        diff: { fields: { definition: [`Definition ${version - 1}`, `Definition ${version}`] } },
+        schema_revision: '0001',
+      },
+      refs: {},
+    };
+  }
+  if (url.pathname === `${base}/diff`) {
+    return {
+      from: Number(url.searchParams.get('from')),
+      to: Number(url.searchParams.get('to')),
+      diff: { fields: { definition: ['Original example definition', 'Example definition of cluster_a'] } },
+      not_recorded: [],
+      refs: {},
+    };
+  }
+  if (url.pathname === `${base}/restore`) {
+    const body = jsonBody(init) as { dry_run: boolean };
+    const changes = { definition: ['Example definition of cluster_a', 'Original example definition'] };
+    if (body.dry_run) return { changes };
+    return { item: items.voc_a, changed: true, revision_id: 80, warnings: [], skipped_fields: [], changes };
+  }
+  return undefined;
+}
 
 function mockCodebookApi() {
   return mockApi((url, init) => {
+    const history = termHistory(url, init);
+    if (history !== undefined) return history;
     if (url.pathname === '/api/meta') return meta;
-    if (url.pathname === '/api/vocab') return { vocabularies: VOCABULARIES };
+    if (url.pathname === '/api/vocab') return { vocabularies };
     if (url.pathname === '/api/comments') return { threads: [] };
     if (url.pathname === '/api/entities/vocabulary_term/voc_b') return { item: termItem(CLUSTER_B, 'example_cluster', 1) };
     if (url.pathname === '/api/entities/vocabulary_term' && init?.method === 'POST') {
@@ -138,6 +194,7 @@ const patchBodies = (fetchMock: ReturnType<typeof mockApi>, id: string) =>
 describe('Codebook', () => {
   beforeEach(() => {
     window.localStorage.setItem(AUTHOR_STORAGE_KEY, 'Example Person');
+    vocabularies = VOCABULARIES;
     items = {
       voc_a: termItem(CLUSTER_A, 'example_cluster', 3),
       voc_mod: termItem(CHANGE_TYPE, 'event_type', 5),
@@ -177,6 +234,80 @@ describe('Codebook', () => {
     });
     await waitFor(() => {
       expect(screen.queryByRole('dialog')).toBeNull();
+    });
+  });
+
+  it('deactivates with the version shown when the dialog opened, also after a refetch', async () => {
+    const fetchMock = mockCodebookApi();
+    const { user, queryClient } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
+
+    await user.click(await screen.findByRole('button', { name: 'Deactivate cluster_b' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Deactivate example_cluster:cluster_b' });
+    // A colleague edits the term meanwhile; the vocabularies are refetched with version 4.
+    vocabularies = VOCABULARIES.map((vocabulary) => ({
+      ...vocabulary,
+      terms: vocabulary.terms.map((candidate) =>
+        candidate.id === CLUSTER_B.id ? { ...candidate, version: 4, definition: 'Changed elsewhere' } : candidate,
+      ),
+    }));
+    await queryClient.invalidateQueries({ queryKey: ['vocab'] });
+    await waitFor(() => {
+      expect(requestsTo(fetchMock, '/api/vocab')).toHaveLength(2);
+    });
+    await user.click(within(dialog).getByRole('button', { name: 'Deactivate' }));
+
+    // Version 3 was shown when the dialog opened: the server answers with the
+    // confirmation listing the colleague's revision instead of a silent write.
+    await waitFor(() => {
+      expect(patchBodies(fetchMock, 'voc_b')).toEqual([{ expected_version: 3, changes: { active: false }, note: null }]);
+    });
+  });
+
+  it('compares any two versions of a term and restores one after a dry run (assignment §6)', async () => {
+    const fetchMock = mockCodebookApi();
+    const { user } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
+
+    await user.click(await screen.findByRole('button', { name: 'History of cluster_a' }));
+    const dialog = await screen.findByRole('dialog', { name: 'History of example_cluster:cluster_a' });
+    expect(await within(dialog).findByText('Changes of version 3')).toBeInTheDocument();
+
+    // Compare mode: pick versions 1 and 3.
+    await user.click(within(dialog).getByRole('switch', { name: 'Compare two versions' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Compare version 3' }));
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Compare version 1' }));
+    expect(await within(dialog).findByText('Changes from v1 to v3')).toBeInTheDocument();
+    // The word diff of the definition (old → new).
+    await waitFor(() => {
+      expect(dialog).toHaveTextContent(/Original/);
+    });
+    expect(requestsTo(fetchMock, '/api/entities/vocabulary_term/voc_a/diff').map((url) => url.search)).toEqual([
+      '?from=1&to=3',
+    ]);
+
+    // Restore version 1: the current version cannot be restored, the others can.
+    expect(within(dialog).getByRole('button', { name: 'Restore version 3' })).toBeDisabled();
+    await user.click(within(dialog).getByRole('button', { name: 'Restore version 1' }));
+    const panel = await within(dialog).findByRole('region', { name: 'Restore version 1' });
+    expect(await within(panel).findByRole('checkbox', { name: 'Restore Definition' })).toBeChecked();
+    await user.type(within(panel).getByRole('textbox', { name: /Note/ }), 'Back to the original definition');
+    await user.click(within(panel).getByRole('button', { name: 'Restore' }));
+
+    await waitFor(() => {
+      expect(
+        callsTo(fetchMock, '/api/entities/vocabulary_term/voc_a/restore').map((call) => jsonBody(call.init)),
+      ).toEqual([
+        { expected_version: 3, version: 1, dry_run: true },
+        {
+          expected_version: 3,
+          version: 1,
+          fields: ['definition'],
+          note: 'Back to the original definition',
+          dry_run: false,
+        },
+      ]);
+    });
+    await waitFor(() => {
+      expect(within(dialog).queryByRole('region', { name: 'Restore version 1' })).toBeNull();
     });
   });
 

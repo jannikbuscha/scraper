@@ -46,6 +46,9 @@ describe('field verification', () => {
     expect(isVerifiable(fieldSpec('verification_status', 'vocab'), item)).toBe(false);
     expect(isVerifiable(fieldSpec('period', 'vocab', { derived: true }), item)).toBe(false);
     expect(isVerifiable(fieldSpec('canonical_url', 'url', { system: true }), item)).toBe(false);
+    // Evidence cannot be the subject of evidence, so its own fields are not field-verified.
+    const evidence = exampleItem('evd_EXAMPLE', { quote: 'An example quote' }, { type: 'evidence' });
+    expect(isVerifiable(fieldSpec('quote', 'text'), evidence)).toBe(false);
   });
 
   it('retries once with the current version when the field value did not change', () => {
@@ -67,7 +70,34 @@ describe('field verification', () => {
       to: 'New name',
       by: 'First Colleague',
       at: '2026-01-03T10:00:00.000000Z',
+      verification: null,
+      note: null,
     });
+  });
+
+  it('asks instead of retrying when a colleague changed the verification of the field', () => {
+    const dispute = { ...revision(3, 'Example Colleague', ['name_en']), action: 'verify' as const, note: 'Example reason' };
+    const payload = {
+      ...verifyConflict({ name_en: 'Example' }, { name_en: 'Example' }, [dispute]),
+      meta_changed_since_base: { name_en: { verified: ['unverified', 'disputed'] as [string, string] } },
+    };
+    expect(verifyConflictDecision(payload, 'name_en')).toEqual({
+      kind: 'ask',
+      version: 3,
+      from: 'Example',
+      to: 'Example',
+      by: 'Example Colleague',
+      at: '2026-01-03T10:00:00.000000Z',
+      verification: ['unverified', 'disputed'],
+      note: 'Example reason',
+    });
+  });
+
+  it('asks when the field was verified again with other evidence (no status change)', () => {
+    const reverified = { ...revision(3, 'Example Colleague', ['name_en']), action: 'verify' as const };
+    const payload = verifyConflict({ name_en: 'Example' }, { name_en: 'Example' }, [reverified]);
+    const decision = verifyConflictDecision(payload, 'name_en');
+    expect(decision).toMatchObject({ kind: 'ask', version: 3, by: 'Example Colleague', verification: null });
   });
 
   it('asks when the base snapshot is unknown, and reloads when the row was deleted', () => {

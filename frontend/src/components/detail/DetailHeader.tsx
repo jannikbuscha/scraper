@@ -1,18 +1,19 @@
 // Header of the detail page (docs/UI.md §4): breadcrumb, label, badges
 // (verification status, project cluster, paper scope, deleted, version) and
 // the actions Edit, Delete / Undelete, Copy link and the comments toggle.
-import { Badge, Breadcrumbs, Button, CopyButton, Group, Stack, Title, Tooltip } from '@mantine/core';
-import { IconCheck, IconLink, IconMessage, IconPencil, IconRestore, IconTrash } from '@tabler/icons-react';
+import { Badge, Breadcrumbs, Button, Group, Stack, Title } from '@mantine/core';
+import { IconMessage, IconPencil, IconRestore, IconTrash } from '@tabler/icons-react';
 
-import type { EntityTypeMeta, Item, TableEntityType } from '../../api/types';
+import type { EntityTypeMeta, Item } from '../../api/types';
 import { useVocabIndex } from '../../hooks/useVocabIndex';
-import { detailHref, TABLE_PATHS } from '../../lib/entity';
+import { detailHref, isTableType, TABLE_PATHS, type DetailEntityType } from '../../lib/entity';
 import { asBoolean, asNumber, asString } from '../../lib/format';
 import { termLabel } from '../../lib/vocab';
 import { AnchorLink } from '../AnchorLink';
 import { isVerificationStatus, VerificationDot } from '../fields/VerificationDot';
 import { VocabBadge } from '../fields/VocabBadge';
 import { WriteButton } from '../WriteButton';
+import { CopyLinkButton } from './CopyLinkButton';
 
 /** The record's paper-scope flag: stored for projects, virtual for the other types. */
 function scopeField(typeMeta: EntityTypeMeta) {
@@ -34,7 +35,7 @@ function ScopeBadge({ item, typeMeta }: { item: Item; typeMeta: EntityTypeMeta }
 }
 
 interface DetailHeaderProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   typeMeta: EntityTypeMeta;
   editing: boolean;
@@ -67,7 +68,12 @@ export function DetailHeader({
   return (
     <Stack gap={6}>
       <Breadcrumbs separator="›" fz="sm">
-        <AnchorLink to={TABLE_PATHS[type]}>{typeMeta.label_plural}</AnchorLink>
+        {isTableType(type) ? (
+          <AnchorLink to={TABLE_PATHS[type]}>{typeMeta.label_plural}</AnchorLink>
+        ) : (
+          // Records without a table: the type only.
+          <span>{typeMeta.label_plural}</span>
+        )}
         <bdi>{item.label}</bdi>
       </Breadcrumbs>
       <Group justify="space-between" align="flex-start" gap="sm">
@@ -128,19 +134,7 @@ export function DetailHeader({
               Delete
             </WriteButton>
           )}
-          <CopyButton value={`${window.location.origin}${detailHref(type, item.id)}`}>
-            {({ copied, copy }) => (
-              <Tooltip label="Copied" opened={copied} withArrow>
-                <Button
-                  variant="default"
-                  leftSection={copied ? <IconCheck size={14} /> : <IconLink size={14} />}
-                  onClick={copy}
-                >
-                  Copy link
-                </Button>
-              </Tooltip>
-            )}
-          </CopyButton>
+          <CopyLinkButton url={`${window.location.origin}${detailHref(type, item.id)}`} />
           <Button
             variant={commentsOpen ? 'light' : 'default'}
             leftSection={<IconMessage size={14} />}

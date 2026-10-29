@@ -7,7 +7,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useMeta, useVocab } from '../../api/queries';
 import { AuthorModalContext } from '../../hooks/useAuthor';
 import { VocabIndexContext } from '../../hooks/useVocabIndex';
-import { readStoredAuthor } from '../../lib/author';
+import { readStoredAuthor, rememberReadOnly, shouldAskForAuthor } from '../../lib/author';
 import { buildVocabIndex } from '../../lib/vocab';
 import { AuthorMenu } from './AuthorMenu';
 import { AuthorModal } from './AuthorModal';
@@ -22,8 +22,9 @@ export function AppLayout() {
   const meta = useMeta();
   const vocab = useVocab();
   const vocabIndex = useMemo(() => buildVocabIndex(vocab.data?.vocabularies ?? []), [vocab.data]);
-  // On the first visit (no stored name) the app asks who you are.
-  const [authorModalOpen, setAuthorModalOpen] = useState(() => readStoredAuthor() === null);
+  // On the first visit (no stored name, no read-only choice in this browser
+  // session) the app asks who you are.
+  const [authorModalOpen, setAuthorModalOpen] = useState(shouldAskForAuthor);
   const openAuthorModal = useCallback(() => {
     setAuthorModalOpen(true);
   }, []);
@@ -54,6 +55,8 @@ export function AppLayout() {
         <AuthorModal
           opened={authorModalOpen}
           onClose={() => {
+            // Closed without a name ("Continue read-only", Escape, ×): remembered for the session.
+            if (readStoredAuthor() === null) rememberReadOnly();
             setAuthorModalOpen(false);
           }}
           teamMembers={meta.data?.team_members ?? []}

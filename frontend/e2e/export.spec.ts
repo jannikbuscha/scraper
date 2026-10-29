@@ -42,4 +42,15 @@ test('(h) export CSV and XLSX of a filtered view', async ({ page }) => {
   expect(xlsxColumn('id')).toEqual(csvColumn('id'));
   expect(xlsxColumn('name_en')).toEqual(names);
   expect(xlsxColumn('paper_cluster_label')).toEqual(csvColumn('paper_cluster_label'));
+
+  // A custom column choice exports the visible columns, still after the record ID.
+  await page.getByRole('button', { name: 'Columns' }).click();
+  await page.getByRole('checkbox', { name: 'Unit type' }).check();
+  await expect(page).toHaveURL(/[?&]cols=/);
+  await page.keyboard.press('Escape');
+  const custom = await exportView(page, 'CSV (for analysis tools)');
+  const [customHeader = [], ...customRows] = parseCsv(custom.content.toString('utf8').slice(1));
+  expect(customHeader[0]).toBe('id');
+  expect(customHeader).toEqual(expect.arrayContaining(['name_en', 'unit_type']));
+  expect(customRows.map((row) => row[0])).toEqual(csvColumn('id'));
 });

@@ -29,9 +29,17 @@ export function safeFilename(name: string, fallback: string): string {
   return cleaned === '' || cleaned === '.' || cleaned === '..' ? fallback : cleaned;
 }
 
-/** Downloads the current view; resolves with the file name. Errors throw ApiError. */
-export async function downloadExport(type: EntityType, search: SearchRecord, format: ExportFormat): Promise<string> {
-  const response = await fetchApi(`/api/entities/${type}/export?${exportQueryString(search, format)}`);
+/**
+ * Downloads the current view with the table's visible `columns` (the ID is
+ * added first); resolves with the file name. Errors throw ApiError.
+ */
+export async function downloadExport(
+  type: EntityType,
+  search: SearchRecord,
+  format: ExportFormat,
+  columns: readonly string[],
+): Promise<string> {
+  const response = await fetchApi(`/api/entities/${type}/export?${exportQueryString(search, format, columns)}`);
   const blob = await response.blob();
   const fallback = `${type}-export.${format}`;
   const filename = safeFilename(filenameFromDisposition(response.headers.get('Content-Disposition')) ?? fallback, fallback);

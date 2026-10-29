@@ -1,14 +1,17 @@
-// Sends POST verify-field with the 409 rules of docs/UI.md §1.3: if the
-// field's value is unchanged between base and current, retry once with the
-// current version; otherwise ask "Value changed from A to B by X — verify B?".
+// Sends POST verify-field with the 409 rules of docs/UI.md §1.3. The caller
+// passes the version of its base (captured when the verification menu
+// opened), never the version of a later refetch. If nobody touched the field
+// between base and current (neither its value nor its verification), retry
+// once with the current version; otherwise ask "Value changed from A to B by
+// X — verify B?" or "Verification changed to S by X (note) — … anyway?".
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { isApiError, isConflictError } from '../../api/client';
 import { queryKeys, useVerifyField } from '../../api/queries';
-import type { FieldSpec, Item, Refs, TableEntityType, VerificationStatus } from '../../api/types';
+import type { EntityType, FieldSpec, Item, Refs, VerificationStatus } from '../../api/types';
 import { notifyError, notifySuccess } from '../feedback';
-import { verifyConflictDecision, type VerifyConflictDecision } from './verification';
+import { verifyConflictDecision, type VerifyQuestionDecision } from './verification';
 
 export interface VerifyRequest {
   status: VerificationStatus;
@@ -20,12 +23,12 @@ export interface VerifyRequest {
 export interface VerifyQuestion {
   field: FieldSpec;
   request: VerifyRequest;
-  decision: Extract<VerifyConflictDecision, { kind: 'ask' }>;
+  decision: VerifyQuestionDecision;
   /** Labels of the referenced IDs in the conflict payload. */
   refs: Refs;
 }
 
-export function useFieldVerifier(type: TableEntityType, item: Item) {
+export function useFieldVerifier(type: EntityType, item: Item) {
   const client = useQueryClient();
   const mutation = useVerifyField(type);
   const [question, setQuestion] = useState<VerifyQuestion | null>(null);
@@ -65,7 +68,16 @@ export function useFieldVerifier(type: TableEntityType, item: Item) {
             decision:
               decision.kind === 'ask'
                 ? decision
-                : { kind: 'ask', version: decision.version, from: current, to: current, by: null, at: null },
+                : {
+                    kind: 'ask',
+                    version: decision.version,
+                    from: current,
+                    to: current,
+                    by: null,
+                    at: null,
+                    verification: null,
+                    note: null,
+                  },
           });
         }
         return false;
@@ -80,7 +92,8 @@ export function useFieldVerifier(type: TableEntityType, item: Item) {
     pending: mutation.isPending,
     question,
     stale,
-    verify: (field: FieldSpec, request: VerifyRequest) => send(field, request, item.version, false),
+    /** `baseVersion`: the version the user saw when choosing (docs/UI.md §1.3). */
+    verify: (field: FieldSpec, request: VerifyRequest, baseVersion: number) => send(field, request, baseVersion, false),
     /** Verifies the current value after the user confirmed the question. */
     confirm: async (): Promise<boolean> => {
       if (!question) return false;

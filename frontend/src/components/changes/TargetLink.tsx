@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 
 import { useEntity } from '../../api/queries';
 import type { TableEntityType } from '../../api/types';
-import { DETAIL_PATHS, TABLE_PATHS } from '../../lib/entity';
+import { DETAIL_PATHS, RECORD_PATH, TABLE_PATHS } from '../../lib/entity';
 import { asString } from '../../lib/format';
 import { searchFromQuery } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
@@ -29,6 +29,12 @@ export function TargetLink({ target, label }: { target: RecordTarget | null; lab
     case 'detail':
       return (
         <AnchorLink to={DETAIL_PATHS[target.type]} params={{ id: target.id }} search={target.search}>
+          {text}
+        </AnchorLink>
+      );
+    case 'record':
+      return (
+        <AnchorLink to={RECORD_PATH} params={{ id: target.id }} search={target.search}>
           {text}
         </AnchorLink>
       );

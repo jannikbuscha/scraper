@@ -173,6 +173,15 @@ export function useEntity(type: EntityType, id: string, options: EntityOptions =
   });
 }
 
+/** Reads a record fresh from the server (and updates its cached query), e.g. right before a write. */
+export async function fetchEntity(client: QueryClient, type: EntityType, id: string): Promise<ItemResponse> {
+  return client.query({
+    queryKey: queryKeys.item(type, id),
+    queryFn: ({ signal }) => apiGet<ItemResponse>(entityPath(type, id), '', signal),
+    staleTime: 0,
+  });
+}
+
 export function useRevisions(type: RecordType, id: string, page = 1, pageSize = 50) {
   return useQuery({
     queryKey: [...queryKeys.revisions(type, id), 'page', page, pageSize],

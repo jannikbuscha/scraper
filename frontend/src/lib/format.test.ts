@@ -70,7 +70,30 @@ describe('item values', () => {
         refs: { 'derived.trajectory_event_id': event },
       },
     );
-    expect(derivedDetails(item, 'war_trajectory')).toEqual({ basis: null, reason: 'example_reason', decidedBy: event });
+    expect(derivedDetails(item, 'war_trajectory')).toEqual({
+      basis: null,
+      reason: 'example_reason',
+      decidedBy: event,
+      interval: null,
+    });
+  });
+
+  it('reports the interval over all candidates only where it differs from the displayed value', () => {
+    // Synthetic candidates "2022" and "2022-03": the one that ends first is shown,
+    // the interval [earliest start, earliest end] decides the period (DATA_MODEL §8.3).
+    const several = exampleItem(
+      'prj_1',
+      {},
+      { derived: { launch: '2022-03', launch_precision: 'month', launch_start: '2022-01-01', launch_end: '2022-03-31' } },
+    );
+    expect(derivedDetails(several, 'launch').interval).toEqual({ start: '2022-01-01', end: '2022-03-31' });
+    const single = exampleItem(
+      'prj_1',
+      {},
+      { derived: { launch: '2020-02', launch_precision: 'month', launch_start: '2020-02-01', launch_end: '2020-02-29' } },
+    );
+    expect(derivedDetails(single, 'launch').interval).toBeNull();
+    expect(derivedDetails(single, 'period').interval).toBeNull();
   });
 
   it('labels refs by ID first, by field name only for the current value', () => {

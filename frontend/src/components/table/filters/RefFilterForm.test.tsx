@@ -38,4 +38,38 @@ describe('ref filter form', () => {
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     expect(onApply).toHaveBeenCalledWith('in:prj_B');
   });
+
+  it('keeps "has any value" (empty:false) when applied unchanged, and can write it', async () => {
+    mockApi(() => undefined);
+    const onApply = vi.fn();
+    const { user } = renderRoute(() => <RefFilterForm field={projectField} raw="empty:false" onApply={onApply} />, {
+      url: '/',
+      path: '/',
+    });
+    const condition = await screen.findByRole('combobox', { name: 'Condition' });
+    expect(condition).toHaveValue('any');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenLastCalledWith('empty:false');
+
+    // Switching to "is any of" without values removes the filter, as before.
+    await user.selectOptions(condition, 'in');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenLastCalledWith(null);
+    // ... and "has any value" can be chosen in the form.
+    await user.selectOptions(condition, 'any');
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenLastCalledWith('empty:false');
+  });
+
+  it('keeps an "is empty" filter as its equivalent ~empty selection', async () => {
+    mockApi(() => undefined);
+    const onApply = vi.fn();
+    const { user } = renderRoute(() => <RefFilterForm field={projectField} raw="empty:true" onApply={onApply} />, {
+      url: '/',
+      path: '/',
+    });
+    expect(await screen.findByRole('checkbox', { name: '(empty)' })).toBeChecked();
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+    expect(onApply).toHaveBeenLastCalledWith('in:~empty');
+  });
 });

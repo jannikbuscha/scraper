@@ -40,9 +40,9 @@ Every write sends `expected_version`. Nothing is retried blindly.
 | Action | On 409 |
 |---|---|
 | Edit form (PATCH, `action = patch`, live row) | Conflict dialog (§4.1). |
-| verify-field | Refetch (on every conflict). If the field value is unchanged between base and current, retry once with `current_version`. Otherwise, or if the retry conflicts again, ask "Value changed from A to B by X — verify B?". |
+| verify-field | The base is the record's version when the verification menu opened (§4.1), never that of a later refetch. Refetch (on every conflict). If no revision between base and current touched the field (neither its value nor its verification: no intervening revision lists it in `changed_fields`, and `meta_changed_since_base` has no entry for it), retry once with `current_version`. Otherwise, or if the retry conflicts again, ask: "Value changed from A to B by X — verify B?", or, if only the verification changed, "Verification changed from S1 to S2 by X (with the revision's note) — mark … anyway?". |
 | delete, undelete, restore, codebook modal | Show the confirmation again, listing the intervening revisions (author, time, note); resend with `current_version` only on confirm. |
-| comment edit | Two-way dialog (theirs vs yours, word diff); resend only on confirm. |
+| comment edit | The editor freezes its base (version and text) when editing starts; refetches never change the version sent, and a newer version shows "Changed by … at …; saving will open the conflict dialog". On 409: two-way dialog (theirs vs yours, word diff); resend with `current_version` only on confirm. |
 | comment resolve/reopen | Idempotent on the server; a 409 only arises for real changes and is shown like delete. |
 | bulk | Per-row results (§3). |
 | `entity_deleted`, `invalid_state` | Notice "Changed by <updated_by> at <updated_at>" with **Reload** (comment actions show the comment's own "Changed/Deleted by … at …" notice). |
@@ -58,7 +58,7 @@ Every write sends `expected_version`. Nothing is retried blindly.
 
 ### 1.5 Attribution, not authentication
 
-- **Author modal:** on first visit it asks for a name: a quick pick from `meta.team_members` or free text, with recently used names remembered.
+- **Author modal:** on first visit it asks for a name: a quick pick from `meta.team_members` or free text, with recently used names remembered. "First visit" means no stored name and no read-only choice in this browser session: closing the modal without a name ("Continue read-only", Escape or ×) is remembered in `sessionStorage["mdt.read_only"]`, so reloads, deep links and shared links in the same tab do not ask again (a new browser session asks again); write buttons still need a name.
   - The same validation as the server applies: NFC, trim, collapse whitespace; no control, format, bidi or zero-width characters, no comma; reserved names refused (DATA_MODEL §7).
   - `encodeURIComponent` errors (lone surrogates) are caught.
 - **Storage and sending:** the name is stored in `localStorage["mdt.author"]` and sent on every write as `X-Author: encodeURIComponent(name)`.
@@ -78,6 +78,7 @@ Every write sends `expected_version`. Nothing is retried blindly.
 | `/` | **Overview:** counts per entity type from `/api/stats` (total, unverified), open comments, links. The dashboard proper comes in Phase 3. |
 | `/projects`, `/services`, `/events`, `/documents`, `/organizations` | `EntityTablePage` |
 | `/projects/$id` (likewise for the other four) | `EntityDetailPage`; search params `tab=details\|history`, `from`, `to`, `comments=open`, `thread=<id>`, `edit=1` |
+| `/records/$id` | `RecordPage`: the generic record page for records without a table (evidence, participation, component, relation, indicator, saved view; the type comes from the ID prefix). It is the `EntityDetailPage` with the same search params; IDs of table types and vocabulary terms are redirected to their own pages with the search params kept. Related lists, ref values, the change feed, the comment feed and the trash link these records here. |
 | `/changes` | `RecentChangesPage` |
 | `/comments` | `CommentsPage` |
 | `/trash` | `TrashPage` (`type=` tab param: an entity type name or `comment`) |
@@ -101,11 +102,11 @@ Review inbox, collector runs, timeline, dashboard and releases come in later pha
   - `chips` (period) → a chip group (multi-select) over the codes of the field's vocabulary, writing `f.period=in:…` with the codes in vocabulary order (no chip selected removes the parameter);
   - `preset` (events, documents) → one group of mutually exclusive date presets, from the quick filter's `presets` list (API §3.1); without such a list the UI builds the three `within` presets from `meta.parameters`;
 - **Saved views** menu:
-  - list via `GET /api/entities/saved_view?f.entity_type=eq:<type>&sort=name&page_size=500`, applied by navigation (§1.2); the view matching the current query is marked;
-  - "Save current view…" opens a dialog with name, description and the query to be saved; for the default view its Save button is disabled, with an explanation;
+  - list via `GET /api/entities/saved_view?f.entity_type=eq:<type>&sort=name&page_size=500`, applied by navigation (§1.2); the view matching the current query is marked; the list scrolls inside the dropdown (at most `min(60vh, 420px)` high, `overscroll-behavior: contain`, so scrolling past its end does not scroll the page away from the dropdown), so every view stays reachable however many the team saves;
+  - "Save current view…" (below the list, always visible) opens a dialog with name, description and the query to be saved; for the default view its Save button is disabled, with an explanation;
   - delete with confirmation (soft delete);
-- **Columns** menu (checkboxes over the type's fields, system columns included; stored in `cols`; default = `in_list` fields);
-- **Export** menu: "CSV (for analysis tools)" and "XLSX (for Excel, exact values)", downloaded per §1.6;
+- **Columns** menu (checkboxes over the type's `exportable` fields, i.e. those with a value per list row, system columns included; the detail-only document `text` is not offered; stored in `cols`; default = `in_list` fields; unknown or non-exportable names in a URL are ignored);
+- **Export** menu: "CSV (for analysis tools)" and "XLSX (for Excel, exact values)", downloaded per §1.6; the request sends the page's filters, `q` and sort, and `cols` = `id` followed by the visible columns (never the raw URL `cols`), so every export of the current view identifies its rows and has the table's columns;
 - **"+ New"** opens a create modal with the `in_create` fields and their defaults:
   - the "one of" constraints are shown;
   - a project needs a `scope_note`;
@@ -124,13 +125,13 @@ Review inbox, collector runs, timeline, dashboard and releases come in later pha
   - `date_range`: from and to (`YYYY-MM-DD`), mode overlaps or within; "empty" is exclusive and disables from/to;
   - `bool`: segmented yes, no, any;
   - `number_range`: min and max;
-  - `ref`: multi-select backed by `GET /api/lookup` (labels of IDs from a shared URL via `/api/lookup?ids=…`).
+  - `ref`: condition "is any of" (multi-select backed by `GET /api/lookup`, labels of IDs from a shared URL via `/api/lookup?ids=…`, plus "(empty)", which writes `~empty`) or "has any value" (`empty:false`); a form opened on a filter and applied unchanged keeps it.
 - **Cells by type:**
   - `vocab`: label as a small badge (code in tooltip);
   - `vocab_list`: badges, at most 3 plus "+n" (the first is the main value);
   - `ref`: link with label, struck through if deleted;
   - `partial_date`: canonical string plus precision hint (`2020-06 · month`);
-  - derived values: italic with a "derived" tooltip showing basis, reason and the deciding event; `existed_by` shown as `≤ 2021-05-14`;
+  - derived values: italic with a "derived" tooltip showing basis, reason and the deciding event, and for `launch` the interval over all candidates whenever it differs from the displayed candidate (API §2: it decides the period, sorting, filters and exports); `existed_by` shown as `≤ 2021-05-14`;
   - `bool`: check icon;
   - `url_list`: count plus the first host;
   - `verification_status`: coloured dot (grey unverified, green verified, red disputed);
@@ -138,23 +139,25 @@ Review inbox, collector runs, timeline, dashboard and releases come in later pha
   - documents with `q`: the `search_snippet` segments under the title, hits as `<mark>`.
 - **Selection:** checkbox column and select-all on the page.
 - **Bulk edit:**
-  - **modal:** a field from the `bulk_editable` fields; operation set / add / remove for lists; value; note. A scope change asks for a `scope_note`; setting verified or disputed asks for a note;
+  - **modal:** a field from the `bulk_editable` fields; operation set / add / remove for lists; value; note. A scope change asks for a `scope_note`; setting verified or disputed asks for a note. Set and add offer active codes only; remove also offers the inactive codes that the selected rows carry (marked "(inactive)"), so a deactivated code can be cleaned out of many rows at once (only adding inactive codes is refused, DATA_MODEL §7);
   - **versions:** the `expected_version` of each row is captured when the modal opens;
   - **summary** per status (updated, unchanged, conflict, deleted, error): conflicted rows are listed with their current values, with "Retry with current versions" for those rows after review;
   - **Mark verified:** a bulk set of `verification_status`, note required.
 - **Footer:** pagination (page numbers, first and last), page size 25 / 50 / 100 / 200, total.
-- **Empty states** explain the active filters (labels via lookup) and offer "Clear filters", which removes every `f.*` filter, `q` and the `deleted` mode and drops a `relevance` sort (the server refuses it without `q`). A page past the end has its own empty state; an invalid filter or sort in the URL (`400 bad_filter`/`bad_sort`) offers "Reset filters and sort".
+- **Empty states** keep the table header (with its sort buttons and filter popovers) above them, explain the active filters (labels via lookup) with a remove button per line (one filter, the search or the `deleted` mode), and offer "Clear filters", which removes every `f.*` filter, `q` and the `deleted` mode and drops a `relevance` sort (the server refuses it without `q`). A page past the end has its own empty state; an invalid filter or sort in the URL (`400 bad_filter`/`bad_sort`) offers "Reset filters and sort".
 
 ## 4. EntityDetailPage
+
+The page of a table type's record and of the record-page types (`/records/$id`, §2). For the latter the breadcrumb shows the type without a table link, the related records are those listed below, and evidence rows have no field verification of their own (evidence cannot be the subject of evidence).
 
 **Header:**
 - breadcrumb (type → label);
 - badges: `verification_status`, project cluster, `in_paper_scope`, "deleted", version `vN`;
 - actions:
   - **Edit**;
-  - **Delete** (confirm with note; on `409 has_dependents`, ask about cascade);
+  - **Delete** (confirm with note; on `409 has_dependents`, ask about cascade; for evidence that a field verification rests on (`{"field_verification": 1}`) explain instead that the field has to be marked unverified or disputed, or verified with other evidence, first, linking the subject, and offer no cascade);
   - **Undelete** (the shared undelete dialog of the trash, §5: it offers the cascade when the delete revision's batch contains other rows, counted with `GET /api/revisions?batch_id=…&page_size=1`, and preselects it then);
-  - **Copy link**;
+  - **Copy link** (the page's address: `/projects/<id>` etc., `/records/<id>` for the record-page types). It uses the Clipboard API in a secure context; over plain http on a LAN or VPN address (README "Team access"), where browsers offer no Clipboard API, it copies through a selected hidden field (`execCommand('copy')`); if the browser refuses both, a dialog shows the link selected for manual copying, so the action never fails silently;
   - **Comments** toggle with the number of open threads (opens the comments panel, §4.3).
 - A deleted entity is shown read-only (Edit and verification disabled) with a banner and an Undelete button.
 
@@ -171,13 +174,13 @@ Field groups in the order `meta.groups` (Basics · Classification · Wartime · 
 - **lock icon** if `locked`;
 - **verification dot**, with a menu:
   - **Verified:** choose one of the field's evidence rows (`GET /api/entities/evidence?f.subject_id=in:<id>&f.target=eq:field:<name>`), or "Add evidence…" first;
-  - **Disputed:** note required; afterwards the comment composer opens, pre-set to that field;
+  - **Disputed:** note required; the dialog shows the disputed value; afterwards the comment composer opens, pre-set to that field;
   - **Unverified.**
-  The choice is sent as `POST verify-field`.
-- **"Add evidence…"** opens a small form that posts to `/api/entities/evidence`: URL, retrieved at (default now), verbatim quote, locator, note (the evidence row's `description`); the inputs come from `meta.entity_types.evidence`. It sets `subject_id` and `target = field:<name>`. Its button "Add evidence and mark verified" creates the evidence row and then marks the field verified with it.
+  The choice is sent as `POST verify-field`. Opening the menu captures the base of the choice: the record's version and the field's value as shown then. Every choice, also from the evidence and dispute dialogs, is sent with that version as `expected_version`, so a change meanwhile (e.g. a background refetch while the user copies a quote from the source) leads to the 409 rules of §1.3 instead of verifying a value the user has not seen.
+- **"Add evidence…"** opens a small form that posts to `/api/entities/evidence`: URL, retrieved at (default now), verbatim quote, locator, note (the evidence row's `description`); the inputs come from `meta.entity_types.evidence`. URL, retrieval time and the quote are required, because a verified field needs evidence that quotes the source (CODEBOOK §2.3, DATA_MODEL §6.4). It sets `subject_id` and `target = field:<name>`, and shows the value the evidence is for (the captured one). Its button "Add evidence and mark verified" first reads the record again: if the field's value differs from the captured one, it asks ("The value changed meanwhile": who, when, from, to) before anything is stored, so no evidence row gets a `value_snapshot` its quote does not support; "Add evidence for the new value" (checked once more) or "Back to the form" (the form then shows the new value) continue. Then it creates the evidence row and marks the field verified with it.
 - **comment-on-field** icon with the open field-comment count from `virtual.open_comments_by_field`.
 
-**Derived values** appear in the Wartime group with an explanation: basis, reason code in words, and links to the deciding event or participation (labels from `refs`).
+**Derived values** appear in the Wartime group with an explanation: basis, the reason (label and definition of its `derived_reason` term from `/api/vocab`, verbatim), links to the deciding event or participation (labels from `refs`), and, whenever it differs from the displayed candidate, the launch interval over all candidates (e.g. "2022-03 · month" with "Launch interval over all candidates: 2022-01-01 – 2022-03-31"), so a reason such as `imprecise_date` can be traced to the dates it refers to.
 
 **Edit mode** (`edit=1`; only on a live record):
 - While editing, the History tab is disabled, so the form, its frozen base and the typed values stay mounted. If the record is deleted meanwhile, the form stays open with an alert and Save disabled, so nothing typed is lost silently.
@@ -237,8 +240,14 @@ Field groups in the order `meta.groups` (Basics · Classification · Wartime · 
 | event | subject, Evidence |
 | document | metadata, extracted text as plain text, links (subjects with origin and state), Evidence that cites it |
 | organization | Participations |
+| evidence | subject and cited document (links) |
+| participation | organization and subject (links), Evidence |
+| relation | both ends (links), Evidence |
+| indicator | subject (link), Evidence |
+| component | Relations, Evidence |
+| saved view | "Open the view in its table" (the table with the stored query) |
 
-After "+ Add service" or "+ Add event" the user stays on the page and the new row appears in the list. Related lists show the first 100 rows; table types link to their table ("Open in table").
+After "+ Add service" or "+ Add event" the user stays on the page and the new row appears in the list. Related lists show the first 100 rows; table types link to their table ("Open in table"). Each row of a type with a page (table types and the record-page types, e.g. an evidence row) is listed by its linked label, which opens that page; there a wrong evidence row is corrected (Edit), withdrawn (Delete) or commented on.
 
 ### 4.2 History
 
@@ -279,15 +288,15 @@ After a successful "Disputed…" (§4.1) the panel opens with the composer set t
   - filters: author (multi, from `/api/revisions/authors`), entity type (incl. comment, vocabulary term, saved view), channel, action, date range (local days, sent as timestamps), batch;
   - the page URL keeps the API parameter names, except that `since` and `until` hold local days (`YYYY-MM-DD`); the request sends the first and last instant of those days as timestamps;
   - rows grouped by local day: time, author, channel and action badges, entity link (type + label), version, changed fields, note;
-  - link targets: comments link to their subject with `comments=open&thread=<root id>` (a reply links to its root, `context.parent_id`), vocabulary terms to the Codebook page, saved views to their table with the view applied;
+  - link targets: comments link to their subject with `comments=open&thread=<root id>` (a reply links to its root, `context.parent_id`), vocabulary terms to the Codebook page, saved views to their table with the view applied, the other records without a table to their record page (§2);
   - expanding a row loads `GET /api/revisions/{revision_id}` and shows its diff.
 - **CommentsPage:**
   - filters: status, entity type, author, text, deleted; record type and author are single-value selects; status "All" and "Hide deleted" are expressed by leaving the parameter out;
   - one row per thread: subject link, field, last activity, number of replies;
-  - clicking opens the subject page with `comments=open&thread=<id>` (vocabulary terms open the Codebook page).
+  - clicking opens the subject page with `comments=open&thread=<id>` (vocabulary terms open the Codebook page, records without a table their record page, §2).
 - **TrashPage:**
   - tabs for every soft-deletable type: the five table types, participation, component, relation, indicator, evidence, saved view, and comments (vocabulary terms are deactivated, not deleted);
-  - sorted by `-deleted_at`; deleted items with label, `deleted_at`, `deleted_by`, the deletion note and "deleted together with n others" for cascades. The cascade size comes from one request per page for the delete revisions within ±60 s of the page's deletion times (`page_size=500`), counting the rows that share a batch; if that request is cut off, the count reads "n or more";
+  - sorted by `-deleted_at`; deleted items with label (linked to the record's page, also for the record-page types), `deleted_at`, `deleted_by`, the deletion note and "deleted together with n others" for cascades. The cascade size comes from one request per page for the delete revisions within ±60 s of the page's deletion times (`page_size=500`), counting the rows that share a batch; if that request is cut off, the count reads "n or more";
   - the comments tab lists deleted threads (roots, `GET /api/comments?deleted=only`), newest deletion first; deleted replies under a live root are undeleted from the comments panel ("show deleted");
   - **Undelete** with a note in the shared undelete dialog (also used by the detail page): the cascade option is offered unless the deletion is known to be a single one, and is preselected for a known cascade.
 - **CodebookPage:**
@@ -295,7 +304,7 @@ After a successful "Disputed…" (§4.1) the panel opens with the composer set t
   - terms table: code, labels, definition, active, `usage_count`, sort order, attributes such as `candidate`, open comments;
   - **Edit** (modal, generic PATCH of `vocabulary_term`; code and vocabulary read-only). For `event_type` it shows a switch for `attributes.counts_as_modification`, with a warning that derived values will be recomputed. "Replaced by" is a picker of active codes, enabled only for inactive terms; "Active" is locked for fixed codes;
   - **Add term** (the `in_create` fields plus the code, whose format `^[a-z0-9_]+$` is checked in the browser, and the `event_type` switch) and **Deactivate**, both disabled for fixed vocabularies and fixed codes;
-  - **History** (revision list and the diff of the selected revision; terms have no compare or restore);
+  - **History** (like every curated record, assignment §6): the revision list, the stored diff of the selected revision, a "Compare two versions" switch that picks any two versions (component state; `/diff?from=&to=`) and a "Restore" button per row (accessible name "Restore version N"; disabled for the current version) that opens the shared restore form inline below the list (dry run with a checkbox per field, required note, `expected_version` = the current version, conflicts confirmed again as in §4.2); the server applies the codebook rules (fixed codes, `replaced_by`) to a restore like to any edit;
   - **comments panel** per term (`term=`, `comments=open`, `thread=`).
 
 ## 6. Code structure
@@ -309,7 +318,7 @@ frontend/src/
   hooks/      useAuthor, useUrlSearch, useVocabIndex
   components/ layout/, table/ (incl. filters/), fields/ (display + input per type), detail/ (incl. the add-evidence form), history/ (incl. the shared ChangedMeanwhileAlert),
               comments/, conflict/, changes/ (recent changes and comment feed), trash/ (incl. the shared undelete dialog), codebook/, ExternalLink.tsx and small shared components
-  pages/      Overview, EntityTable, EntityDetail, RecentChanges, Comments, Trash, Codebook, NotFound, RouteError
+  pages/      Overview, EntityTable, EntityDetail, Record (generic record page), RecentChanges, Comments, Trash, Codebook, NotFound, RouteError
   test/       Vitest setup, fixtures and the fetch mock
 frontend/e2e/ Playwright specs and the server start script (§7)
 ```
@@ -330,7 +339,8 @@ frontend/e2e/ Playwright specs and the server start script (§7)
   - round-trip of filter grammar and URL (incl. Cyrillic values, commas in text values, `~empty`, chips, canonical sorting);
   - validation and formatting of partial dates;
   - the conflict-resolution payload (only-mine, only-theirs, conflicting, merged text, repeated conflict);
-  - **a refetch during editing leaves the PATCH payload unchanged;**
+  - **a refetch during editing leaves the PATCH payload unchanged** (entity edit form, comment editor, codebook dialogs), and verify-field is sent with the version captured when the verification menu opened;
+  - the verify-field 409 decision: retry only if nobody touched the field, else ask (value or verification changed);
   - diff helpers;
   - author validation and header encoding;
   - `ExternalLink` (javascript:, data:, `java\tscript:`, userinfo URLs render as text).
@@ -345,7 +355,7 @@ frontend/e2e/ Playwright specs and the server start script (§7)
     - (b) filter by `paper_cluster` and sort by `name_en`, `name_uk` (exact expected order), `policy_domains` and `verification_status` (asc and desc); a `contains:дія` filter on `name_uk`; the URL updates and a reload keeps the state;
     - (c) edit a field with a note → history shows author and note;
     - (d) diff and restore with the dry-run preview;
-    - (e) two browser contexts edit the same field → the second sees the conflict dialog with the intervening revision and resolves it;
-    - (f) frozen base: B starts editing, A saves a different field, B posts a comment on the same page (which invalidates the item) and then saves → B sees the conflict dialog and A's value survives;
+    - (e) two browser contexts edit the same field → the second sees the conflict dialog with the intervening revision and resolves it; verify-field after a colleague's dispute (made through the API) shows the question with the colleague's reason instead of a retry, and the dispute stands; "Add evidence…" after a colleague changed the value meanwhile asks before anything is stored (no evidence row);
+    - (f) frozen base: B starts editing, A saves a different field, B posts a comment on the same page (which invalidates the item) and then saves → B sees the conflict dialog and A's value survives; likewise for a comment edit: A starts editing B's comment, B edits it, A posts another comment (which refetches the threads) and saves → A sees the two-way dialog, B's text survives until A confirms, and both edits stay in the comment's history;
     - (g) comment thread create, reply, resolve, delete and undelete; the "open comments" quick filter;
-    - (h) export CSV and XLSX of a filtered view.
+    - (h) export CSV and XLSX of a filtered view; after ticking a column, the export has the visible columns after the record ID.

@@ -4,6 +4,8 @@
 
 export const AUTHOR_STORAGE_KEY = 'mdt.author';
 export const RECENT_AUTHORS_STORAGE_KEY = 'mdt.recent_authors';
+/** sessionStorage: the "Continue read-only" choice of this browser session (docs/UI.md §1.5). */
+export const READ_ONLY_SESSION_KEY = 'mdt.read_only';
 const MAX_RECENT_AUTHORS = 8;
 const MAX_AUTHOR_LENGTH = 100;
 
@@ -86,6 +88,38 @@ function writeItem(key: string, value: string): void {
     // Storage full or disabled: the name then lasts for this page view only.
   }
 }
+
+function sessionStore(): Storage | null {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Remembers for this browser session (tab) that the user chose to continue
+ * without a name, so reloads and deep links do not ask again; writes still
+ * ask for a name.
+ */
+export function rememberReadOnly(): void {
+  try {
+    sessionStore()?.setItem(READ_ONLY_SESSION_KEY, '1');
+  } catch {
+    // Storage disabled: the app asks again on the next page load.
+  }
+}
+
+export function readOnlyChosen(): boolean {
+  try {
+    return sessionStore()?.getItem(READ_ONLY_SESSION_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** The author modal opens by itself only on a first visit: no name and no read-only choice this session. */
+export const shouldAskForAuthor = (): boolean => readStoredAuthor() === null && !readOnlyChosen();
 
 export function readStoredAuthor(): string | null {
   const raw = readItem(AUTHOR_STORAGE_KEY);

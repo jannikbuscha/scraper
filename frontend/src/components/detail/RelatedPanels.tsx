@@ -1,12 +1,18 @@
 // Related records per type (docs/UI.md §4.1): read-only lists with empty
 // states; projects offer "+ Add service" and "+ Add event", services
-// "+ Add event". Columns are layout preferences over registry fields.
+// "+ Add event". Columns are layout preferences over registry fields. Rows
+// of types with a page link to it (evidence and the other record-page types
+// open `/records/$id`, where they are edited, deleted, restored and
+// commented on).
 import { Group, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import type { EntityType, Item, Meta, RefLabel, TableEntityType } from '../../api/types';
-import { asString } from '../../lib/format';
+import type { EntityType, Item, Meta, RefLabel } from '../../api/types';
+import { isTableType, TABLE_PATHS, type DetailEntityType } from '../../lib/entity';
+import { asString, getFieldValue } from '../../lib/format';
+import { searchFromQuery } from '../../lib/query-string';
+import { AnchorLink } from '../AnchorLink';
 import { EntityLink } from '../EntityLink';
 import { CreateEntityModal } from '../table/CreateEntityModal';
 import { WriteButton } from '../WriteButton';
@@ -26,7 +32,7 @@ const EVENT_COLUMNS = ['event_type', 'date', 'date_basis', 'description_en'];
 const DOCUMENT_COLUMNS = ['doc_type', 'published', 'publisher'];
 const EVIDENCE_COLUMNS = ['target', 'document_id', 'url', 'quote', 'locator', 'retrieved_at'];
 
-function listsFor(type: TableEntityType, id: string, meta: Meta): ListSpec[] {
+function listsFor(type: DetailEntityType, id: string, meta: Meta): ListSpec[] {
   const plural = (listed: EntityType, fallback: string) => meta.entity_types[listed]?.label_plural ?? fallback;
   const events: ListSpec = {
     key: 'events',
@@ -129,16 +135,55 @@ function listsFor(type: TableEntityType, id: string, meta: Meta): ListSpec[] {
       ];
     case 'organization':
       return [participations('organization_id', ['subject_id', 'role', 'start', 'end'])];
+    case 'component':
+      return [relations, evidence];
+    case 'participation':
+    case 'relation':
+    case 'indicator':
+      return [evidence];
+    // Evidence cannot be the subject of evidence; a saved view has its table link.
+    case 'evidence':
+    case 'saved_view':
+      return [];
   }
 }
 
-/** Links to the records this one belongs to: the project and parent of a service, the subject of an event. */
-function ParentLinks({ type, item, meta }: { type: TableEntityType; item: Item; meta: Meta }) {
-  const names = type === 'service' ? ['project_id', 'parent_service_id'] : type === 'event' ? ['subject_id'] : [];
+/** The fields that link a record to the records it belongs to (layout preference). */
+const PARENT_FIELDS: Partial<Record<DetailEntityType, readonly string[]>> = {
+  service: ['project_id', 'parent_service_id'],
+  event: ['subject_id'],
+  evidence: ['subject_id', 'document_id'],
+  participation: ['organization_id', 'subject_id'],
+  relation: ['from_id', 'to_id'],
+  indicator: ['subject_id'],
+};
+
+/** A saved view opens as its table with the stored query applied. */
+function SavedViewTableLink({ item }: { item: Item }) {
+  const entityType = asString(item.fields.entity_type);
+  const query = asString(item.fields.query);
+  if (!isTableType(entityType) || query === null) return null;
+  return (
+    <Text size="sm">
+      <AnchorLink to={TABLE_PATHS[entityType]} search={searchFromQuery(query)}>
+        Open the view in its table
+      </AnchorLink>
+    </Text>
+  );
+}
+
+/**
+ * Links to the records this one belongs to: the project and parent of a
+ * service, the subject of an event, the subject and document of an evidence
+ * row, the ends of a relation.
+ */
+function ParentLinks({ type, item, meta }: { type: DetailEntityType; item: Item; meta: Meta }) {
+  const names = PARENT_FIELDS[type] ?? [];
   const fields = meta.entity_types[type]?.fields ?? [];
   const links = names.flatMap((name) => {
-    const id = asString(item.fields[name]);
-    const label = fields.find((field) => field.name === name)?.label ?? name;
+    const spec = fields.find((field) => field.name === name);
+    const id = asString(spec ? getFieldValue(item, spec) : (item.fields[name] ?? null));
+    const label = spec?.label ?? name;
     return id ? [{ name, id, label, ref: item.refs[name] }] : [];
   });
   if (links.length === 0) return null;
@@ -153,17 +198,20 @@ function ParentLinks({ type, item, meta }: { type: TableEntityType; item: Item; 
   );
 }
 
-export function RelatedPanels({ type, item, meta }: { type: TableEntityType; item: Item; meta: Meta }) {
+export function RelatedPanels({ type, item, meta }: { type: DetailEntityType; item: Item; meta: Meta }) {
   const [adding, setAdding] = useState<AddSpec | null>(null);
   const deleted = item.deleted_at !== null;
   const selfRef: RefLabel = { id: item.id, type, label: item.label, deleted };
+  const lists = listsFor(type, item.id, meta);
+  if (lists.length === 0 && !PARENT_FIELDS[type] && type !== 'saved_view') return null;
 
   return (
     <Stack gap="md" component="section" aria-label="Related records">
       <Title order={2}>Related records</Title>
       <ParentLinks type={type} item={item} meta={meta} />
+      {type === 'saved_view' && <SavedViewTableLink item={item} />}
       {type === 'document' && <DocumentTextPanel item={item} />}
-      {listsFor(type, item.id, meta).map(({ key, add, ...list }) => (
+      {lists.map(({ key, add, ...list }) => (
         <RelatedList
           key={key}
           {...list}

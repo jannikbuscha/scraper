@@ -19,9 +19,8 @@ import type {
   JsonValue,
   Meta,
   RecordType,
-  TableEntityType,
 } from '../../api/types';
-import { DETAIL_PATHS, isTableType } from '../../lib/entity';
+import { DETAIL_PATHS, isRecordPageType, isTableType, RECORD_PATH, type DetailEntityType } from '../../lib/entity';
 import { asString, pluralize } from '../../lib/format';
 import { requiresScopeNote, requiresVerificationNote } from '../../lib/write-rules';
 import { AnchorLink } from '../AnchorLink';
@@ -43,7 +42,7 @@ import { EditFields } from './EditFields';
 import { SaveBar } from './SaveBar';
 
 interface EditFormProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   /** The latest item from the query cache; only read for display and the newer-version banner. */
   item: Item;
   meta: Meta;
@@ -60,6 +59,13 @@ const withoutKey = <T,>(record: Record<string, T>, key: string): Record<string, 
 
 /** A link that opens in a new tab, so the form keeps its values. */
 function NewTabLink({ type, id, label }: { type: RecordType; id: string; label: string }) {
+  if (isRecordPageType(type)) {
+    return (
+      <AnchorLink to={RECORD_PATH} params={{ id }} target="_blank" rel="noopener noreferrer">
+        <bdi>{label}</bdi>
+      </AnchorLink>
+    );
+  }
   if (!isTableType(type)) return <bdi>{label}</bdi>;
   return (
     <AnchorLink to={DETAIL_PATHS[type]} params={{ id }} target="_blank" rel="noopener noreferrer">

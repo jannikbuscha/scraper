@@ -1,11 +1,13 @@
 // ref filter: multi-select backed by GET /api/lookup; labels of IDs from a
 // shared URL via /api/lookup?ids=… (docs/UI.md §3). Document links can be
-// restricted to confirmed links (`confirmed:`).
-import { Checkbox, Group, MultiSelect, Text, type ComboboxItem } from '@mantine/core';
+// restricted to confirmed links (`confirmed:`). The condition "has any value"
+// writes `empty:false`; applying an unchanged form keeps the filter.
+import { Checkbox, Group, MultiSelect, NativeSelect, Text, type ComboboxItem } from '@mantine/core';
 import { useState } from 'react';
 
 import { useLookupIds, useLookupSearch } from '../../../api/lookup';
 import { TABLE_ENTITY_TYPES, type FieldSpec, type LookupItem, type RecordType } from '../../../api/types';
+import { pick } from '../../../lib/format';
 import { EMPTY_TOKEN, formatRefFilter, parseRefFilter, type RefFilterValue } from '../../../lib/query-string';
 import { FilterFormFrame, type FilterFormProps } from './FilterFormFrame';
 
@@ -13,8 +15,14 @@ import { FilterFormFrame, type FilterFormProps } from './FilterFormFrame';
 const lookupTypes = (field: FieldSpec): readonly RecordType[] =>
   field.ref_types?.length ? field.ref_types : TABLE_ENTITY_TYPES;
 
+const MODES = ['in', 'any'] as const;
+type Mode = (typeof MODES)[number];
+const MODE_LABELS: Record<Mode, string> = { in: 'is any of', any: 'has any value' };
+
 export function RefFilterForm({ field, raw, onApply }: FilterFormProps) {
   const initial = parseRefFilter(raw);
+  // `empty:false` (e.g. from a shared link or a saved view) is "has any value".
+  const [mode, setMode] = useState<Mode>(initial?.op === 'empty' && !initial.empty ? 'any' : 'in');
   const initialIds = initial && initial.op !== 'empty' ? initial.ids : [];
   const [ids, setIds] = useState<string[]>(initialIds.filter((id) => id !== EMPTY_TOKEN));
   const [includeEmpty, setIncludeEmpty] = useState(initialIds.includes(EMPTY_TOKEN));
@@ -35,8 +43,10 @@ export function RefFilterForm({ field, raw, onApply }: FilterFormProps) {
   for (const item of results.data?.items ?? []) if (!items.has(item.id)) items.set(item.id, item);
   const data: ComboboxItem[] = [...items.values()].map((item) => ({ value: item.id, label: item.label }));
 
-  const value: RefFilterValue =
-    confirmedOnly && isDocLinks
+  const anyValue = mode === 'any';
+  const value: RefFilterValue = anyValue
+    ? { op: 'empty', empty: false }
+    : confirmedOnly && isDocLinks
       ? { op: 'confirmed', ids }
       : { op: 'in', ids: includeEmpty ? [...ids, EMPTY_TOKEN] : ids };
 
@@ -50,15 +60,20 @@ export function RefFilterForm({ field, raw, onApply }: FilterFormProps) {
         onApply(null);
       }}
     >
-      {initial?.op === 'empty' && (
-        <Text size="xs" c="dimmed">
-          Current filter: has any value. Choosing values below replaces it.
-        </Text>
-      )}
+      <NativeSelect
+        size="xs"
+        label="Condition"
+        data={MODES.map((m) => ({ value: m, label: MODE_LABELS[m] }))}
+        value={mode}
+        onChange={(event) => {
+          setMode(pick(MODES, event.currentTarget.value) ?? 'in');
+        }}
+      />
       <MultiSelect
         size="xs"
         label="Is any of"
-        placeholder="Type to search"
+        placeholder={anyValue ? 'Any value' : 'Type to search'}
+        disabled={anyValue}
         data={data}
         value={ids}
         onChange={(next) => {
@@ -99,6 +114,7 @@ export function RefFilterForm({ field, raw, onApply }: FilterFormProps) {
         <Checkbox
           size="xs"
           label="Only confirmed links"
+          disabled={anyValue}
           checked={confirmedOnly}
           onChange={(event) => {
             setConfirmedOnly(event.currentTarget.checked);
@@ -108,6 +124,7 @@ export function RefFilterForm({ field, raw, onApply }: FilterFormProps) {
         <Checkbox
           size="xs"
           label="(empty)"
+          disabled={anyValue}
           checked={includeEmpty}
           onChange={(event) => {
             setIncludeEmpty(event.currentTarget.checked);

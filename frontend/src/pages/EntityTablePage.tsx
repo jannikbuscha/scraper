@@ -20,7 +20,7 @@ import { TableEmptyState } from '../components/table/TableEmptyState';
 import { TablePagination } from '../components/table/TablePagination';
 import { TableToolbar } from '../components/table/TableToolbar';
 import { useUrlSearch } from '../hooks/useUrlSearch';
-import { clearFilters, getColumns, listQueryString, setSort } from '../lib/query-string';
+import { clearFilters, listQueryString, setSort, tableColumns } from '../lib/query-string';
 
 // Stable fallbacks: a new [] or {} per render would rebuild the table's row model.
 const NO_ITEMS: Item[] = [];
@@ -80,13 +80,9 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
   const list = useEntityList(type, qs, { keepPrevious: true });
   const items = list.data?.items ?? NO_ITEMS;
 
-  // Visible columns: `cols` (in URL order) or the in_list fields; a stable
-  // array while neither changes.
-  const columnKey = getColumns(
-    search,
-    typeMeta.fields.map((field) => field.name),
-    typeMeta.fields.filter((field) => field.in_list).map((field) => field.name),
-  ).join(',');
+  // Visible columns: `cols` (in URL order) or the in_list fields, both limited
+  // to fields with a value per row; a stable array while neither changes.
+  const columnKey = tableColumns(typeMeta.fields, search).join(',');
   const columns = useMemo(
     () => columnKey.split(',').flatMap((name) => typeMeta.fields.filter((field) => field.name === name)),
     [columnKey, typeMeta],
@@ -108,14 +104,31 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
   const [bulk, setBulk] = useState<BulkEditRequest | null>(null);
   // The row versions are captured here, when the dialog opens (docs/UI.md §3).
   const openBulk = (preset?: BulkEditRequest['preset']) => {
-    setBulk({ targets: selected.map((item) => ({ id: item.id, label: item.label, version: item.version })), preset });
+    setBulk({
+      targets: selected.map((item) => ({ id: item.id, label: item.label, version: item.version, values: item.fields })),
+      preset,
+    });
   };
 
   let body;
   if (list.isError) body = <ListError error={list.error} onRetry={() => void list.refetch()} />;
   else if (list.isPending) body = <Loader size="sm" />;
-  else if (items.length === 0) body = <TableEmptyState total={list.data.total} />;
-  else {
+  else if (items.length === 0) {
+    // The header stays, so each column filter can still be opened and relaxed.
+    body = (
+      <Stack gap="sm">
+        <EntityTable
+          type={type}
+          items={NO_ITEMS}
+          fields={columns}
+          rowSelection={NO_SELECTION}
+          onRowSelectionChange={onRowSelectionChange}
+          busy={list.isPlaceholderData}
+        />
+        <TableEmptyState total={list.data.total} />
+      </Stack>
+    );
+  } else {
     body = (
       <EntityTable
         type={type}

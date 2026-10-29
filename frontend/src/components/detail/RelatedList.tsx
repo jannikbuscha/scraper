@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 
 import { useEntityList } from '../../api/queries';
 import type { EntityType, Meta } from '../../api/types';
-import { isTableType, TABLE_PATHS } from '../../lib/entity';
+import { hasDetailPage, isTableType, TABLE_PATHS } from '../../lib/entity';
 import { canonicalQuery, type SearchRecord } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
 import { EntityLink } from '../EntityLink';
@@ -32,8 +32,9 @@ export function RelatedList({ title, type, query, columns, emptyText, meta, acti
   const list = useEntityList(type, canonicalQuery({ ...query, page_size: String(RELATED_PAGE_SIZE) }));
   const typeMeta = meta.entity_types[type];
   const specs = columns.flatMap((name) => typeMeta?.fields.find((field) => field.name === name) ?? []);
-  // Types with a detail page are listed by their linked label.
-  const withLabel = isTableType(type);
+  // Types with a page (table types and the record-page types, e.g. evidence)
+  // are listed by their linked label.
+  const withLabel = hasDetailPage(type);
   const total = list.data?.total;
   const items = list.data?.items ?? [];
 

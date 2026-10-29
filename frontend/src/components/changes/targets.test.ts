@@ -54,12 +54,17 @@ describe('record targets', () => {
       id: 'svc_B',
       search: { comments: 'open', thread: 'cmt_root' },
     });
-    // Comments on types without a page in Phase 1 have no target.
-    expect(threadTarget('evidence', 'evd_1', 'cmt_3')).toBeNull();
+    // Comments on records without a table open on the generic record page.
+    expect(threadTarget('evidence', 'evd_1', 'cmt_3')).toEqual({
+      kind: 'record',
+      id: 'evd_1',
+      search: { comments: 'open', thread: 'cmt_3' },
+    });
+    // Without the subject in the context there is nothing to open.
     expect(changeTarget(change({ entity_type: 'comment', entity_id: 'cmt_4', context: null }))).toBeNull();
   });
 
-  it('opens vocabulary terms on the Codebook page and saved views as their table', () => {
+  it('opens vocabulary terms on the Codebook page, saved views as their table, other records on their page', () => {
     expect(
       changeTarget(change({ entity_type: 'vocabulary_term', entity_id: 'voc_1', context: { vocabulary: 'example_cluster' } })),
     ).toEqual({ kind: 'codebook', search: { vocabulary: 'example_cluster', term: 'voc_1' } });
@@ -68,6 +73,21 @@ describe('record targets', () => {
       id: 'view_1',
       tableType: 'event',
     });
-    expect(changeTarget(change({ entity_type: 'relation', entity_id: 'rel_1' }))).toBeNull();
+    // Records without a table open on the generic record page (docs/UI.md §2).
+    expect(changeTarget(change({ entity_type: 'relation', entity_id: 'rel_1' }))).toEqual({
+      kind: 'record',
+      id: 'rel_1',
+      search: {},
+    });
+    expect(changeTarget(change({ entity_type: 'evidence', entity_id: 'evd_1' }))).toEqual({
+      kind: 'record',
+      id: 'evd_1',
+      search: {},
+    });
+    expect(changeTarget(change({ entity_type: 'saved_view', entity_id: 'view_2', context: null }))).toEqual({
+      kind: 'record',
+      id: 'view_2',
+      search: {},
+    });
   });
 });

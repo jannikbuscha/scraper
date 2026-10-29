@@ -5,10 +5,12 @@ import { Group, Loader, Pagination, Paper, Stack, Switch, Text, Title, Tooltip }
 import { IconRestore } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import { useDiff, useRevision, useRevisions } from '../../api/queries';
-import type { EntityTypeMeta, Item, RevisionSummary, TableEntityType } from '../../api/types';
+import { useRevision, useRevisions } from '../../api/queries';
+import type { EntityTypeMeta, Item, RevisionSummary } from '../../api/types';
+import type { DetailEntityType } from '../../lib/entity';
 import type { SearchRecord } from '../../lib/query-string';
 import { ErrorAlert } from '../feedback';
+import { CompareDiff } from '../history/CompareDiff';
 import { DiffView } from '../history/DiffView';
 import { ActionBadge, ChannelBadge } from '../history/RevisionBadges';
 import { RevisionList } from '../history/RevisionList';
@@ -20,7 +22,7 @@ import { RestoreModal } from './RestoreModal';
 import { compareSelection, withCompareSelection } from './search-params';
 
 interface HistoryTabProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   typeMeta: EntityTypeMeta;
   search: SearchRecord;
@@ -33,7 +35,7 @@ function RevisionDiff({
   typeMeta,
   revision,
 }: {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   typeMeta: EntityTypeMeta;
   revision: RevisionSummary;
@@ -60,41 +62,6 @@ function RevisionDiff({
         <ErrorAlert title="Could not load the revision" error={full.error} onRetry={() => void full.refetch()} />
       )}
       {full.data && <DiffView diff={full.data.revision.diff} fields={typeMeta.fields} refs={full.data.refs} />}
-    </Stack>
-  );
-}
-
-function CompareDiff({
-  type,
-  item,
-  typeMeta,
-  from,
-  to,
-}: {
-  type: TableEntityType;
-  item: Item;
-  typeMeta: EntityTypeMeta;
-  from: number;
-  to: number;
-}) {
-  const diff = useDiff(type, item.id, from, to);
-  return (
-    <Stack gap="xs">
-      <Title order={3}>
-        Changes from v{from} to v{to}
-      </Title>
-      {diff.isPending && <Loader size="xs" />}
-      {diff.isError && (
-        <ErrorAlert title="Could not compare the versions" error={diff.error} onRetry={() => void diff.refetch()} />
-      )}
-      {diff.data && (
-        <DiffView
-          diff={diff.data.diff}
-          fields={typeMeta.fields}
-          refs={diff.data.refs}
-          notRecorded={diff.data.not_recorded}
-        />
-      )}
     </Stack>
   );
 }
@@ -193,7 +160,7 @@ export function HistoryTab({ type, item, typeMeta, search, setSearch }: HistoryT
       <Paper withBorder p="sm">
         {compareMode ? (
           from !== undefined && to !== undefined ? (
-            <CompareDiff type={type} item={item} typeMeta={typeMeta} from={from} to={to} />
+            <CompareDiff type={type} id={item.id} fields={typeMeta.fields} from={from} to={to} />
           ) : (
             <Text size="sm" c="dimmed">
               Pick two versions to compare ({picked.length} of 2 picked).
@@ -206,7 +173,7 @@ export function HistoryTab({ type, item, typeMeta, search, setSearch }: HistoryT
       <RestoreModal
         type={type}
         item={item}
-        typeMeta={typeMeta}
+        fields={typeMeta.fields}
         version={restoring}
         onClose={() => {
           setRestoring(null);

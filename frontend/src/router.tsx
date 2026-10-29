@@ -13,6 +13,7 @@ import { EntityTablePage } from './pages/EntityTablePage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { RecentChangesPage } from './pages/RecentChangesPage';
+import { RecordPage } from './pages/RecordPage';
 import { RouteErrorPage } from './pages/RouteErrorPage';
 import { TrashPage } from './pages/TrashPage';
 
@@ -20,6 +21,12 @@ import { TrashPage } from './pages/TrashPage';
 function DetailRoute({ type }: { type: TableEntityType }) {
   const { id = '' } = useParams({ strict: false });
   return <EntityDetailPage key={id} type={type} id={id} />;
+}
+
+/** The generic record page: remounts when the ID changes. */
+function RecordRoute() {
+  const { id = '' } = useParams({ strict: false });
+  return <RecordPage key={id} id={id} />;
 }
 
 // One component per route; React Fast Refresh and the hooks lint rules need
@@ -58,6 +65,7 @@ const routeTree = rootRoute.addChildren([
   route('/documents/$id', DocumentPage),
   route('/organizations', OrganizationsPage),
   route('/organizations/$id', OrganizationPage),
+  route('/records/$id', RecordRoute),
   route('/changes', RecentChangesPage),
   route('/comments', CommentsPage),
   route('/trash', TrashPage),

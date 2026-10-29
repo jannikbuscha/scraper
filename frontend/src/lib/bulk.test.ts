@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import type { BulkResult } from '../api/types';
-import { bulkRequest, conflictRetryTargets, countBulkResults, mergeBulkResults, type BulkTarget } from './bulk';
+import {
+  bulkRequest,
+  codesInRows,
+  conflictRetryTargets,
+  countBulkResults,
+  mergeBulkResults,
+  type BulkTarget,
+} from './bulk';
 
 const targets: BulkTarget[] = [
   { id: 'svc_1', label: 'Example service A', version: 3 },
@@ -67,5 +74,16 @@ describe('bulk results', () => {
     results = mergeBulkResults(results, [result('svc_2', 'updated', { version: 11 })]);
     expect(countBulkResults(results)).toEqual({ updated: 2, unchanged: 0, conflict: 0, entity_deleted: 0, error: 0 });
     expect(conflictRetryTargets(targets, results)).toEqual([]);
+  });
+
+  it('collects the codes the selected rows carry, for a bulk remove of inactive codes', () => {
+    const rows: BulkTarget[] = [
+      { id: 'svc_1', label: 'Example service A', version: 1, values: { channels: ['app', 'old_code'], kind: 'e_service' } },
+      { id: 'svc_2', label: 'Example service B', version: 1, values: { channels: ['old_code', 'chatbot'], kind: null } },
+      { id: 'svc_3', label: 'Example service C', version: 1 },
+    ];
+    expect(codesInRows(rows, 'channels')).toEqual(['app', 'old_code', 'chatbot']);
+    expect(codesInRows(rows, 'kind')).toEqual(['e_service']);
+    expect(codesInRows(rows, 'missing')).toEqual([]);
   });
 });

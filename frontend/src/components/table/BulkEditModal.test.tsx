@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import type { BulkRequest, BulkResult } from '../../api/types';
+import type { BulkRequest, BulkResult, Vocabulary } from '../../api/types';
 import { AUTHOR_STORAGE_KEY } from '../../lib/author';
 import { EntityTablePage } from '../../pages/EntityTablePage';
 import { callsTo, jsonBody, mockApi, requestsTo } from '../../test/api-mock';
@@ -143,6 +143,62 @@ describe('bulk edit', () => {
       ],
       set: { verification_status: 'verified' },
       note: 'Checked against the example source',
+    });
+  });
+
+  it('offers the inactive codes the selected rows carry for removal, but not for adding', async () => {
+    // Example domain B was deactivated; both rows still carry it.
+    const vocabularies: Vocabulary[] = exampleVocabularies.map((vocabulary) =>
+      vocabulary.name === 'example_domain'
+        ? {
+            ...vocabulary,
+            terms: vocabulary.terms.map((term) => (term.code === 'domain_b' ? { ...term, active: false } : term)),
+          }
+        : vocabulary,
+    );
+    mockApi((url, init) => {
+      if (url.pathname === '/api/meta') return exampleMeta;
+      if (url.pathname === '/api/entities/saved_view') return listResponse([]);
+      if (url.pathname === '/api/entities/project') {
+        return listResponse([
+          exampleItem('prj_A', { name_en: 'Example project A', policy_domains: ['domain_a', 'domain_b'] }, { version: 3 }),
+          exampleItem('prj_B', { name_en: 'Example project B', policy_domains: ['domain_b'] }, { version: 7 }),
+        ]);
+      }
+      if (url.pathname === '/api/entities/project/bulk' && init?.method === 'POST') {
+        bulkBodies.push(jsonBody(init) as BulkRequest);
+        return { batch_id: 'batch_1', results: [result('prj_A', 'updated'), result('prj_B', 'updated')] };
+      }
+      return undefined;
+    });
+    const { user } = renderRoute(ProjectsPage, { url: '/projects', path: '/projects', vocabularies });
+    await selectBothRows(user);
+    await user.click(screen.getByRole('button', { name: 'Bulk edit…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Bulk edit · 2 projects' });
+    await user.click(within(dialog).getByRole('combobox', { name: 'Field' }));
+    await user.click(await screen.findByRole('option', { name: 'Policy domains' }));
+
+    // Add: active codes only.
+    await user.click(within(dialog).getByText('Add'));
+    await user.click(within(dialog).getByRole('combobox', { name: 'Values to add' }));
+    expect(await screen.findByRole('option', { name: /Example domain A/ })).toBeInTheDocument();
+    expect(screen.queryByRole('option', { name: /Example domain B/ })).toBeNull();
+
+    // Remove: the deactivated code the rows carry is offered and can be removed.
+    await user.click(within(dialog).getByText('Remove'));
+    await user.click(within(dialog).getByRole('combobox', { name: 'Values to remove' }));
+    await user.click(await screen.findByRole('option', { name: /Example domain B \(inactive\)/ }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    await waitFor(() => {
+      expect(bulkBodies).toHaveLength(1);
+    });
+    expect(bulkBodies[0]).toEqual({
+      items: [
+        { id: 'prj_A', expected_version: 3 },
+        { id: 'prj_B', expected_version: 7 },
+      ],
+      remove: { policy_domains: ['domain_b'] },
+      note: null,
     });
   });
 });

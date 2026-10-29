@@ -1,8 +1,10 @@
 // Delete (soft) with a note (docs/UI.md §4). `409 has_dependents` asks
-// whether to delete the dependents too (cascade); `409 conflict` shows the
-// confirmation again with the intervening revisions and resends with the
-// current version only on confirm; `entity_deleted`/`invalid_state` offer
-// Reload (docs/UI.md §1.3).
+// whether to delete the dependents too (cascade), except for evidence that a
+// field verification rests on (`field_verification`), which no cascade
+// deletes: the verification has to be withdrawn or moved to other evidence
+// first (docs/DATA_MODEL.md §6.4). `409 conflict` shows the confirmation again
+// with the intervening revisions and resends with the current version only on
+// confirm; `entity_deleted`/`invalid_state` offer Reload (docs/UI.md §1.3).
 import { Alert, Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -15,15 +17,16 @@ import {
   type HasDependentsDetails,
   type Item,
   type Meta,
-  type TableEntityType,
 } from '../../api/types';
-import { pluralize } from '../../lib/format';
+import type { DetailEntityType } from '../../lib/entity';
+import { asString, pluralize } from '../../lib/format';
+import { EntityLink } from '../EntityLink';
 import { notifyError, notifySuccess } from '../feedback';
 import { StaleRecordNotice } from '../StaleRecordNotice';
 import { ChangedMeanwhileAlert } from '../history/ChangedMeanwhileAlert';
 
 interface DeleteEntityModalProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   opened: boolean;
   onClose: () => void;
@@ -37,9 +40,13 @@ export function DeleteEntityModal({ type, item, opened, onClose }: DeleteEntityM
   );
 }
 
+/** Dependents that a cascade does not delete: field verifications resting on evidence. */
+const VERIFICATION_DEPENDENTS = 'field_verification';
+
 /** e.g. "12 services", labelled from meta. */
 function describeDependents(details: HasDependentsDetails, meta: Meta | undefined): string {
   return Object.entries(details)
+    .filter(([name]) => name !== VERIFICATION_DEPENDENTS)
     .map(([name, count]) => {
       const depType = ENTITY_TYPES.find((candidate) => candidate === name);
       const typeMeta = depType ? meta?.entity_types[depType] : undefined;
@@ -48,7 +55,7 @@ function describeDependents(details: HasDependentsDetails, meta: Meta | undefine
     .join(', ');
 }
 
-function DeleteForm({ type, item, onDone }: { type: TableEntityType; item: Item; onDone: () => void }) {
+function DeleteForm({ type, item, onDone }: { type: DetailEntityType; item: Item; onDone: () => void }) {
   const client = useQueryClient();
   const meta = useMeta();
   const remove = useDeleteEntity(type);
@@ -80,6 +87,10 @@ function DeleteForm({ type, item, onDone }: { type: TableEntityType; item: Item;
     }
   };
 
+  const verified = dependents !== null && (dependents[VERIFICATION_DEPENDENTS] ?? 0) > 0;
+  const cascadable = dependents !== null && !verified && describeDependents(dependents, meta.data) !== '';
+  const subjectId = asString(item.fields.subject_id ?? null);
+
   if (stale) {
     return (
       <StaleRecordNotice
@@ -100,7 +111,28 @@ function DeleteForm({ type, item, onDone }: { type: TableEntityType; item: Item;
         with Undelete or from the trash.
       </Text>
       {conflict && <ChangedMeanwhileAlert revisions={conflict.intervening} question="Delete it anyway?" />}
-      {dependents && (
+      {verified && (
+        <Alert color="orange" variant="light" title="A verified field rests on this evidence">
+          <Text size="sm">
+            The field it supports is marked verified with it
+            {subjectId && (
+              <>
+                {' '}
+                (on{' '}
+                <EntityLink
+                  id={subjectId}
+                  label={item.refs.subject_id?.label}
+                  type={item.refs.subject_id?.type}
+                  deleted={item.refs.subject_id?.deleted}
+                />
+                )
+              </>
+            )}
+            . Mark the field unverified or disputed, or verify it with other evidence, then delete this evidence.
+          </Text>
+        </Alert>
+      )}
+      {cascadable && (
         <Alert color="orange" variant="light" title="This record has dependent records">
           <Text size="sm">
             {describeDependents(dependents, meta.data)} that are not deleted belong to it. Delete them together with
@@ -122,7 +154,7 @@ function DeleteForm({ type, item, onDone }: { type: TableEntityType; item: Item;
         <Button variant="default" onClick={onDone}>
           Cancel
         </Button>
-        {dependents ? (
+        {verified ? null : cascadable ? (
           <Button color="red" loading={remove.isPending} onClick={() => void submit(true)}>
             Delete with dependents
           </Button>

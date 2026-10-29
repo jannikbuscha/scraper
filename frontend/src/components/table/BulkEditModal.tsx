@@ -10,6 +10,7 @@ import { useBulkEdit } from '../../api/queries';
 import type { BulkResult, FieldSpec, JsonValue } from '../../api/types';
 import {
   bulkRequest,
+  codesInRows,
   conflictRetryTargets,
   countBulkResults,
   mergeBulkResults,
@@ -60,10 +61,12 @@ interface ValueInputProps {
   value: JsonValue;
   onChange: (value: JsonValue) => void;
   error: ReactNode;
+  /** Codes the selected rows carry: a remove offers them even if inactive. */
+  inRows: readonly string[];
 }
 
 /** The value input of a bulk_editable field (vocab, vocab_list or bool). */
-function ValueInput({ field, op, value, onChange, error }: ValueInputProps) {
+function ValueInput({ field, op, value, onChange, error, inRows }: ValueInputProps) {
   if (field.type === 'bool') {
     return (
       <Switch
@@ -84,6 +87,8 @@ function ValueInput({ field, op, value, onChange, error }: ValueInputProps) {
         value={asStringArray(value)}
         onChange={onChange}
         markMain={op === 'set'}
+        // Set and add take active codes only; remove also the inactive codes in the rows.
+        keep={op === 'remove' ? inRows : []}
         error={error}
       />
     );
@@ -231,7 +236,14 @@ function BulkEditForm({ request, onDone }: { request: BulkEditRequest; onDone: (
               />
             )}
             {field && (
-              <ValueInput field={field} op={op} value={value} onChange={setValue} error={shown(errors.value)} />
+              <ValueInput
+                field={field}
+                op={op}
+                value={value}
+                onChange={setValue}
+                error={shown(errors.value)}
+                inRows={codesInRows(targets, field.name)}
+              />
             )}
           </>
         )}

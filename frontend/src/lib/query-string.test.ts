@@ -6,6 +6,7 @@ import {
   chipValues,
   clearFilters,
   clickSort,
+  columnChoice,
   cycleSort,
   EMPTY_TOKEN,
   exportQueryString,
@@ -21,6 +22,7 @@ import {
   getPageSize,
   isQueryActive,
   listQueryString,
+  tableColumns,
   parseBoolFilter,
   parseDateRangeFilter,
   parseFilter,
@@ -43,6 +45,7 @@ import {
   withPageSize,
   withQuery,
 } from './query-string';
+import { fieldSpec } from '../test/fixtures';
 
 /** What a reload does: serialise to the URL and parse it back. */
 const roundTrip = (search: Record<string, string>) => parseSearch(stringifySearch(search));
@@ -111,10 +114,21 @@ describe('canonical query strings', () => {
     );
   });
 
-  it('builds the export query with cols and format but without paging', () => {
-    expect(exportQueryString(search, 'xlsx')).toBe(
-      'cols=name_en%2Ckind&f.kind=in%3Ae_service&format=xlsx&q=%D0%94%D1%96%D1%8F&sort=-launch',
+  it('builds the export query with the visible columns after the ID, the format, and without paging', () => {
+    expect(exportQueryString(search, 'xlsx', ['name_en', 'kind'])).toBe(
+      'cols=id%2Cname_en%2Ckind&f.kind=in%3Ae_service&format=xlsx&q=%D0%94%D1%96%D1%8F&sort=-launch',
     );
+  });
+
+  it('exports the columns the table shows, never the raw URL cols, and always the ID first', () => {
+    // A custom choice (e.g. ticking a column) still identifies the rows.
+    expect(exportQueryString({ cols: 'name_en,paper_cluster' }, 'csv', ['name_en', 'paper_cluster'])).toBe(
+      'cols=id%2Cname_en%2Cpaper_cluster&format=csv',
+    );
+    // Unknown names in the URL are ignored by the table, so the export ignores them too.
+    expect(exportQueryString({ cols: 'bogus' }, 'csv', ['slug', 'name_en'])).toBe('cols=id%2Cslug%2Cname_en&format=csv');
+    // A hand-written `id` is not repeated.
+    expect(exportQueryString({}, 'csv', ['id', 'slug'])).toBe('cols=id%2Cslug&format=csv');
   });
 
   it('applies a saved view query as search params', () => {
@@ -307,6 +321,20 @@ describe('q, paging and columns', () => {
     expect(getDeletedMode({ deleted: 'bogus' })).toBe('exclude');
     expect(withDeletedMode({ deleted: 'only', page: '2' }, 'exclude')).toEqual({});
     expect(withDeletedMode({}, 'include')).toEqual({ deleted: 'include' });
+  });
+
+  it('offers only fields with a value per row as columns', () => {
+    const fields = [
+      fieldSpec('title', 'string', { in_list: true }),
+      fieldSpec('publisher', 'string'),
+      // The document text is detail-only: never a table or export column.
+      fieldSpec('text', 'text', { virtual: true, exportable: false, in_list: true }),
+      fieldSpec('open_comments', 'int', { virtual: true, in_list: true }),
+    ];
+    expect(columnChoice(fields)).toEqual({ known: ['title', 'publisher', 'open_comments'], defaults: ['title', 'open_comments'] });
+    expect(tableColumns(fields, {})).toEqual(['title', 'open_comments']);
+    expect(tableColumns(fields, { cols: 'title,text' })).toEqual(['title']);
+    expect(tableColumns(fields, { cols: 'text' })).toEqual(['title', 'open_comments']);
   });
 
   it('reads cols in URL order and stores only non-default choices', () => {

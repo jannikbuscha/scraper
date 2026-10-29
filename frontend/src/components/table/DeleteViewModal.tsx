@@ -30,6 +30,8 @@ export function DeleteViewModal({ view, onClose }: DeleteViewModalProps) {
 function DeleteViewForm({ view, onDone }: { view: Item; onDone: () => void }) {
   const client = useQueryClient();
   const remove = useDeleteEntity('saved_view');
+  // The version shown when the dialog opened (docs/UI.md §1.3).
+  const [baseVersion] = useState(view.version);
   const [note, setNote] = useState('');
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const [stale, setStale] = useState(false);
@@ -39,7 +41,7 @@ function DeleteViewForm({ view, onDone }: { view: Item; onDone: () => void }) {
     try {
       await remove.mutateAsync({
         id: view.id,
-        expected_version: conflict ? conflict.current_version : view.version,
+        expected_version: conflict ? conflict.current_version : baseVersion,
         note: note.trim() || null,
       });
       notifySuccess(`Deleted the saved view “${name}”. It can be restored from the trash.`);

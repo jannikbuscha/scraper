@@ -40,6 +40,9 @@ interface DeactivateFormProps {
 function DeactivateForm({ term, vocabulary, maxNoteChars, onDone }: DeactivateFormProps) {
   const client = useQueryClient();
   const patch = usePatchEntity('vocabulary_term');
+  // The version shown when the dialog opened; a refetch of the vocabularies
+  // meanwhile must lead to the confirmation with the intervening revisions.
+  const [baseVersion] = useState(term.version);
   const [replacedBy, setReplacedBy] = useState<string | null>(null);
   const [note, setNote] = useState('');
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
@@ -52,7 +55,7 @@ function DeactivateForm({ term, vocabulary, maxNoteChars, onDone }: DeactivateFo
     try {
       await patch.mutateAsync({
         id: term.id,
-        expected_version: conflict ? conflict.current_version : term.version,
+        expected_version: conflict ? conflict.current_version : baseVersion,
         changes: replacedBy === null ? { active: false } : { active: false, replaced_by: replacedBy },
         note: note.trim() || null,
       });

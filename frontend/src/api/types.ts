@@ -72,6 +72,8 @@ export interface FieldSpec {
   in_create: boolean;
   default: JsonValue;
   bulk_editable: boolean;
+  /** Has a value per list row: can be a table column and an export column (docs/API.md §5). */
+  exportable: boolean;
   help: string | null;
 }
 

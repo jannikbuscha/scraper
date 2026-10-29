@@ -1,21 +1,22 @@
-// Export of the current view (filters, sort, columns), downloaded per
-// docs/UI.md §1.6: fetch → Blob → a[download].
+// Export of the current view (filters, sort, the visible columns plus the
+// record ID), downloaded per docs/UI.md §1.6: fetch → Blob → a[download].
 import { Button, Menu, Text } from '@mantine/core';
 import { IconChevronDown, IconDownload } from '@tabler/icons-react';
 import { useState } from 'react';
 
 import { downloadExport, type ExportFormat } from '../../lib/download';
+import { tableColumns } from '../../lib/query-string';
 import { notifyError, notifySuccess } from '../feedback';
 import { useTableContext } from './TableContext';
 
 export function ExportMenu() {
-  const { type, search } = useTableContext();
+  const { type, typeMeta, search } = useTableContext();
   const [running, setRunning] = useState(false);
 
   const run = async (format: ExportFormat) => {
     setRunning(true);
     try {
-      const filename = await downloadExport(type, search, format);
+      const filename = await downloadExport(type, search, format, tableColumns(typeMeta.fields, search));
       notifySuccess(`Downloaded ${filename}.`);
     } catch (error) {
       notifyError(error, 'The export failed');

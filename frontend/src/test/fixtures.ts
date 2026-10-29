@@ -33,6 +33,7 @@ export function fieldSpec(name: string, type: FieldType, overrides: Partial<Fiel
     in_create: false,
     default: null,
     bulk_editable: false,
+    exportable: true,
     help: null,
     ...overrides,
   };

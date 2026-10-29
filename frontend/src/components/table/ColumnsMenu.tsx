@@ -1,25 +1,26 @@
-// Column chooser (docs/UI.md §3): checkboxes over the type's fields grouped as
-// in meta.groups, system columns included; stored in `cols`, default = the
-// in_list fields.
+// Column chooser (docs/UI.md §3): checkboxes over the type's fields that have
+// a value per list row (`exportable`; not the detail-only document text),
+// grouped as in meta.groups, system columns included; stored in `cols`,
+// default = the in_list fields.
 import { Button, Checkbox, Group, Popover, ScrollArea, Stack, Text } from '@mantine/core';
 import { IconChevronDown, IconColumns } from '@tabler/icons-react';
 
-import { getColumns, withColumns } from '../../lib/query-string';
+import { columnChoice, getColumns, withColumns } from '../../lib/query-string';
 import { useTableContext } from './TableContext';
 
 export function ColumnsMenu() {
   const { meta, typeMeta, search, setSearch } = useTableContext();
-  const known = typeMeta.fields.map((field) => field.name);
-  const defaults = typeMeta.fields.filter((field) => field.in_list).map((field) => field.name);
+  const { known, defaults } = columnChoice(typeMeta.fields);
+  const offered = typeMeta.fields.filter((field) => field.exportable);
   const visible = new Set(getColumns(search, known, defaults));
   const groupKeys = new Set(meta.groups.map((group) => group.key));
   const groups = [
     ...meta.groups.map((group) => ({
       key: group.key,
       label: group.label,
-      fields: typeMeta.fields.filter((field) => field.group === group.key),
+      fields: offered.filter((field) => field.group === group.key),
     })),
-    { key: 'other', label: 'Other', fields: typeMeta.fields.filter((field) => !groupKeys.has(field.group)) },
+    { key: 'other', label: 'Other', fields: offered.filter((field) => !groupKeys.has(field.group)) },
   ].filter((group) => group.fields.length > 0);
 
   const toggle = (name: string, checked: boolean) => {

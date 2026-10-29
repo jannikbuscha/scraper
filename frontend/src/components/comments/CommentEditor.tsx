@@ -1,6 +1,10 @@
-// Editing a comment (docs/UI.md §4.3). On 409 a two-way dialog shows theirs
-// against yours as a word diff; yours is resent with the current version only
-// on confirm (docs/UI.md §1.3).
+// Editing a comment (docs/UI.md §4.3). Like the entity edit form, the editor
+// freezes its base (version and text) when editing starts: a refetch of the
+// thread (returning to the tab, another comment write) never changes the
+// version sent, so a colleague's newer edit leads to the conflict dialog
+// instead of being overwritten. On 409 a two-way dialog shows theirs against
+// yours as a word diff; yours is resent with the current version only on
+// confirm (docs/UI.md §1.3).
 import { Alert, Button, Group, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { useState } from 'react';
 
@@ -11,6 +15,7 @@ import { asString } from '../../lib/format';
 import { errorMessage } from '../feedback';
 import { InterveningRevisions } from '../history/InterveningRevisions';
 import { WordDiff } from '../history/WordDiff';
+import { Timestamp } from '../Timestamp';
 import { WriteButton } from '../WriteButton';
 import { CommentChangedNotice } from './CommentChangedNotice';
 
@@ -22,7 +27,9 @@ interface CommentEditorProps {
 
 export function CommentEditor({ comment, maxChars, onDone }: CommentEditorProps) {
   const edit = useEditComment();
-  const [text, setText] = useState(comment.body_md);
+  // The frozen base: the version and text the user started editing from.
+  const [base] = useState(() => ({ version: comment.version, body: comment.body_md }));
+  const [text, setText] = useState(base.body);
   const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [stale, setStale] = useState(false);
@@ -59,6 +66,12 @@ export function CommentEditor({ comment, maxChars, onDone }: CommentEditorProps)
         }}
         data-autofocus
       />
+      {comment.version > base.version && (
+        <Alert color="yellow" variant="light">
+          Changed by <bdi>{comment.updated_by}</bdi> at <Timestamp value={comment.updated_at} />; saving will open
+          the conflict dialog.
+        </Alert>
+      )}
       {error && (
         <Alert color="red" variant="light">
           {error}
@@ -70,8 +83,8 @@ export function CommentEditor({ comment, maxChars, onDone }: CommentEditorProps)
         </Button>
         <WriteButton
           loading={edit.isPending}
-          disabled={text.trim() === '' || text === comment.body_md}
-          onClick={() => void save(comment.version)}
+          disabled={text.trim() === '' || text === base.body}
+          onClick={() => void save(base.version)}
         >
           Save
         </WriteButton>

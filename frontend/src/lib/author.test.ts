@@ -5,9 +5,13 @@ import {
   encodeAuthorHeader,
   normalizeAuthor,
   readRecentAuthors,
+  readOnlyChosen,
+  READ_ONLY_SESSION_KEY,
   readStoredAuthor,
   RECENT_AUTHORS_STORAGE_KEY,
+  rememberReadOnly,
   setAuthor,
+  shouldAskForAuthor,
   subscribeAuthor,
   validateAuthor,
 } from './author';
@@ -90,6 +94,20 @@ describe('storage', () => {
     expect(readRecentAuthors()).toEqual([]);
     window.localStorage.setItem(RECENT_AUTHORS_STORAGE_KEY, '["Valid", "system", 3, "Valid"]');
     expect(readRecentAuthors()).toEqual(['Valid']);
+  });
+
+  it('asks for a name only until a name is stored or read-only was chosen in this session', () => {
+    expect(shouldAskForAuthor()).toBe(true);
+    rememberReadOnly();
+    expect(readOnlyChosen()).toBe(true);
+    // The choice lives in sessionStorage: it ends with the browser session.
+    expect(window.sessionStorage.getItem(READ_ONLY_SESSION_KEY)).toBe('1');
+    expect(window.localStorage.getItem(READ_ONLY_SESSION_KEY)).toBeNull();
+    expect(shouldAskForAuthor()).toBe(false);
+    window.sessionStorage.clear();
+    expect(shouldAskForAuthor()).toBe(true);
+    setAuthor('Example Person');
+    expect(shouldAskForAuthor()).toBe(false);
   });
 
   it('notifies subscribers on change', () => {

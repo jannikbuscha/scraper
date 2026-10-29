@@ -7,6 +7,7 @@ import { afterEach, vi } from 'vitest';
 afterEach(() => {
   cleanup();
   window.localStorage.clear();
+  window.sessionStorage.clear();
 });
 
 Object.defineProperty(window, 'matchMedia', {

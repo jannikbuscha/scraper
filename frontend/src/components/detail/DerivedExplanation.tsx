@@ -1,18 +1,31 @@
 // Explanation of a derived value (docs/UI.md §4.1): basis, the reason code in
-// words, and a link to the deciding event or participation (labels from refs).
+// words, a link to the deciding event or participation (labels from refs),
+// and, where it differs from the displayed candidate, the interval over all
+// candidates that sorting, filters, exports and the period use.
 import { Text } from '@mantine/core';
 import type { ReactNode } from 'react';
 
 import type { FieldSpec, Item } from '../../api/types';
 import { useVocabIndex } from '../../hooks/useVocabIndex';
-import { derivedDetails } from '../../lib/format';
+import { derivedDetails, formatInterval } from '../../lib/format';
 import { findTerm, termLabel } from '../../lib/vocab';
 import { EntityLink } from '../EntityLink';
 
 export function DerivedExplanation({ item, field }: { item: Item; field: FieldSpec }) {
   const vocab = useVocabIndex();
-  const { basis, reason, decidedBy } = derivedDetails(item, field.name);
+  const { basis, reason, decidedBy, interval } = derivedDetails(item, field.name);
   const parts: { key: string; content: ReactNode }[] = [];
+  if (interval) {
+    parts.push({
+      key: 'interval',
+      content: (
+        <>
+          {field.label} interval over all candidates: {formatInterval(interval)} (it decides the period, sorting,
+          filters and exports)
+        </>
+      ),
+    });
+  }
   if (basis) parts.push({ key: 'basis', content: <>Basis: {termLabel(vocab, 'date_basis', basis)}</> });
   if (reason) {
     const definition = findTerm(vocab, 'derived_reason', reason)?.definition;

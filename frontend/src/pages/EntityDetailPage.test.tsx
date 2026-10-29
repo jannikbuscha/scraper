@@ -426,6 +426,100 @@ describe('entity detail page: verification, comments, history', () => {
     expect(requestedEvidence(fetchMock)).toContain('eq:field:name_en');
   });
 
+  it('asks instead of retrying when a colleague disputed the field meanwhile, showing the reason', async () => {
+    const fetchMock = mockDetailApi();
+    const { user } = renderDetail();
+    await user.click(await screen.findByRole('button', { name: /^Verification of Name \(EN\)/ }));
+    // The value is unchanged, but a colleague disputed it (a verify revision with a note).
+    queue(`${ITEM_PATH}/verify-field`, () =>
+      conflictResponse({
+        action: 'verify',
+        current: baseFields,
+        meta_changed_since_base: { name_en: { verified: ['unverified', 'disputed'] } },
+        intervening: [
+          { ...revision(4, 'Example Colleague', ['name_en']), action: 'verify', note: 'Example reason: outdated name' },
+        ],
+      }),
+    );
+    await user.click(await screen.findByRole('menuitem', { name: /An example quote/ }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'The record changed meanwhile' });
+    expect(within(dialog).getByText(/The verification of/)).toHaveTextContent(
+      'The verification of Name (EN) was changed by Example Colleague',
+    );
+    expect(within(dialog).getByText('Disputed')).toBeInTheDocument();
+    expect(within(dialog).getByText('Example reason: outdated name')).toBeInTheDocument();
+    // Nothing was retried blindly.
+    expect(bodiesTo(fetchMock, `${ITEM_PATH}/verify-field`)).toHaveLength(1);
+
+    await user.click(within(dialog).getByRole('button', { name: 'Mark verified' }));
+    await waitFor(() => {
+      expect(bodiesTo(fetchMock, `${ITEM_PATH}/verify-field`)).toHaveLength(2);
+    });
+    expect(bodiesTo(fetchMock, `${ITEM_PATH}/verify-field`)[1]).toEqual({
+      expected_version: 4,
+      field: 'name_en',
+      status: 'verified',
+      evidence_id: 'evd_EXAMPLE',
+      note: null,
+    });
+  });
+
+  it('verifies with the version shown when the menu opened, so a value changed meanwhile is asked about', async () => {
+    const fetchMock = mockDetailApi();
+    const { user, queryClient } = renderDetail();
+    await user.click(await screen.findByRole('button', { name: /^Verification of Name \(EN\)/ }));
+    const evidence = await screen.findByRole('menuitem', { name: /An example quote/ });
+
+    // While the menu is open, a background refetch brings a colleague's rename (version 4).
+    server = { fields: { ...server.fields, name_en: 'Renamed by a colleague' }, version: 4, updatedBy: 'Example Colleague' };
+    await queryClient.invalidateQueries({ queryKey: ['item'] });
+    await waitFor(() => {
+      expect(screen.getAllByText('Renamed by a colleague').length).toBeGreaterThan(0);
+    });
+    queue(`${ITEM_PATH}/verify-field`, () =>
+      conflictResponse({
+        action: 'verify',
+        current: { ...baseFields, name_en: 'Renamed by a colleague' },
+        changed_since_base: ['name_en'],
+        intervening: [revision(4, 'Example Colleague', ['name_en'])],
+      }),
+    );
+    await user.click(evidence);
+
+    const dialog = await screen.findByRole('dialog', { name: 'The record changed meanwhile' });
+    expect(within(dialog).getByText('Mark the new value verified?')).toBeInTheDocument();
+    expect(within(dialog).getByText('Renamed by a colleague')).toBeInTheDocument();
+    expect(bodiesTo(fetchMock, `${ITEM_PATH}/verify-field`)).toEqual([
+      { expected_version: 3, field: 'name_en', status: 'verified', evidence_id: 'evd_EXAMPLE', note: null },
+    ]);
+  });
+
+  it('disputes with the version and value shown when the menu opened', async () => {
+    const fetchMock = mockDetailApi();
+    const { user, queryClient } = renderDetail();
+    await user.click(await screen.findByRole('button', { name: /^Verification of Name \(EN\)/ }));
+    await user.click(await screen.findByRole('menuitem', { name: 'Disputed…' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Dispute · Name (EN)' });
+    expect(within(dialog).getByRole('group', { name: 'The disputed value' })).toHaveTextContent('Example project');
+
+    // A refetch while the reason is typed: the dialog keeps the value it was opened for.
+    server = { fields: { ...server.fields, name_en: 'Renamed by a colleague' }, version: 4, updatedBy: 'Example Colleague' };
+    await queryClient.invalidateQueries({ queryKey: ['item'] });
+    await waitFor(() => {
+      expect(screen.getAllByText('Renamed by a colleague').length).toBeGreaterThan(0);
+    });
+    expect(within(dialog).getByRole('group', { name: 'The disputed value' })).toHaveTextContent('Example project');
+    await user.type(within(dialog).getByRole('textbox', { name: /Note/ }), 'Example reason');
+    await user.click(within(dialog).getByRole('button', { name: 'Mark disputed' }));
+
+    await waitFor(() => {
+      expect(bodiesTo(fetchMock, `${ITEM_PATH}/verify-field`)).toEqual([
+        { expected_version: 3, field: 'name_en', status: 'disputed', evidence_id: null, note: 'Example reason' },
+      ]);
+    });
+  });
+
   it('opens the comments panel for a field and posts a comment about it', async () => {
     const fetchMock = mockDetailApi();
     const { user, router } = renderDetail();

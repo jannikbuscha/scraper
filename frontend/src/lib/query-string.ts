@@ -1,7 +1,7 @@
 // The table's query string is the API query string (docs/UI.md §1.2,
 // docs/API.md §4). These helpers read and write it as a flat record of
 // strings; every writer returns a new record and never mutates its input.
-import type { DeletedMode, QuickFilterPresetOption } from '../api/types';
+import type { DeletedMode, FieldSpec, QuickFilterPresetOption } from '../api/types';
 import { addDays } from './partial-date';
 
 export type SearchRecord = Record<string, string>;
@@ -53,13 +53,22 @@ export function facetQueryString(search: SearchRecord, field: string): string {
   return canonicalQuery(search, (key) => omitted.has(key) || DETAIL_PAGE_PARAMS.has(key));
 }
 
-/** Export request: every list parameter except paging, plus `format` (docs/API.md §5). */
-export function exportQueryString(search: SearchRecord, format: 'csv' | 'xlsx'): string {
-  const omitted = new Set(['page', 'page_size']);
+/** The record ID column of exports (docs/API.md §5). */
+export const ID_COLUMN = 'id';
+
+/**
+ * Export request (docs/API.md §5): every list parameter except paging, plus
+ * `format`, and `cols` = `id` followed by the columns the table shows (never
+ * the raw URL `cols`, which may name columns the table ignores), so the file
+ * has the table's columns and always identifies its rows.
+ */
+export function exportQueryString(search: SearchRecord, format: 'csv' | 'xlsx', columns: readonly string[]): string {
+  const omitted = new Set(['page', 'page_size', 'cols']);
   const kept = Object.fromEntries(
     Object.entries(search).filter(([key]) => !omitted.has(key) && !DETAIL_PAGE_PARAMS.has(key)),
   );
-  return canonicalQuery({ ...kept, format });
+  const cols = [ID_COLUMN, ...columns.filter((name) => name !== ID_COLUMN)];
+  return canonicalQuery({ ...kept, cols: cols.join(','), format });
 }
 
 /** Applies a saved view's stored query by navigation (docs/UI.md §1.2). */
@@ -448,6 +457,24 @@ export function withDeletedMode(search: SearchRecord, mode: DeletedMode): Search
   const next = without(search, 'page', 'deleted');
   if (mode !== 'exclude') next.deleted = mode;
   return next;
+}
+
+/**
+ * The columns a table can offer: fields with a value per list row (`exportable`;
+ * not the detail-only document text), and the default choice (`in_list`).
+ */
+export function columnChoice(fields: readonly FieldSpec[]): { known: string[]; defaults: string[] } {
+  const offered = fields.filter((field) => field.exportable);
+  return {
+    known: offered.map((field) => field.name),
+    defaults: offered.filter((field) => field.in_list).map((field) => field.name),
+  };
+}
+
+/** The visible columns of a table: `cols` (offered names, in URL order), else the defaults. */
+export function tableColumns(fields: readonly FieldSpec[], search: SearchRecord): string[] {
+  const { known, defaults } = columnChoice(fields);
+  return getColumns(search, known, defaults);
 }
 
 /** Visible columns: `cols` (known names, in URL order), else the defaults. */

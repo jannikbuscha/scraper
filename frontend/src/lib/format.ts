@@ -3,7 +3,7 @@
 import dayjs from 'dayjs';
 
 import type { Alias, FieldSpec, FieldType, Item, JsonValue, RefLabel, Refs } from '../api/types';
-import { formatPartialDate, isIsoDate } from './partial-date';
+import { formatPartialDate, isIsoDate, parsePartialDate } from './partial-date';
 import { termLabel, type VocabIndex } from './vocab';
 
 // ---------------------------------------------------------------------------
@@ -102,11 +102,32 @@ export function getFieldValue(item: Item, field: FieldSpec): JsonValue {
 /** Derived fields whose detail keys use another stem (docs/API.md §2: trajectory_reason). */
 const DERIVED_KEY_STEMS: Readonly<Record<string, string>> = { war_trajectory: 'trajectory' };
 
+export interface DateInterval {
+  start: string;
+  end: string;
+}
+
 export interface DerivedDetails {
   basis: string | null;
   reason: string | null;
   /** The deciding event or participation, labelled from `refs`. */
   decidedBy: RefLabel | null;
+  /**
+   * The interval over all candidates (`<name>_start`/`<name>_end`, e.g. the launch
+   * interval, docs/DATA_MODEL.md §8.3) when it differs from the bounds of the
+   * displayed candidate. Sorting, date filters, exports and the period use it.
+   */
+  interval: DateInterval | null;
+}
+
+/** `<stem>_start`/`<stem>_end` unless they are just the bounds of the displayed partial date. */
+function candidateInterval(derived: Readonly<Record<string, JsonValue>>, stem: string): DateInterval | null {
+  const start = asString(derived[`${stem}_start`] ?? null);
+  const end = asString(derived[`${stem}_end`] ?? null);
+  const shown = asString(derived[stem] ?? null);
+  if (start === null || end === null || shown === null) return null;
+  const bounds = parsePartialDate(shown);
+  return bounds?.start === start && bounds.end === end ? null : { start, end };
 }
 
 export function derivedDetails(item: Item, field: string): DerivedDetails {
@@ -117,8 +138,12 @@ export function derivedDetails(item: Item, field: string): DerivedDetails {
     basis: asString(derived[`${stem}_basis`]),
     reason: asString(derived[`${stem}_reason`]),
     decidedBy: refKey ? (item.refs[`derived.${refKey}`] ?? null) : null,
+    interval: candidateInterval(derived, stem),
   };
 }
+
+/** "2022-01-01 – 2022-03-31" */
+export const formatInterval = (interval: DateInterval): string => `${interval.start} – ${interval.end}`;
 
 // ---------------------------------------------------------------------------
 // Timestamps (UTC strings with microseconds, docs/DATA_MODEL.md §1.1)
@@ -256,6 +281,7 @@ export function syntheticField(name: string, type: FieldType, label = name): Fie
     in_create: false,
     default: null,
     bulk_editable: false,
+    exportable: false,
     help: null,
   };
 }

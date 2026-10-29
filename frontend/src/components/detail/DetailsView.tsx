@@ -6,11 +6,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { queryKeys } from '../../api/queries';
-import type { EntityTypeMeta, FieldSpec, Item, Meta, TableEntityType } from '../../api/types';
+import type { EntityTypeMeta, FieldSpec, Item, Meta } from '../../api/types';
+import type { DetailEntityType } from '../../lib/entity';
 import { asNumber, asString, isJsonObject } from '../../lib/format';
 import { StaleRecordNotice } from '../StaleRecordNotice';
 import { Timestamp } from '../Timestamp';
-import { AddEvidenceModal } from './AddEvidenceModal';
+import { AddEvidenceModal, type EvidenceTarget } from './AddEvidenceModal';
 import classes from './detail.module.css';
 import { detailFieldGroups } from './field-groups';
 import { FieldGroupSection } from './FieldGroupSection';
@@ -18,10 +19,10 @@ import { FieldRow } from './FieldRow';
 import type { VerificationChoice } from './FieldVerificationMenu';
 import { RelatedPanels } from './RelatedPanels';
 import { useFieldVerifier } from './useFieldVerifier';
-import { DisputeFieldModal, VerifyQuestionModal } from './VerificationModals';
+import { DisputeFieldModal, VerifyQuestionModal, type DisputeTarget } from './VerificationModals';
 
 interface DetailsViewProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   meta: Meta;
   typeMeta: EntityTypeMeta;
@@ -32,17 +33,19 @@ interface DetailsViewProps {
 export function DetailsView({ type, item, meta, typeMeta, onComment }: DetailsViewProps) {
   const client = useQueryClient();
   const verifier = useFieldVerifier(type, item);
-  const [evidenceFor, setEvidenceFor] = useState<FieldSpec | null>(null);
-  const [disputeFor, setDisputeFor] = useState<FieldSpec | null>(null);
+  // The dialogs keep the base captured when the verification menu opened.
+  const [evidenceFor, setEvidenceFor] = useState<EvidenceTarget | null>(null);
+  const [disputeFor, setDisputeFor] = useState<DisputeTarget | null>(null);
   const byField = isJsonObject(item.virtual.open_comments_by_field) ? item.virtual.open_comments_by_field : {};
   const computedAt = asString(item.derived?.computed_at);
 
   const onVerification = (field: FieldSpec, choice: VerificationChoice) => {
-    if (choice.kind === 'add-evidence') setEvidenceFor(field);
-    else if (choice.kind === 'disputed') setDisputeFor(field);
+    const { base } = choice;
+    if (choice.kind === 'add-evidence') setEvidenceFor({ field, base });
+    else if (choice.kind === 'disputed') setDisputeFor({ field, base });
     else if (choice.kind === 'verified')
-      void verifier.verify(field, { status: 'verified', evidenceId: choice.evidenceId });
-    else void verifier.verify(field, { status: 'unverified' });
+      void verifier.verify(field, { status: 'verified', evidenceId: choice.evidenceId }, base.version);
+    else void verifier.verify(field, { status: 'unverified' }, base.version);
   };
 
   return (
@@ -91,23 +94,24 @@ export function DetailsView({ type, item, meta, typeMeta, onComment }: DetailsVi
 
       <AddEvidenceModal
         subject={item}
-        field={evidenceFor}
+        target={evidenceFor}
         onClose={() => {
           setEvidenceFor(null);
         }}
-        onCreated={(evidence, field) => {
-          void verifier.verify(field, { status: 'verified', evidenceId: evidence.id });
+        onCreated={(evidence, field, base) => {
+          void verifier.verify(field, { status: 'verified', evidenceId: evidence.id }, base.version);
         }}
       />
       <DisputeFieldModal
-        field={disputeFor}
+        target={disputeFor}
+        refs={item.refs}
         maxNoteChars={meta.limits.max_note_chars}
         pending={verifier.pending}
         onClose={() => {
           setDisputeFor(null);
         }}
-        onSubmit={(field, note) => {
-          void verifier.verify(field, { status: 'disputed', note }).then((saved) => {
+        onSubmit={({ field, base }, note) => {
+          void verifier.verify(field, { status: 'disputed', note }, base.version).then((saved) => {
             setDisputeFor(null);
             // The comment composer opens, pre-set to the disputed field.
             if (saved) onComment(field.name);

@@ -1,14 +1,18 @@
 // Where a record opens in the UI (docs/UI.md §5): table types on their detail
-// page, comments on their subject's page with the thread open, vocabulary
-// terms on the Codebook page, saved views as their table with the view
-// applied. Other types have no page in Phase 1 (null).
+// page, the record-page types (evidence, participations, components,
+// relations, indicators, saved views) on the generic record page
+// `/records/$id`, comments on their subject's page with the thread open,
+// vocabulary terms on the Codebook page; in the change feed, saved views open
+// as their table with the view applied.
 import type { ChangeFeedItem, RecordType, TableEntityType } from '../../api/types';
-import { isTableType } from '../../lib/entity';
+import { isRecordPageType, isTableType } from '../../lib/entity';
 import type { SearchRecord } from '../../lib/query-string';
 
 /** A page reached by route path, params and search. */
 export type PageTarget =
   | { kind: 'detail'; type: TableEntityType; id: string; search: SearchRecord }
+  /** The generic record page `/records/$id`. */
+  | { kind: 'record'; id: string; search: SearchRecord }
   | { kind: 'codebook'; search: SearchRecord };
 
 export type RecordTarget =
@@ -24,6 +28,7 @@ function termTarget(termId: string, vocabulary?: string | null, extra: SearchRec
 /** The page of a record (vocabulary terms: the Codebook page), with optional search params. */
 export function pageTarget(type: RecordType, id: string, search: SearchRecord = {}): PageTarget | null {
   if (isTableType(type)) return { kind: 'detail', type, id, search };
+  if (isRecordPageType(type)) return { kind: 'record', id, search };
   if (type === 'vocabulary_term') return termTarget(id, null, search);
   return null;
 }
@@ -46,5 +51,5 @@ export function changeTarget(change: ChangeFeedItem): RecordTarget | null {
   if (type === 'saved_view' && isTableType(context?.entity_type)) {
     return { kind: 'saved_view', id, tableType: context.entity_type };
   }
-  return null;
+  return pageTarget(type, id);
 }

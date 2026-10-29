@@ -12,8 +12,8 @@ import type {
   JsonValue,
   Meta,
   Refs,
-  TableEntityType,
 } from '../../api/types';
+import type { DetailEntityType } from '../../lib/entity';
 import { asString, asStringArray } from '../../lib/format';
 import { canonicalQuery } from '../../lib/query-string';
 import { FieldInput, FieldLabel } from '../fields/FieldInput';
@@ -26,7 +26,7 @@ import { FieldGroupSection } from './FieldGroupSection';
  * The parent-service picker offers services of the same project only and
  * never the service itself or its descendants (docs/UI.md §4.1).
  */
-function useParentServicePicker(type: TableEntityType, item: Item, projectId: string | null) {
+function useParentServicePicker(type: DetailEntityType, item: Item, projectId: string | null) {
   const enabled = type === 'service' && projectId !== null;
   const services = useEntityList(
     'service',
@@ -54,7 +54,7 @@ function keepCodes(field: FieldSpec, base: JsonValue): string[] {
 }
 
 interface EditFieldsProps {
-  type: TableEntityType;
+  type: DetailEntityType;
   item: Item;
   meta: Meta;
   typeMeta: EntityTypeMeta;

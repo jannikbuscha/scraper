@@ -3,22 +3,15 @@
 // authors of the revisions that would be undone; a note is required.
 // Confirming sends the selected fields with expected_version = the current
 // version. A 409 conflict shows the intervening revisions, recomputes the
-// preview and is resent only on confirm (docs/UI.md §1.3).
+// preview and is resent only on confirm (docs/UI.md §1.3). Used for every
+// entity type with a history: detail pages and vocabulary terms (§5).
 import { Alert, Button, Checkbox, Group, Loader, Modal, Stack, Table, Text, Textarea } from '@mantine/core';
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 
 import { isApiError, isConflictError, referenceDeleted, uniqueViolation } from '../../api/client';
 import { queryKeys, useMeta, useRestoreEntity, useRestorePreview, useRevisions } from '../../api/queries';
-import type {
-  ConflictPayload,
-  EntityTypeMeta,
-  FieldSpec,
-  Item,
-  JsonValue,
-  RevisionSummary,
-  TableEntityType,
-} from '../../api/types';
+import type { ConflictPayload, EntityType, FieldSpec, JsonValue, RevisionSummary } from '../../api/types';
 import { shouldWordDiff } from '../../lib/diff';
 import { asString, guessFieldType, pluralize, syntheticField } from '../../lib/format';
 import { EntityLink } from '../EntityLink';
@@ -27,25 +20,31 @@ import { ValueDisplay } from '../fields/FieldValue';
 import { WordDiff } from '../history/WordDiff';
 import { StaleRecordNotice } from '../StaleRecordNotice';
 import { ChangedMeanwhileAlert } from '../history/ChangedMeanwhileAlert';
-import { fieldLabels } from './field-groups';
 
 /** Enough to cover the history of any record in this project. */
 const AUTHOR_SCAN_SIZE = 500;
 
+/** The record to restore: its ID and current version. */
+export interface RestoreTarget {
+  id: string;
+  version: number;
+}
+
 interface RestoreModalProps {
-  type: TableEntityType;
-  item: Item;
-  typeMeta: EntityTypeMeta;
+  type: EntityType;
+  item: RestoreTarget;
+  /** Registry fields of the type, for labels and value types. */
+  fields: readonly FieldSpec[];
   /** The version to restore; the dialog is open while set. */
   version: number | null;
   onClose: () => void;
 }
 
-export function RestoreModal({ type, item, typeMeta, version, onClose }: RestoreModalProps) {
+export function RestoreModal({ type, item, fields, version, onClose }: RestoreModalProps) {
   return (
     <Modal opened={version !== null} onClose={onClose} size="xl" title={`Restore version ${version ?? ''}`}>
       {version !== null && (
-        <RestoreForm key={version} type={type} item={item} typeMeta={typeMeta} version={version} onDone={onClose} />
+        <RestoreForm key={version} type={type} item={item} fields={fields} version={version} onDone={onClose} />
       )}
     </Modal>
   );
@@ -81,14 +80,15 @@ function ChangeValue({ field, current, restored }: { field: FieldSpec; current: 
 }
 
 interface RestoreFormProps {
-  type: TableEntityType;
-  item: Item;
-  typeMeta: EntityTypeMeta;
+  type: EntityType;
+  item: RestoreTarget;
+  fields: readonly FieldSpec[];
   version: number;
   onDone: () => void;
 }
 
-function RestoreForm({ type, item, typeMeta, version, onDone }: RestoreFormProps) {
+/** The restore dialog's content; also shown inline (term history, which is a dialog itself). */
+export function RestoreForm({ type, item, fields: typeFields, version, onDone }: RestoreFormProps) {
   const client = useQueryClient();
   const meta = useMeta();
   const { mutate: runPreview, ...preview } = useRestorePreview(type);
@@ -101,7 +101,7 @@ function RestoreForm({ type, item, typeMeta, version, onDone }: RestoreFormProps
   const [submitted, setSubmitted] = useState(false);
   const [stale, setStale] = useState(false);
   const [problem, setProblem] = useState<ReactNode>(null);
-  const labels = fieldLabels(typeMeta);
+  const labels: Record<string, string> = Object.fromEntries(typeFields.map((field) => [field.name, field.label]));
   const labelOf = (name: string) => labels[name] ?? name;
 
   const onWriteError = (error: unknown) => {
@@ -143,7 +143,7 @@ function RestoreForm({ type, item, typeMeta, version, onDone }: RestoreFormProps
   }
   const previewStale = isApiError(preview.error, 'entity_deleted') || conflictOnDeletedRow;
   const specOf = (name: string, values: [JsonValue, JsonValue]): FieldSpec =>
-    typeMeta.fields.find((field) => field.name === name) ?? syntheticField(name, guessFieldType(...values));
+    typeFields.find((field) => field.name === name) ?? syntheticField(name, guessFieldType(...values));
   const changes = preview.data?.changes ?? {};
   const fields = Object.keys(changes);
   const selected = fields.filter((field) => !excluded.has(field));
