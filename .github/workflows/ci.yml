@@ -143,6 +143,18 @@ jobs:
           echo
           curl -fsS -o "${RUNNER_TEMP}/index.html" http://127.0.0.1:8080/
           grep -qi '<!doctype html' "${RUNNER_TEMP}/index.html"
+      - name: Check that the start left no root-owned files in the checkout
+        # The Docker daemon runs as root and creates a missing bind-mount source as root.
+        # ./releases is part of the repository and the entrypoint hands ./data to the user
+        # "app", so nothing in the checkout may belong to root afterwards.
+        run: |
+          root_owned="$(find . -xdev -user 0)"
+          if [ -n "${root_owned}" ]; then
+            echo "::error::Owned by root after docker compose up (see README.md, Data):"
+            printf '%s\n' "${root_owned}"
+            exit 1
+          fi
+          stat -c '%u:%g %n' data releases
       - name: Show container logs
         if: always()
         run: docker compose logs --no-color

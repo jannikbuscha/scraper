@@ -51,8 +51,12 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-127.0.0.1,localhost}
     volumes:
       # All runtime data (SQLite database; later raw snapshots, backups, imports).
+      # Gitignored; if it is missing, the Docker daemon creates it as root and the
+      # entrypoint hands it to the user "app" on every start.
       - ./data:/app/data
       # Dataset releases (written from Phase 4 on, committed and tagged on the host).
+      # Part of the repository (releases/README.md), so it exists in every clone and
+      # the Docker daemon never creates it as root. Keep that file.
       - ./releases:/app/releases
     healthcheck:
       test:
