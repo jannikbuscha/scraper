@@ -22,9 +22,9 @@ The app has **one user**: the data lead provides the server, and one other perso
 | Phase | Content | State |
 |---|---|---|
 | 0 | Exploration and plan: `PLAN.md`, drafts of `docs/SOURCES.md` and `docs/CODEBOOK.md` | done |
-| 0b | Hands-on source checks and fixture capture | open: the development environment cannot reach the source hosts (`PLAN.md` §2.2) |
-| 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; adversarial review findings fixed; simplified the same day for one user without concurrent editing or a security layer (D-15); all local gates, the E2E suite and a Docker start are green on the simplified state (CI ran green before the simplification) |
-| **2** | **Data acquisition:** collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | **next**, after the data lead's go; needs network access to the source hosts (Phase 0b) |
+| 0b | Hands-on source checks and fixture capture | partially done (2026-10-29): every source except S5 (Wayback Machine) and S6 (zakon.rada.gov.ua) checked from the development environment; results and every S1–S5 hypothesis resolved in `docs/SOURCES.md`; 103 fixtures in `backend/tests/fixtures/` (checked by `test_fixtures.py`). Open: S5, S6 and a geo-blocking re-check from the target server, and the data lead's decisions in `docs/SOURCES.md` §5 |
+| 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; adversarial review findings fixed; simplified the same day for one user without concurrent editing or a security layer (D-15); all gates, the E2E suite and CI green on the simplified state |
+| **2** | **Data acquisition:** collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | **next**, after the data lead's go; C5 (Wayback) and C6 need the Phase 0b checks from the target server first |
 | 3 | Analysis: document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | planned |
 | 4 | Operations: releases with git tags, backups, schedules, documentation | planned |
 
@@ -54,9 +54,10 @@ In practice:
 - Every write records its channel (`ui`, `restore`, `seed`, `import`, `collector`, …) in the revision and a provenance per field (`field_meta`). Names exist only for the automatic channels (`seed`, `import:<file>`, `collector:<name>`); writes through the app are recorded as `user`, with `src = manual`. Collectors write only unlocked fields and turn other differences into proposals (Phase 2).
 - Delete is soft (trash). A hard purge is planned only as a CLI command with explicit confirmation (`mdt purge`, `PLAN.md` §6.4).
 
-## Collection rules (assignment §5; collectors arrive in Phase 2)
+## Collection rules (assignment §5, refined in Phase 0b; collectors arrive in Phase 2)
 
-- **Be polite:** obey robots.txt; at most about **1 request per second per host**; back off on errors (honour `Retry-After`); send a unique User-Agent that contains the contact e-mail from `.env` (`CONTACT_EMAIL`).
+- **Be polite:** obey robots.txt (longest-match semantics of RFC 9309, re-checked on every redirect hop, a larger `Crawl-delay` honoured); at most about **1 request per second per host**; back off on errors (honour `Retry-After`); send a unique User-Agent that contains the contact e-mail from `.env` (`CONTACT_EMAIL`). Client details found in Phase 0b: `docs/SOURCES.md` §2.
+- **Nothing that identifies our client goes into the repository, exports or releases** (Phase 0b): no User-Agent or contact address, no tokens that identify the requester (e.g. the kmu.gov.ua bot-manager token encodes the client IP). Fixtures also drop third-party contact data (e-mail addresses, phone numbers), and fixtures of sources that are not openly licensed are minimal excerpts (`backend/tests/fixtures/README.md`).
 - **No circumvention of protections:** no CAPTCHA solving, no proxy rotation.
 - **If gov.ua sites block or throttle:** log it, fall back to the Wayback Machine, and report it to the data lead.
 - Look for structured access first (JSON endpoints, sitemaps, RSS, embedded JSON); HTML parsing is the fallback, a headless browser only if unavoidable.
