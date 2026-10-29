@@ -1,0 +1,87 @@
+[project]
+name = "mdt"
+version = "0.1.0"
+description = "MDT Portfolio: research data platform on the portfolio of the Ministry of Digital Transformation of Ukraine"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic",
+    "fastapi",
+    "markdown-it-py[linkify]",
+    "nh3",
+    "openpyxl",
+    "pydantic>=2",
+    "pydantic-settings",
+    "python-ulid",
+    "pyyaml",
+    "sqlalchemy>=2",
+    "typer",
+    "uvicorn[standard]",
+]
+
+[project.scripts]
+mdt = "mdt.cli:app"
+
+[dependency-groups]
+dev = [
+    "httpx2",
+    "mypy",
+    "pytest",
+    "ruff",
+    "types-PyYAML",
+    "types-openpyxl",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mdt"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+extend-exclude = ["migrations/script.py.mako"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM", "C4", "RUF"]
+ignore = [
+    # Typer and FastAPI use function calls in argument defaults by design.
+    "B008",
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Unicode test data (apostrophe and dash variants, Cyrillic) is intentional.
+"tests/**" = ["RUF001", "RUF002", "RUF003"]
+"src/mdt/domain/text.py" = ["RUF001", "RUF002", "RUF003"]
+# Labels use typographic dashes on purpose (e.g. "Framework D1–D4", API §3.1).
+"src/mdt/domain/registry.py" = ["RUF001"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.mypy]
+python_version = "3.12"
+files = ["src"]
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+no_implicit_optional = true
+check_untyped_defs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["mdt.db.*", "mdt.domain.*"]
+strict = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-m 'not network' --strict-markers"
+markers = [
+    "network: tests that need network access (deselected by default)",
+]
+filterwarnings = [
+    "error::DeprecationWarning:mdt.*",
+]
