@@ -7,7 +7,7 @@ const revision = (overrides: Partial<RevisionSummary>): RevisionSummary => ({
   id: 7,
   version: 4,
   at: '2026-01-03T08:00:00.000000Z',
-  author: 'Example Person',
+  author: 'user',
   channel: 'ui',
   action: 'delete',
   note: 'Example note',

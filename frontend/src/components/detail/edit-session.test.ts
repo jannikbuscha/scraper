@@ -8,7 +8,6 @@ import {
   editErrors,
   hasEditErrors,
   serviceSubtree,
-  sessionFromResolution,
   startEditSession,
 } from './edit-session';
 
@@ -37,33 +36,18 @@ const typeMeta: EntityTypeMeta = {
   quick_filters: [],
 };
 
-const makeItem = () =>
-  exampleItem(
-    'prj_EXAMPLE',
-    {
-      name_en: 'Example project',
-      name_uk: null,
-      official_urls: ['https://example.org/'],
-      in_paper_scope: false,
-      scope_note: 'Example reason.',
-      verification_status: 'unverified',
-      canonical_url: null,
-      links: [],
-    },
-    { version: 7 },
-  );
-const item = makeItem();
+const item = exampleItem('prj_EXAMPLE', {
+  name_en: 'Example project',
+  name_uk: null,
+  official_urls: ['https://example.org/'],
+  in_paper_scope: false,
+  scope_note: 'Example reason.',
+  verification_status: 'unverified',
+  canonical_url: null,
+  links: [],
+});
 
 describe('edit session', () => {
-  it('freezes a copy of the fields and the version when editing starts', () => {
-    const cached = makeItem();
-    const session = startEditSession(cached);
-    expect(session.base).toEqual({ fields: cached.fields, version: 7 });
-    cached.fields.name_en = 'Changed in the cache';
-    expect(session.base.fields.name_en).toBe('Example project');
-    expect(session.values.name_en).toBe('Example project');
-  });
-
   it('edits only stored, editable, non-structural fields', () => {
     expect(editableFields(typeMeta).map((field) => field.name)).toEqual([
       'name_en',
@@ -75,7 +59,7 @@ describe('edit session', () => {
     ]);
   });
 
-  it('sends only the values that differ from the base, list order included', () => {
+  it('sends only the values that differ from the fields when editing started, list order included', () => {
     const session = startEditSession(item);
     const fields = editableFields(typeMeta);
     expect(changedValues(session, fields)).toEqual({});
@@ -112,15 +96,6 @@ describe('edit session', () => {
     const errors = editErrors(session, typeMeta, changedValues(session, editableFields(typeMeta)), '');
     expect(errors.fields.name_en).toMatch(/at least one of Name \(EN\) or Name \(UK\)/);
     expect(errors.fields.official_urls).toMatch(/http/);
-  });
-
-  it('continues after a conflict from the current state with the chosen values', () => {
-    const session = sessionFromResolution({
-      base: { fields: { ...item.fields, name_en: 'Their name' }, version: 8 },
-      changes: { scope_note: 'My reason.' },
-    });
-    expect(session.base.version).toBe(8);
-    expect(changedValues(session, editableFields(typeMeta))).toEqual({ scope_note: 'My reason.' });
   });
 
   it('excludes the service itself and all its descendants from the parent picker', () => {

@@ -1,38 +1,29 @@
 // "Restore this version" (docs/UI.md §4.2): a dry run first shows the
 // resulting changes, one per field with a checkbox (default all), and the
-// authors of the revisions that would be undone; a note is required.
-// Confirming sends the selected fields with expected_version = the current
-// version. A 409 conflict shows the intervening revisions, recomputes the
-// preview and is resent only on confirm (docs/UI.md §1.3). Used for every
-// entity type with a history: detail pages and vocabulary terms (§5).
+// channels of the later revisions that would be undone; a note is required.
+// Confirming sends the selected fields. Used for every entity type with a
+// history: detail pages and vocabulary terms (§5).
 import { Alert, Button, Checkbox, Group, Loader, Modal, Stack, Table, Text, Textarea } from '@mantine/core';
-import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState, type ReactNode } from 'react';
 
-import { isApiError, isConflictError, referenceDeleted, uniqueViolation } from '../../api/client';
-import { queryKeys, useMeta, useRestoreEntity, useRestorePreview, useRevisions } from '../../api/queries';
-import type { ConflictPayload, EntityType, FieldSpec, JsonValue, RevisionSummary } from '../../api/types';
+import { referenceDeleted, uniqueViolation } from '../../api/client';
+import { useMeta, useRestoreEntity, useRestorePreview, useRevisions } from '../../api/queries';
+import type { Channel, EntityType, FieldSpec, JsonValue, RevisionSummary } from '../../api/types';
 import { shouldWordDiff } from '../../lib/diff';
 import { asString, guessFieldType, pluralize, syntheticField } from '../../lib/format';
+import { channelLabel } from '../changes/record-labels';
 import { EntityLink } from '../EntityLink';
 import { errorMessage, notifySuccess } from '../feedback';
 import { ValueDisplay } from '../fields/FieldValue';
 import { WordDiff } from '../history/WordDiff';
-import { StaleRecordNotice } from '../StaleRecordNotice';
-import { ChangedMeanwhileAlert } from '../history/ChangedMeanwhileAlert';
 
 /** Enough to cover the history of any record in this project. */
-const AUTHOR_SCAN_SIZE = 500;
-
-/** The record to restore: its ID and current version. */
-export interface RestoreTarget {
-  id: string;
-  version: number;
-}
+const HISTORY_SCAN_SIZE = 500;
 
 interface RestoreModalProps {
   type: EntityType;
-  item: RestoreTarget;
+  /** The record to restore. */
+  id: string;
   /** Registry fields of the type, for labels and value types. */
   fields: readonly FieldSpec[];
   /** The version to restore; the dialog is open while set. */
@@ -40,26 +31,24 @@ interface RestoreModalProps {
   onClose: () => void;
 }
 
-export function RestoreModal({ type, item, fields, version, onClose }: RestoreModalProps) {
+export function RestoreModal({ type, id, fields, version, onClose }: RestoreModalProps) {
   return (
     <Modal opened={version !== null} onClose={onClose} size="xl" title={`Restore version ${version ?? ''}`}>
-      {version !== null && (
-        <RestoreForm key={version} type={type} item={item} fields={fields} version={version} onDone={onClose} />
-      )}
+      {version !== null && <RestoreForm key={version} type={type} id={id} fields={fields} version={version} onDone={onClose} />}
     </Modal>
   );
 }
 
-/** Authors of the later revisions that touched the selected fields, with their number of revisions. */
-function undoneAuthors(
+/** Channels of the later revisions that touched the selected fields, with their number of revisions. */
+function undoneChannels(
   revisions: readonly RevisionSummary[],
   version: number,
   fields: readonly string[],
-): [string, number][] {
-  const counts = new Map<string, number>();
+): [Channel, number][] {
+  const counts = new Map<Channel, number>();
   for (const revision of revisions) {
     if (revision.version <= version || !revision.changed_fields.some((field) => fields.includes(field))) continue;
-    counts.set(revision.author, (counts.get(revision.author) ?? 0) + 1);
+    counts.set(revision.channel, (counts.get(revision.channel) ?? 0) + 1);
   }
   return [...counts];
 }
@@ -81,25 +70,21 @@ function ChangeValue({ field, current, restored }: { field: FieldSpec; current: 
 
 interface RestoreFormProps {
   type: EntityType;
-  item: RestoreTarget;
+  id: string;
   fields: readonly FieldSpec[];
   version: number;
   onDone: () => void;
 }
 
 /** The restore dialog's content; also shown inline (term history, which is a dialog itself). */
-export function RestoreForm({ type, item, fields: typeFields, version, onDone }: RestoreFormProps) {
-  const client = useQueryClient();
+export function RestoreForm({ type, id, fields: typeFields, version, onDone }: RestoreFormProps) {
   const meta = useMeta();
   const { mutate: runPreview, ...preview } = useRestorePreview(type);
   const restore = useRestoreEntity(type);
-  const history = useRevisions(type, item.id, 1, AUTHOR_SCAN_SIZE);
-  const [expectedVersion, setExpectedVersion] = useState(item.version);
-  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
+  const history = useRevisions(type, id, 1, HISTORY_SCAN_SIZE);
   const [excluded, setExcluded] = useState<ReadonlySet<string>>(new Set());
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
-  const [stale, setStale] = useState(false);
   const [problem, setProblem] = useState<ReactNode>(null);
   const labels: Record<string, string> = Object.fromEntries(typeFields.map((field) => [field.name, field.label]));
   const labelOf = (name: string) => labels[name] ?? name;
@@ -107,11 +92,7 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
   const onWriteError = (error: unknown) => {
     const unique = uniqueViolation(error);
     const reference = referenceDeleted(error);
-    if (isConflictError(error) && error.payload.current_state.deleted_at === null) {
-      setConflict(error.payload);
-      setExpectedVersion(error.payload.current_version);
-    } else if (isConflictError(error) || isApiError(error, 'entity_deleted')) setStale(true);
-    else if (unique) {
+    if (unique) {
       setProblem(
         <>
           {labelOf(unique.field)}: the restored value is already used by{' '}
@@ -129,25 +110,17 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
     } else setProblem(errorMessage(error));
   };
 
-  // The dry run; it runs again with the current version after a conflict.
+  // The dry run.
   useEffect(() => {
-    runPreview({ id: item.id, expected_version: expectedVersion, version });
-  }, [runPreview, item.id, expectedVersion, version]);
+    runPreview({ id, version });
+  }, [runPreview, id, version]);
 
-  // A dry run refused with a conflict: continue from the current version.
-  const previewConflict = isConflictError(preview.error) ? preview.error.payload : null;
-  const conflictOnDeletedRow = previewConflict !== null && previewConflict.current_state.deleted_at !== null;
-  if (previewConflict !== null && !conflictOnDeletedRow && previewConflict.current_version !== expectedVersion) {
-    setConflict(previewConflict);
-    setExpectedVersion(previewConflict.current_version);
-  }
-  const previewStale = isApiError(preview.error, 'entity_deleted') || conflictOnDeletedRow;
   const specOf = (name: string, values: [JsonValue, JsonValue]): FieldSpec =>
     typeFields.find((field) => field.name === name) ?? syntheticField(name, guessFieldType(...values));
   const changes = preview.data?.changes ?? {};
   const fields = Object.keys(changes);
   const selected = fields.filter((field) => !excluded.has(field));
-  const undone = history.data ? undoneAuthors(history.data.items, version, selected) : [];
+  const undone = history.data ? undoneChannels(history.data.items, version, selected) : [];
   const noteError = note.trim() === '' ? 'A note is required: why is this version restored?' : null;
 
   const submit = async () => {
@@ -155,13 +128,7 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
     setProblem(null);
     if (noteError !== null || selected.length === 0) return;
     try {
-      const result = await restore.mutateAsync({
-        id: item.id,
-        expected_version: expectedVersion,
-        version,
-        fields: selected,
-        note: note.trim(),
-      });
+      const result = await restore.mutateAsync({ id, version, fields: selected, note: note.trim() });
       const parts = [
         result.changed
           ? `Restored ${pluralize(selected.length, 'field')} from version ${version} as version ${result.item.version}.`
@@ -176,28 +143,8 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
     }
   };
 
-  if (stale || previewStale) {
-    return (
-      <StaleRecordNotice
-        type={type}
-        id={item.id}
-        onReload={() => {
-          void client.invalidateQueries({ queryKey: queryKeys.item(type, item.id) });
-          onDone();
-        }}
-      />
-    );
-  }
-
   return (
     <Stack gap="sm">
-      {conflict && (
-        <ChangedMeanwhileAlert
-          revisions={conflict.intervening}
-          fieldLabels={labels}
-          question="The preview below is recomputed against the current version. Restore anyway?"
-        />
-      )}
       {preview.isPending && <Loader size="sm" />}
       {preview.data && fields.length === 0 && (
         <Text size="sm">
@@ -254,13 +201,8 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
           </Table>
           {undone.length > 0 && (
             <Text size="sm">
-              Undoes changes by:{' '}
-              {undone.map(([author, count], index) => (
-                <span key={author}>
-                  {index > 0 && ', '}
-                  <bdi>{author}</bdi> ({pluralize(count, 'revision')})
-                </span>
-              ))}
+              Undoes later changes:{' '}
+              {undone.map(([channel, count]) => `${channelLabel(channel)} (${pluralize(count, 'revision')})`).join(', ')}
             </Text>
           )}
           {submitted && selected.length === 0 && (
@@ -270,7 +212,7 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
           )}
         </>
       )}
-      {preview.isError && previewConflict === null && <Alert color="red">{errorMessage(preview.error)}</Alert>}
+      {preview.isError && <Alert color="red">{errorMessage(preview.error)}</Alert>}
       <Textarea
         label="Note"
         description="Required: why this version is restored."
@@ -293,12 +235,8 @@ export function RestoreForm({ type, item, fields: typeFields, version, onDone }:
         <Button variant="default" onClick={onDone}>
           Cancel
         </Button>
-        <Button
-          loading={restore.isPending}
-          disabled={!preview.data || fields.length === 0}
-          onClick={() => void submit()}
-        >
-          {conflict ? 'Restore anyway' : 'Restore'}
+        <Button loading={restore.isPending} disabled={!preview.data || fields.length === 0} onClick={() => void submit()}>
+          Restore
         </Button>
       </Group>
     </Stack>

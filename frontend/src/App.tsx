@@ -14,7 +14,7 @@ const shouldRetry = (failureCount: number, error: unknown): boolean =>
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 10_000, retry: shouldRetry },
-    // Writes are never retried blindly (docs/UI.md §1.3).
+    // Writes are never retried: a repeated create would store the record twice.
     mutations: { retry: false },
   },
 });

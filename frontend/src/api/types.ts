@@ -131,9 +131,6 @@ export interface EntityTypeMeta {
 export interface MetaLimits {
   max_comment_chars: number;
   max_note_chars: number;
-  max_page_size: number;
-  max_bulk_items: number;
-  max_export_rows: number;
 }
 
 export interface MetaGroup {
@@ -149,7 +146,6 @@ export interface VocabularyMeta {
 
 export interface Meta {
   app_version: string;
-  team_members: string[];
   focal_org_id: string | null;
   parameters: { ministry_founded: string; full_scale_invasion: string } & Record<string, string>;
   limits: MetaLimits;
@@ -339,7 +335,6 @@ export interface CreateResponse {
 }
 
 export interface PatchRequest {
-  expected_version: number;
   changes: JsonObject;
   note?: string | null;
 }
@@ -352,7 +347,6 @@ export interface PatchResponse {
 }
 
 export interface DeleteRequest {
-  expected_version: number;
   note?: string | null;
   cascade?: boolean;
 }
@@ -368,7 +362,6 @@ export interface DeleteResponse {
 export type UndeleteResponse = DeleteResponse;
 
 export interface VerifyFieldRequest {
-  expected_version: number;
   field: string;
   status: VerificationStatus;
   evidence_id?: string | null;
@@ -382,7 +375,6 @@ export interface VerifyFieldResponse {
 }
 
 export interface RestoreRequest {
-  expected_version: number;
   version: number;
   /** Limit the restore to these fields; null = all restorable fields. */
   fields?: string[] | null;
@@ -409,27 +401,20 @@ export interface RestoreResponse {
   changes: RestoreChanges;
 }
 
-export interface BulkItemRef {
-  id: string;
-  expected_version: number;
-}
-
 export interface BulkRequest {
-  items: BulkItemRef[];
+  ids: string[];
   set?: JsonObject;
   add?: Record<string, JsonValue[]>;
   remove?: Record<string, JsonValue[]>;
   note?: string | null;
 }
 
-export type BulkStatus = 'updated' | 'unchanged' | 'conflict' | 'entity_deleted' | 'error';
+export type BulkStatus = 'updated' | 'unchanged' | 'entity_deleted' | 'error';
 
 export interface BulkResult {
   id: string;
   status: BulkStatus;
   version: number | null;
-  current_version: number | null;
-  current_values: JsonObject | null;
   error: ApiErrorBody | null;
 }
 
@@ -552,10 +537,6 @@ export interface ChangeFeedResponse {
   page_size: number;
 }
 
-export interface RevisionAuthorsResponse {
-  authors: string[];
-}
-
 // ---------------------------------------------------------------------------
 // Comments (docs/API.md §3.3)
 // ---------------------------------------------------------------------------
@@ -570,7 +551,7 @@ export interface Comment {
   field: string | null;
   parent_id: string | null;
   body_md: string;
-  /** Server-rendered and sanitised; pass through lib/sanitize before injecting. */
+  /** Rendered by the server from body_md (Markdown without raw HTML). */
   body_html: string;
   status: CommentStatus | null;
   resolved_by: string | null;
@@ -624,22 +605,15 @@ export interface CreateCommentRequest {
 }
 
 export interface EditCommentRequest {
-  expected_version: number;
   body_md: string;
   note?: string | null;
 }
 
-export interface CommentVersionRequest {
-  expected_version: number;
-}
-
 export interface CommentNoteRequest {
-  expected_version: number;
   note?: string | null;
 }
 
 export interface RestoreCommentRequest {
-  expected_version: number;
   version: number;
   note?: string | null;
 }
@@ -653,7 +627,7 @@ export interface CommentThreadsQuery {
 }
 
 // ---------------------------------------------------------------------------
-// Errors (docs/API.md §1.2) and the conflict payload (docs/DATA_MODEL.md §6.5)
+// Errors (docs/API.md §1.2)
 // ---------------------------------------------------------------------------
 
 export type DeletedMode = 'exclude' | 'only' | 'include';
@@ -666,33 +640,6 @@ export interface ApiErrorBody {
 
 export interface ApiErrorEnvelope {
   error: ApiErrorBody;
-}
-
-export type ConflictAction = 'patch' | 'delete' | 'undelete' | 'verify' | 'restore' | 'bulk' | 'comment';
-
-export interface RowState {
-  deleted_at: string | null;
-  deleted_by: string | null;
-  merged_into?: string | null;
-}
-
-export interface ConflictPayload {
-  action: ConflictAction;
-  entity_type: RecordType;
-  entity_id: string;
-  base_version: number;
-  current_version: number;
-  /** Fields of the base snapshot; null if no revision exists for base_version. */
-  base: JsonObject | null;
-  current: JsonObject;
-  base_state: RowState | null;
-  current_state: RowState;
-  changed_since_base: string[];
-  your_changes: JsonObject;
-  conflicting_fields: string[];
-  meta_changed_since_base: Record<string, Record<string, [JsonValue, JsonValue]>>;
-  intervening: RevisionSummary[];
-  refs: Refs;
 }
 
 export type ValidationErrorDetails = Record<string, string[]>;

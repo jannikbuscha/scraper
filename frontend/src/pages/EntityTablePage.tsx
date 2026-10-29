@@ -102,12 +102,8 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
 
   const [creating, setCreating] = useState(false);
   const [bulk, setBulk] = useState<BulkEditRequest | null>(null);
-  // The row versions are captured here, when the dialog opens (docs/UI.md §3).
   const openBulk = (preset?: BulkEditRequest['preset']) => {
-    setBulk({
-      targets: selected.map((item) => ({ id: item.id, label: item.label, version: item.version, values: item.fields })),
-      preset,
-    });
+    setBulk({ targets: selected.map((item) => ({ id: item.id, label: item.label, values: item.fields })), preset });
   };
 
   let body;

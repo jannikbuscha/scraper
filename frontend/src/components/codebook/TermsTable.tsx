@@ -7,7 +7,6 @@ import { IconBan, IconHistory, IconMessage, IconPencil } from '@tabler/icons-rea
 import type { ReactNode } from 'react';
 
 import type { Vocabulary, VocabTerm } from '../../api/types';
-import { useAuthor } from '../../hooks/useAuthor';
 import classes from './codebook.module.css';
 import { TermAttributes } from './TermAttributes';
 import { isFixedTerm } from './term-form';
@@ -24,8 +23,6 @@ interface TermsTableProps {
 }
 
 const count = new Intl.NumberFormat('en-US');
-
-const NO_AUTHOR = 'Set your name (top right) before making changes.';
 
 function Notes({ term }: { term: VocabTerm }) {
   const notes: [string, string | null][] = [
@@ -89,15 +86,11 @@ interface TermRowProps {
 }
 
 function TermRow({ term, vocabulary, selected, onAction }: TermRowProps) {
-  const author = useAuthor();
-  const noAuthor = author === null ? NO_AUTHOR : undefined;
-  const deactivateReason =
-    noAuthor ??
-    (isFixedTerm(vocabulary, term.attributes)
-      ? 'Fixed code: program logic uses it, so it cannot be deactivated.'
-      : term.active
-        ? undefined
-        : 'Already inactive.');
+  const deactivateReason = isFixedTerm(vocabulary, term.attributes)
+    ? 'Fixed code: program logic uses it, so it cannot be deactivated.'
+    : term.active
+      ? undefined
+      : 'Already inactive.';
   const className = [selected && classes.selected, !term.active && classes.inactive].filter(Boolean).join(' ');
 
   return (
@@ -147,7 +140,6 @@ function TermRow({ term, vocabulary, selected, onAction }: TermRowProps) {
           <RowAction
             label={`Edit ${term.code}`}
             icon={<IconPencil size={15} />}
-            disabledReason={noAuthor}
             onClick={() => {
               onAction('edit', term);
             }}

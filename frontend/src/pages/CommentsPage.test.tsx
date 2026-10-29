@@ -20,9 +20,9 @@ const comment = (overrides: Partial<Comment>): Comment => ({
   resolved_by: null,
   resolved_at: null,
   created_at: '2026-10-01T09:30:00.000000Z',
-  created_by: 'Example Person',
+  created_by: 'user',
   updated_at: '2026-10-01T09:30:00.000000Z',
-  updated_by: 'Example Person',
+  updated_by: 'user',
   version: 1,
   edited: false,
   deleted_at: null,
@@ -55,7 +55,6 @@ const FEED: CommentFeedResponse = {
 function mockCommentsApi() {
   return mockApi((url) => {
     if (url.pathname === '/api/meta') return exampleMeta;
-    if (url.pathname === '/api/revisions/authors') return { authors: ['Example Person'] };
     if (url.pathname === '/api/comments') return FEED;
     return undefined;
   });
@@ -91,7 +90,7 @@ describe('Comments page', () => {
 
     // A click elsewhere in a row opens the thread as well.
     const row = screen.getByRole('row', { name: /Is the \*\*example\*\* name correct/ });
-    await user.click(within(row).getByText('Example Person'));
+    await user.click(within(row).getByText('2'));
     await waitFor(() => {
       expect(router.state.location.href).toBe('/projects/prj_A?comments=open&thread=cmt_1');
     });

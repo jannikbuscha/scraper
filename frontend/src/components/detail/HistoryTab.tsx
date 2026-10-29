@@ -1,7 +1,7 @@
 // The History tab (docs/UI.md §4.2): the revision list; selecting a revision
 // shows its stored diff; "Compare" picks any two versions (kept in the URL as
 // `from`/`to`); "Restore this version" opens the restore dialog.
-import { Group, Loader, Pagination, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
+import { Button, Group, Loader, Pagination, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
 import { IconRestore } from '@tabler/icons-react';
 import { useState } from 'react';
 
@@ -15,7 +15,6 @@ import { DiffView } from '../history/DiffView';
 import { ActionBadge, ChannelBadge } from '../history/RevisionBadges';
 import { RevisionList } from '../history/RevisionList';
 import { Timestamp } from '../Timestamp';
-import { WriteButton } from '../WriteButton';
 import { fieldLabels } from './field-groups';
 import { HISTORY_PAGE_SIZE } from './history-constants';
 import { RestoreModal } from './RestoreModal';
@@ -46,9 +45,6 @@ function RevisionDiff({
       <Group gap={6}>
         <Title order={3}>Changes in v{revision.version}</Title>
         <Timestamp value={revision.at} />
-        <Text span size="sm">
-          by <bdi>{revision.author}</bdi>
-        </Text>
         <ChannelBadge channel={revision.channel} />
         <ActionBadge action={revision.action} />
       </Group>
@@ -100,7 +96,7 @@ export function HistoryTab({ type, item, typeMeta, search, setSearch }: HistoryT
     const isCurrent = revision.version === item.version;
     const reason = deleted ? 'Undelete first' : isCurrent ? 'This is the current version' : null;
     const button = (
-      <WriteButton
+      <Button
         size="compact-xs"
         variant="subtle"
         leftSection={<IconRestore size={12} />}
@@ -111,7 +107,7 @@ export function HistoryTab({ type, item, typeMeta, search, setSearch }: HistoryT
         }}
       >
         Restore
-      </WriteButton>
+      </Button>
     );
     return reason ? (
       <Tooltip label={reason}>
@@ -172,7 +168,7 @@ export function HistoryTab({ type, item, typeMeta, search, setSearch }: HistoryT
       </Paper>
       <RestoreModal
         type={type}
-        item={item}
+        id={item.id}
         fields={typeMeta.fields}
         version={restoring}
         onClose={() => {

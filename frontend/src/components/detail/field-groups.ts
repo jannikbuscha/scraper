@@ -30,6 +30,6 @@ export function detailFieldGroups(meta: Meta, type: EntityType, typeMeta: Entity
     .filter((group) => group.fields.length > 0);
 }
 
-/** Registry labels by field name (changed-field chips, conflict and history views). */
+/** Registry labels by field name (changed-field chips of the history). */
 export const fieldLabels = (typeMeta: EntityTypeMeta): Record<string, string> =>
   Object.fromEntries(typeMeta.fields.map((field) => [field.name, field.label]));

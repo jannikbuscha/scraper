@@ -1,4 +1,4 @@
-// Diff helpers for history views and conflict dialogs (docs/UI.md §4.2).
+// Diff helpers for history views and the restore preview (docs/UI.md §4.2).
 // Results are plain data; components render them as React elements.
 import { diffWords } from 'diff';
 
@@ -92,10 +92,18 @@ function orderBy(order: readonly string[]): (a: string, b: string) => number {
   return (a, b) => rank(a) - rank(b) || (a < b ? -1 : a > b ? 1 : 0);
 }
 
+/**
+ * Attribution that names the app's one user is not shown (docs/UI.md §4.2): a
+ * comment's `resolved_by` (its time is) and the provenance `by` (its `src` is).
+ */
+export const HIDDEN_FIELDS: ReadonlySet<string> = new Set(['resolved_by']);
+const HIDDEN_META_KEYS: ReadonlySet<string> = new Set(['by']);
+
 /** Field changes in registry order (fields unknown to the registry last). */
 export function fieldDiffRows(diff: RevisionDiff, order: readonly string[] = []): FieldDiffRow[] {
   const fields = diff.fields ?? {};
   return Object.keys(fields)
+    .filter((field) => !HIDDEN_FIELDS.has(field))
     .sort(orderBy(order))
     .flatMap((field) => {
       const pair = fields[field];
@@ -108,7 +116,9 @@ export function metaDiffRows(diff: RevisionDiff, order: readonly string[] = []):
   return Object.keys(meta)
     .sort(orderBy(order))
     .flatMap((field) =>
-      Object.entries(meta[field] ?? {}).map(([key, pair]) => ({ field, key, oldValue: pair[0], newValue: pair[1] })),
+      Object.entries(meta[field] ?? {})
+        .filter(([key]) => !HIDDEN_META_KEYS.has(key))
+        .map(([key, pair]) => ({ field, key, oldValue: pair[0], newValue: pair[1] })),
     );
 }
 

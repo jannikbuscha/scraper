@@ -1,8 +1,8 @@
 // Comment threads of the Comments page (docs/UI.md §5), one row per thread:
-// an excerpt of the root comment, subject, field, status, who started it,
+// an excerpt of the root comment, subject, field, status, when it started,
 // replies and last activity. A row opens the subject's page with the thread
 // open (vocabulary terms: the Codebook page).
-import { Badge, Group, Table, Text } from '@mantine/core';
+import { Badge, Table, Text } from '@mantine/core';
 import type { MouseEvent } from 'react';
 
 import type { Comment, CommentFeedItem, Meta } from '../../api/types';
@@ -56,7 +56,7 @@ export function CommentFeedTable({ items, meta }: { items: readonly CommentFeedI
             <Table.Th>Subject</Table.Th>
             <Table.Th>Field</Table.Th>
             <Table.Th w={90}>Status</Table.Th>
-            <Table.Th>Started</Table.Th>
+            <Table.Th w={140}>Started</Table.Th>
             <Table.Th w={70} ta="right">
               Replies
             </Table.Th>
@@ -87,12 +87,7 @@ export function CommentFeedTable({ items, meta }: { items: readonly CommentFeedI
                   <StatusBadge root={root} />
                 </Table.Td>
                 <Table.Td className={classes.cell}>
-                  <Group gap={6} wrap="wrap">
-                    <bdi>{root.created_by}</bdi>
-                    <Text span size="xs" c="dimmed">
-                      <Timestamp value={root.created_at} />
-                    </Text>
-                  </Group>
+                  <Timestamp value={root.created_at} />
                 </Table.Td>
                 <Table.Td className={classes.cell} ta="right">
                   {replies}

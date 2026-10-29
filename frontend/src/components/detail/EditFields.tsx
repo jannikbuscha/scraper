@@ -45,12 +45,12 @@ const refsOfValue = (refs: Refs, field: string, value: JsonValue): Refs | undefi
   refs[field]?.id === value ? refs : undefined;
 
 /** Stored codes stay selectable even if their term is inactive now. */
-function keepCodes(field: FieldSpec, base: JsonValue): string[] {
+function keepCodes(field: FieldSpec, stored: JsonValue): string[] {
   if (field.type === 'vocab') {
-    const code = asString(base);
+    const code = asString(stored);
     return code ? [code] : [];
   }
-  return field.type === 'vocab_list' ? asStringArray(base) : [];
+  return field.type === 'vocab_list' ? asStringArray(stored) : [];
 }
 
 interface EditFieldsProps {
@@ -60,7 +60,6 @@ interface EditFieldsProps {
   typeMeta: EntityTypeMeta;
   editable: ReadonlySet<string>;
   values: JsonObject;
-  baseFields: JsonObject;
   errors: Readonly<Record<string, ReactNode>>;
   /** Fields that must be filled although the registry does not require them (e.g. a new scope note). */
   alsoRequired: ReadonlySet<string>;
@@ -74,7 +73,6 @@ export function EditFields({
   typeMeta,
   editable,
   values,
-  baseFields,
   errors,
   alsoRequired,
   onChange,
@@ -94,7 +92,7 @@ export function EditFields({
                   required={field.required || alsoRequired.has(field.name)}
                   error={errors[field.name]}
                   refs={refsOfValue(item.refs, field.name, values[field.name] ?? null)}
-                  keepCodes={keepCodes(field, baseFields[field.name] ?? null)}
+                  keepCodes={keepCodes(field, item.fields[field.name] ?? null)}
                   {...(field.name === 'parent_service_id' ? parentPicker : {})}
                   onChange={(value) => {
                     onChange(field.name, value);

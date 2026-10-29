@@ -4,16 +4,14 @@
 // a cascade. Uniqueness and deleted references block an undelete and are
 // explained with links.
 import { Checkbox, Modal } from '@mantine/core';
-import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 
 import { referenceDeleted, uniqueViolation } from '../../api/client';
-import { queryKeys, useUndeleteEntity } from '../../api/queries';
+import { useUndeleteEntity } from '../../api/queries';
 import type { EntityType, Item, Meta } from '../../api/types';
 import { pluralize } from '../../lib/format';
 import { EntityLink } from '../EntityLink';
 import { notifySuccess } from '../feedback';
-import { StaleRecordNotice } from '../StaleRecordNotice';
 import type { DeleteInfo } from './delete-info';
 import { UndeleteForm } from './UndeleteForm';
 
@@ -49,27 +47,11 @@ function cascadeLabel(info: DeleteInfo | undefined): string {
 
 function UndeleteEntityBody({ target, meta, onDone }: { target: EntityUndeleteTarget; meta: Meta; onDone: () => void }) {
   const { type, item, info } = target;
-  const client = useQueryClient();
   const undelete = useUndeleteEntity(type);
   // Until the user decides, a known cascade is undone as a whole (the info may load after opening).
   const [choice, setChoice] = useState<boolean | null>(null);
   const cascade = choice ?? (info?.others ?? 0) > 0;
-  const [stale, setStale] = useState(false);
   const fieldLabel = (name: string) => meta.entity_types[type]?.fields.find((field) => field.name === name)?.label ?? name;
-
-  if (stale) {
-    return (
-      <StaleRecordNotice
-        type={type}
-        id={item.id}
-        onReload={() => {
-          void client.invalidateQueries({ queryKey: queryKeys.item(type, item.id) });
-          void client.invalidateQueries({ queryKey: queryKeys.listsOf(type) });
-          onDone();
-        }}
-      />
-    );
-  }
 
   const explainError = (error: unknown) => {
     const unique = uniqueViolation(error);
@@ -99,10 +81,9 @@ function UndeleteEntityBody({ target, meta, onDone }: { target: EntityUndeleteTa
   return (
     <UndeleteForm
       label={item.label}
-      version={item.version}
       maxNoteChars={meta.limits.max_note_chars}
-      submit={async (expectedVersion, note) => {
-        await undelete.mutateAsync({ id: item.id, expected_version: expectedVersion, note, cascade: withCascade });
+      submit={async (note) => {
+        await undelete.mutateAsync({ id: item.id, note, cascade: withCascade });
         notifySuccess(
           withCascade
             ? `Undeleted “${item.label}” and the records deleted together with it.`
@@ -111,9 +92,6 @@ function UndeleteEntityBody({ target, meta, onDone }: { target: EntityUndeleteTa
         onDone();
       }}
       explainError={explainError}
-      onStale={() => {
-        setStale(true);
-      }}
       onCancel={onDone}
     >
       {offersCascade(info) && (

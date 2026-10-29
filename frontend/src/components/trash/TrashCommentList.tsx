@@ -40,7 +40,6 @@ function TrashThreadRows({ items, onUndelete }: { items: readonly CommentFeedIte
         label: `comment on ${root.subject_label}`,
         record: <ThreadLabel root={root} replies={replies} />,
         deletedAt: root.deleted_at,
-        deletedBy: root.deleted_by,
         info: info?.get(root.id),
         onUndelete: () => {
           onUndelete(root);

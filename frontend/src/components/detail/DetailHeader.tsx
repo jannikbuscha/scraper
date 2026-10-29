@@ -12,7 +12,6 @@ import { termLabel } from '../../lib/vocab';
 import { AnchorLink } from '../AnchorLink';
 import { isVerificationStatus, VerificationDot } from '../fields/VerificationDot';
 import { VocabBadge } from '../fields/VocabBadge';
-import { WriteButton } from '../WriteButton';
 import { CopyLinkButton } from './CopyLinkButton';
 
 /** The record's paper-scope flag: stored for projects, virtual for the other types. */
@@ -110,29 +109,23 @@ export function DetailHeader({
         </Stack>
         <Group gap="xs">
           {!editing && (
-            <WriteButton
+            <Button
               leftSection={<IconPencil size={14} />}
               disabled={deleted}
               title={deleted ? 'Undelete the record to edit it.' : undefined}
               onClick={onEdit}
             >
               Edit
-            </WriteButton>
+            </Button>
           )}
           {deleted ? (
-            <WriteButton variant="light" leftSection={<IconRestore size={14} />} onClick={onUndelete}>
+            <Button variant="light" leftSection={<IconRestore size={14} />} onClick={onUndelete}>
               Undelete
-            </WriteButton>
+            </Button>
           ) : (
-            <WriteButton
-              variant="light"
-              color="red"
-              leftSection={<IconTrash size={14} />}
-              disabled={editing}
-              onClick={onDelete}
-            >
+            <Button variant="light" color="red" leftSection={<IconTrash size={14} />} disabled={editing} onClick={onDelete}>
               Delete
-            </WriteButton>
+            </Button>
           )}
           <CopyLinkButton url={`${window.location.origin}${detailHref(type, item.id)}`} />
           <Button

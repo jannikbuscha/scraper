@@ -10,7 +10,7 @@ const change = (overrides: Partial<ChangeFeedItem>): ChangeFeedItem => ({
   entity_label: 'Example project A',
   version: 2,
   at: '2026-10-28T10:00:00.000000Z',
-  author: 'Example Person',
+  author: 'user',
   channel: 'ui',
   action: 'update',
   note: null,

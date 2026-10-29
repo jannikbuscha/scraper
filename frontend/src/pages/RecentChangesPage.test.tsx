@@ -14,7 +14,7 @@ const change = (overrides: Partial<ChangeFeedItem>): ChangeFeedItem => ({
   entity_label: 'Example project A',
   version: 2,
   at: '2026-10-01T09:30:00.000000Z',
-  author: 'Example Person',
+  author: 'user',
   channel: 'ui',
   action: 'update',
   note: 'Example note',
@@ -40,7 +40,7 @@ const REVISION: RevisionByIdResponse = {
     id: 11,
     version: 2,
     at: '2026-10-01T09:30:00.000000Z',
-    author: 'Example Person',
+    author: 'user',
     channel: 'ui',
     action: 'update',
     note: 'Example note',
@@ -61,7 +61,6 @@ const REVISION: RevisionByIdResponse = {
 function mockFeedApi() {
   return mockApi((url) => {
     if (url.pathname === '/api/meta') return exampleMeta;
-    if (url.pathname === '/api/revisions/authors') return { authors: ['Example Person', 'seed'] };
     if (url.pathname === '/api/revisions') return FEED;
     if (url.pathname === '/api/revisions/11') return REVISION;
     return undefined;
@@ -79,7 +78,7 @@ describe('Recent changes', () => {
   it('round-trips the filter state through the URL', async () => {
     const fetchMock = mockFeedApi();
     const { router, user } = renderRoute(RecentChangesPage, {
-      url: '/changes?author=Example%20Person&entity_type=project,comment&channel=ui&since=2026-10-01&until=2026-10-02&batch_id=batch_1&page=2',
+      url: '/changes?entity_type=project,comment&channel=ui&since=2026-10-01&until=2026-10-02&batch_id=batch_1&page=2',
       path: '/changes',
     });
 
@@ -87,7 +86,6 @@ describe('Recent changes', () => {
     await screen.findByText('Example project A');
     expect(feedRequests(fetchMock)).toEqual([
       {
-        author: 'Example Person',
         entity_type: 'project,comment',
         channel: 'ui',
         since: '2026-09-30T21:00:00.000000Z',
@@ -102,11 +100,9 @@ describe('Recent changes', () => {
     expect(screen.getByRole('textbox', { name: 'Batch' })).toHaveValue('batch_1');
     const option = (list: string, name: string) =>
       within(screen.getByRole('listbox', { name: list, hidden: true })).getByRole('option', { name, hidden: true });
-    expect(option('Author', 'Example Person')).toHaveAttribute('aria-selected', 'true');
-    expect(option('Author', 'seed')).toHaveAttribute('aria-selected', 'false');
     expect(option('Record type', 'Comment')).toHaveAttribute('aria-selected', 'true');
     expect(option('Record type', 'Project')).toHaveAttribute('aria-selected', 'true');
-    expect(option('Channel', 'ui (web app)')).toHaveAttribute('aria-selected', 'true');
+    expect(option('Channel', 'manual')).toHaveAttribute('aria-selected', 'true');
     expect(option('Channel', 'seed')).toHaveAttribute('aria-selected', 'false');
 
     // A control writes the URL; any filter change returns to page 1.
@@ -114,7 +110,6 @@ describe('Recent changes', () => {
     await user.click(await screen.findByRole('option', { name: 'delete' }));
     await waitFor(() => {
       expect(router.state.location.search).toEqual({
-        author: 'Example Person',
         entity_type: 'project,comment',
         channel: 'ui',
         action: 'delete',
@@ -125,7 +120,6 @@ describe('Recent changes', () => {
     });
     await waitFor(() => {
       expect(feedRequests(fetchMock).at(-1)).toEqual({
-        author: 'Example Person',
         entity_type: 'project,comment',
         channel: 'ui',
         action: 'delete',

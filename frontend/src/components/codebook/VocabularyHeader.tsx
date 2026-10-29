@@ -1,10 +1,9 @@
 // Heading of the selected vocabulary: label, name, multi-valued and fixed
 // badges, description, and "Add term" (not for fixed vocabularies).
-import { Badge, Group, Stack, Text, Title } from '@mantine/core';
+import { Badge, Button, Group, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 
 import type { Vocabulary } from '../../api/types';
-import { WriteButton } from '../WriteButton';
 import classes from './codebook.module.css';
 import { isFixedVocabulary } from './term-form';
 
@@ -42,9 +41,9 @@ export function VocabularyHeader({ vocabulary, onAddTerm }: { vocabulary: Vocabu
           </Text>
         )}
       </Stack>
-      <WriteButton leftSection={<IconPlus size={14} />} disabled={fixed} onClick={onAddTerm}>
+      <Button leftSection={<IconPlus size={14} />} disabled={fixed} onClick={onAddTerm}>
         Add term
-      </WriteButton>
+      </Button>
     </Group>
   );
 }

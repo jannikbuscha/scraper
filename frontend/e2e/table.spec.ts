@@ -3,7 +3,7 @@
 // sort rules of docs/API.md §4.2: case-insensitive, Latin before Cyrillic in
 // Ukrainian alphabetical order, empty values last in both directions, ties by
 // ID (IDs grow in seed order).
-import { ALICE, expect, test } from './fixtures';
+import { expect, test } from './fixtures';
 import { columnHeader, expectRowLabels, expectSearch, openFilter, sortButton, tableRows } from './helpers';
 
 const NAME_EN_ASC = [
@@ -111,7 +111,7 @@ test('(b) filter by paper cluster, sort by policy domains and verification statu
   ];
   for (const [slug, changes] of setup) {
     const project = await api.project(slug);
-    await api.patch('project', project.id, changes, note, ALICE);
+    await api.patch('project', project.id, changes, note);
   }
 
   await page.goto('/projects');

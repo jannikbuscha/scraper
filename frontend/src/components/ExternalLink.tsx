@@ -1,10 +1,9 @@
-// The only component that builds an href from data (docs/UI.md §1.4): an
-// http(s) URL without userinfo becomes a link that opens in a new tab and
-// shows its punycode host; anything else is rendered as plain text.
+// A link to a stored URL (stored URLs are validated as http(s) by the server):
+// it opens in a new tab and shows the URL's host next to the text.
 import { Anchor, Text } from '@mantine/core';
 import type { ReactNode } from 'react';
 
-import { safeExternalUrl } from '../lib/urls';
+import { urlHost } from '../lib/urls';
 import classes from './ExternalLink.module.css';
 
 interface ExternalLinkProps {
@@ -15,17 +14,17 @@ interface ExternalLinkProps {
 }
 
 export function ExternalLink({ url, children }: ExternalLinkProps) {
-  const safe = safeExternalUrl(url);
-  const text = <bdi className={classes.text}>{children ?? url}</bdi>;
-  if (!safe) return text;
+  const host = urlHost(url);
   return (
     <span className={classes.root}>
-      <Anchor href={safe.href} target="_blank" rel="noopener noreferrer nofollow" className={classes.link}>
-        {text}
+      <Anchor href={url} target="_blank" rel="noopener noreferrer" className={classes.link}>
+        <bdi className={classes.text}>{children ?? url}</bdi>
       </Anchor>
-      <Text span size="xs" c="dimmed" className={classes.host}>
-        {safe.host}
-      </Text>
+      {host && (
+        <Text span size="xs" c="dimmed" className={classes.host}>
+          {host}
+        </Text>
+      )}
     </span>
   );
 }

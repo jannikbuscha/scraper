@@ -1,4 +1,4 @@
-// Rows of Recent changes grouped by local day (docs/UI.md §5): time, author,
+// Rows of Recent changes grouped by local day (docs/UI.md §5): time,
 // channel and action, the record (type and label, linked to its page),
 // version, changed fields and note. Expanding a row loads and shows its diff.
 import { ActionIcon, Table, Text, Tooltip, VisuallyHidden } from '@mantine/core';
@@ -15,7 +15,7 @@ import { RevisionDiffPanel } from './RevisionDiffPanel';
 import { changeTarget } from './targets';
 import { TargetLink } from './TargetLink';
 
-const COLUMNS = 8;
+const COLUMNS = 7;
 
 /** Local time of day; the day is the group heading. */
 function TimeOfDay({ value }: { value: string }) {
@@ -88,9 +88,6 @@ function ChangeRow({ change, meta, expanded, onToggle, batchFilter, onShowBatch 
           <TimeOfDay value={change.at} />
         </Table.Td>
         <Table.Td className={classes.cell}>
-          <bdi>{change.author}</bdi>
-        </Table.Td>
-        <Table.Td className={classes.cell}>
           <span className={classes.chips}>
             <ChannelBadge channel={change.channel} />
             <ActionBadge action={change.action} />
@@ -154,7 +151,6 @@ export function ChangeFeedTable({ items, meta, batchFilter, onShowBatch }: Chang
               <VisuallyHidden>Details</VisuallyHidden>
             </Table.Th>
             <Table.Th w={60}>Time</Table.Th>
-            <Table.Th w={140}>Author</Table.Th>
             <Table.Th w={150}>Change</Table.Th>
             <Table.Th>Record</Table.Th>
             <Table.Th w={90}>Version</Table.Th>

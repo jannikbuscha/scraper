@@ -1,8 +1,8 @@
 // Copying text to the clipboard (the detail page's "Copy link", docs/UI.md §4).
-// The Clipboard API exists only in secure contexts (https, localhost); the
-// team may open the app over plain http on a LAN or VPN address (README "Team
-// access"), where only the older `execCommand('copy')` works. Callers show the
-// text for manual copying when both fail, so a copy never fails silently.
+// The Clipboard API exists only in secure contexts (https, localhost); over
+// plain http on a LAN or VPN address only the older `execCommand('copy')`
+// works. Callers show the text for manual copying when both fail, so a copy
+// never fails silently.
 
 /** Resolves true if the text was copied. */
 export async function copyText(text: string): Promise<boolean> {

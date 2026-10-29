@@ -10,7 +10,7 @@ const deletion = (id: number, entityId: string, batchId: string | null, note: st
   entity_label: entityId,
   version: 3,
   at: '2026-10-28T10:00:00.000000Z',
-  author: 'Example Person',
+  author: 'user',
   channel: 'ui',
   action: 'delete',
   note,

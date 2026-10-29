@@ -5,7 +5,7 @@
 // version" with the shared restore form (dry run, field choice, note), shown
 // inline below the list; the server applies the codebook rules (fixed codes,
 // active replacements) to a restore like to any other change.
-import { Group, Loader, Modal, Pagination, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
+import { Button, Group, Loader, Modal, Pagination, Paper, Stack, Switch, Text, Title, Tooltip } from '@mantine/core';
 import { IconRestore } from '@tabler/icons-react';
 import { useState } from 'react';
 
@@ -16,7 +16,6 @@ import { ErrorAlert } from '../feedback';
 import { CompareDiff } from '../history/CompareDiff';
 import { DiffView } from '../history/DiffView';
 import { RevisionList } from '../history/RevisionList';
-import { WriteButton } from '../WriteButton';
 
 const PAGE_SIZE = 50;
 
@@ -72,7 +71,7 @@ function TermHistory({ term, fields }: { term: VocabTerm; fields: readonly Field
   const restoreAction = (revision: RevisionSummary) => {
     const isCurrent = revision.version === term.version;
     const button = (
-      <WriteButton
+      <Button
         size="compact-xs"
         variant="subtle"
         leftSection={<IconRestore size={12} />}
@@ -83,7 +82,7 @@ function TermHistory({ term, fields }: { term: VocabTerm; fields: readonly Field
         }}
       >
         Restore
-      </WriteButton>
+      </Button>
     );
     return isCurrent ? (
       <Tooltip label="This is the current version">
@@ -138,7 +137,7 @@ function TermHistory({ term, fields }: { term: VocabTerm; fields: readonly Field
             <RestoreForm
               key={restoring}
               type="vocabulary_term"
-              item={term}
+              id={term.id}
               fields={fields}
               version={restoring}
               onDone={() => {

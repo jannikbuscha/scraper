@@ -1,23 +1,14 @@
 // Bulk edit of the selected rows (docs/UI.md §3): a bulk_editable field, the
 // operation (set, or add/remove for lists), the value and a note. Changing
 // the scope asks for a scope note; setting verified or disputed asks for a
-// note. Row versions are captured when the dialog opens; the result is shown
-// per row. "Mark verified" opens it preset to verification_status = verified.
+// note. The result is shown per row. "Mark verified" opens it preset to
+// verification_status = verified.
 import { Alert, Button, Group, Modal, SegmentedControl, Select, Stack, Switch, Text, Textarea } from '@mantine/core';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 
 import { useBulkEdit } from '../../api/queries';
 import type { BulkResult, FieldSpec, JsonValue } from '../../api/types';
-import {
-  bulkRequest,
-  codesInRows,
-  conflictRetryTargets,
-  countBulkResults,
-  mergeBulkResults,
-  type BulkEdit,
-  type BulkOp,
-  type BulkTarget,
-} from '../../lib/bulk';
+import { bulkRequest, codesInRows, countBulkResults, type BulkOp, type BulkTarget } from '../../lib/bulk';
 import { asString, asStringArray, isEmptyValue, pick, pluralize } from '../../lib/format';
 import { requiresScopeNote, requiresVerificationNote } from '../../lib/write-rules';
 import { errorMessage, notifySuccess } from '../feedback';
@@ -27,7 +18,7 @@ import { BulkResultSummary } from './BulkResultSummary';
 import { useTableContext } from './TableContext';
 
 export interface BulkEditRequest {
-  /** The selected rows with the versions captured when the dialog opened. */
+  /** The selected rows. */
   targets: BulkTarget[];
   /** "Mark verified": a fixed field and value. */
   preset?: { field: string; value: JsonValue } | undefined;
@@ -119,13 +110,11 @@ function BulkEditForm({ request, onDone }: { request: BulkEditRequest; onDone: (
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [requestError, setRequestError] = useState<unknown>(null);
-  const [sent, setSent] = useState<{ edit: BulkEdit; note: string | null } | null>(null);
-  const [results, setResults] = useState<Map<string, BulkResult> | null>(null);
+  const [results, setResults] = useState<BulkResult[] | null>(null);
 
   const change = field ? { [field.name]: value } : {};
   const scopeNoteNeeded = requiresScopeNote(change);
   const noteNeeded = requiresVerificationNote(change);
-  const tooMany = targets.length > meta.limits.max_bulk_items;
   const errors = {
     field: field ? null : 'Choose a field.',
     value:
@@ -137,16 +126,21 @@ function BulkEditForm({ request, onDone }: { request: BulkEditRequest; onDone: (
     scopeNote: scopeNoteNeeded && scopeNote.trim() === '' ? 'Changing the scope needs a scope note (the reason).' : null,
     note: noteNeeded && note.trim() === '' ? 'Setting verified or disputed needs a note.' : null,
   };
-  const invalid = Object.values(errors).some((error) => error !== null) || tooMany;
+  const invalid = Object.values(errors).some((error) => error !== null);
 
-  const run = async (rows: readonly BulkTarget[], edit: BulkEdit, editNote: string | null) => {
+  const submit = async (event: SubmitEvent) => {
+    event.preventDefault();
+    setSubmitted(true);
+    if (!field || invalid) return;
+    const edit = scopeNoteNeeded
+      ? { field: field.name, op, value, alongside: { scope_note: scopeNote.trim() } }
+      : { field: field.name, op, value };
     setRequestError(null);
     try {
-      const response = await bulk.mutateAsync(bulkRequest(rows, edit, editNote));
-      const merged = mergeBulkResults(results ?? new Map<string, BulkResult>(), response.results);
-      setResults(merged);
-      const counts = countBulkResults(merged);
-      if (counts.conflict + counts.entity_deleted + counts.error === 0) {
+      const response = await bulk.mutateAsync(bulkRequest(targets, edit, note.trim() || null));
+      setResults(response.results);
+      const counts = countBulkResults(response.results);
+      if (counts.entity_deleted + counts.error === 0) {
         notifySuccess(`${pluralize(counts.updated, 'row')} updated, ${counts.unchanged} unchanged.`);
       }
     } catch (error) {
@@ -154,53 +148,16 @@ function BulkEditForm({ request, onDone }: { request: BulkEditRequest; onDone: (
     }
   };
 
-  const submit = (event: SubmitEvent) => {
-    event.preventDefault();
-    setSubmitted(true);
-    if (!field || invalid) return;
-    const edit: BulkEdit = scopeNoteNeeded
-      ? { field: field.name, op, value, alongside: { scope_note: scopeNote.trim() } }
-      : { field: field.name, op, value };
-    const editNote = note.trim() || null;
-    setSent({ edit, note: editNote });
-    void run(targets, edit, editNote);
-  };
-
   const shown = (error: string | null) => (submitted ? error : null);
-  const requestErrorAlert = requestError !== null && (
-    <Alert color="red" variant="light" title="The bulk edit was refused" style={{ whiteSpace: 'pre-line' }}>
-      {errorMessage(requestError)}
-    </Alert>
-  );
 
-  if (results && sent) {
-    return (
-      <Stack gap="sm">
-        {requestErrorAlert}
-        <BulkResultSummary
-          targets={targets}
-          results={results}
-          fields={typeMeta.fields}
-          retrying={bulk.isPending}
-          onRetry={() => void run(conflictRetryTargets(targets, results), sent.edit, sent.note)}
-          onClose={onDone}
-        />
-      </Stack>
-    );
-  }
+  if (results) return <BulkResultSummary targets={targets} results={results} onClose={onDone} />;
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form onSubmit={(event) => void submit(event)} noValidate>
       <Stack gap="sm">
         <Text size="sm" c="dimmed">
-          Applies to {pluralize(targets.length, 'selected row')}, at the versions shown when this dialog opened. Rows
-          changed by someone else in the meantime are reported, not overwritten.
+          Applies to {pluralize(targets.length, 'selected row')}.
         </Text>
-        {tooMany && (
-          <Alert color="red" variant="light">
-            At most {meta.limits.max_bulk_items} rows can be edited at once.
-          </Alert>
-        )}
         {preset && field ? (
           <Group gap={6}>
             <Text size="sm">
@@ -274,12 +231,16 @@ function BulkEditForm({ request, onDone }: { request: BulkEditRequest; onDone: (
             setNote(event.currentTarget.value);
           }}
         />
-        {requestErrorAlert}
+        {requestError !== null && (
+          <Alert color="red" variant="light" title="The bulk edit was refused" style={{ whiteSpace: 'pre-line' }}>
+            {errorMessage(requestError)}
+          </Alert>
+        )}
         <Group justify="flex-end" gap="xs">
           <Button variant="default" onClick={onDone}>
             Cancel
           </Button>
-          <Button type="submit" loading={bulk.isPending} disabled={tooMany || (submitted && invalid)}>
+          <Button type="submit" loading={bulk.isPending} disabled={submitted && invalid}>
             {preset ? 'Mark verified' : 'Apply'}
           </Button>
         </Group>

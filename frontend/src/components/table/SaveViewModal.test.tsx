@@ -1,7 +1,6 @@
 import { screen, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import { setAuthor } from '../../lib/author';
 import { callsTo, jsonBody, mockApi } from '../../test/api-mock';
 import { exampleItem } from '../../test/fixtures';
 import { renderRoute } from '../../test/render';
@@ -10,13 +9,6 @@ import { SaveViewModal } from './SaveViewModal';
 const noop = () => undefined;
 
 describe('SaveViewModal', () => {
-  beforeEach(() => {
-    setAuthor('Example Person');
-  });
-  afterEach(() => {
-    window.localStorage.clear();
-  });
-
   it('does not offer to save the default view, whose query would be empty', async () => {
     const fetchMock = mockApi(() => undefined);
     const Page = () => <SaveViewModal opened onClose={noop} type="project" query="" />;

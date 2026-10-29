@@ -1,12 +1,10 @@
-// Filters of Recent changes (docs/UI.md §5): author (from
-// /api/revisions/authors), record type (comments, vocabulary terms and saved
-// views included), channel, action, a date range of local days and a batch.
-// Every control writes the URL at once.
+// Filters of Recent changes (docs/UI.md §5): record type (comments,
+// vocabulary terms and saved views included), channel, action, a date range
+// of local days and a batch. Every control writes the URL at once.
 import { Button, Group, MultiSelect } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconFilterOff } from '@tabler/icons-react';
 
-import { useRevisionAuthors } from '../../api/queries';
 import type { Meta } from '../../api/types';
 import type { SearchUpdate, SetSearchOptions } from '../../hooks/useUrlSearch';
 import type { SearchRecord } from '../../lib/query-string';
@@ -67,16 +65,13 @@ function ListFilter({ param, label, options, width, search, setSearch }: ListFil
 }
 
 export function ChangeFeedFilters({ meta, search, setSearch }: ChangeFeedFiltersProps) {
-  const authors = useRevisionAuthors();
   const since = dayParam(search, 'since');
   const until = dayParam(search, 'until');
   const url = { search, setSearch };
-  const authorOptions = (authors.data?.authors ?? []).map((author) => ({ value: author, label: author }));
   const typeOptions = RECORD_TYPES.map((type) => ({ value: type, label: recordTypeLabel(meta, type) }));
 
   return (
     <Group gap="sm" align="flex-end" wrap="wrap" role="search" aria-label="Filter changes">
-      <ListFilter param="author" label="Author" options={authorOptions} width={220} {...url} />
       <ListFilter param="entity_type" label="Record type" options={typeOptions} width={220} {...url} />
       <ListFilter param="channel" label="Channel" options={CHANNEL_OPTIONS} width={180} {...url} />
       <ListFilter param="action" label="Action" options={ACTION_OPTIONS} width={180} {...url} />

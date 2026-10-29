@@ -16,7 +16,6 @@ interface DebouncedParamInputProps {
   setSearch: (update: SearchUpdate, options?: SetSearchOptions) => void;
   placeholder?: string;
   width?: number;
-  maxLength?: number;
   leftSection?: ReactNode;
 }
 
@@ -27,7 +26,6 @@ export function DebouncedParamInput({
   setSearch,
   placeholder,
   width = 200,
-  maxLength,
   leftSection,
 }: DebouncedParamInputProps) {
   const urlValue = search[param] ?? '';
@@ -48,7 +46,6 @@ export function DebouncedParamInput({
       w={width}
       label={label}
       placeholder={placeholder}
-      maxLength={maxLength}
       leftSection={leftSection}
       value={text}
       onChange={(event) => {

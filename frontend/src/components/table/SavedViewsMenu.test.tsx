@@ -6,7 +6,7 @@ import { mockApi } from '../../test/api-mock';
 import { exampleItem, exampleMeta, exampleVocabularies, listResponse } from '../../test/fixtures';
 import { renderRoute } from '../../test/render';
 
-/** Many synthetic views of the team: more than fit into a window. */
+/** Many synthetic views: more than fit into a window. */
 const views = Array.from({ length: 40 }, (_, index) =>
   exampleItem(
     `view_${index}`,

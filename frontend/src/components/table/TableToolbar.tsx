@@ -1,11 +1,10 @@
 // Table toolbar (docs/UI.md §3): title with total count, search, quick
 // filters, saved views, columns, export, "+ New" and a link to the trash.
-import { Badge, CloseButton, Group, Stack, Text, Title } from '@mantine/core';
+import { Badge, Button, CloseButton, Group, Stack, Text, Title } from '@mantine/core';
 import { IconPlus, IconTrash } from '@tabler/icons-react';
 
 import { getDeletedMode, withDeletedMode } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
-import { WriteButton } from '../WriteButton';
 import { ColumnsMenu } from './ColumnsMenu';
 import { ExportMenu } from './ExportMenu';
 import { QuickFilters } from './QuickFilters';
@@ -60,9 +59,9 @@ export function TableToolbar({ total, onCreate }: TableToolbarProps) {
           <SavedViewsMenu />
           <ColumnsMenu />
           <ExportMenu />
-          <WriteButton leftSection={<IconPlus size={14} />} onClick={onCreate}>
+          <Button leftSection={<IconPlus size={14} />} onClick={onCreate}>
             New
-          </WriteButton>
+          </Button>
           <AnchorLink to="/trash" search={{ type }} size="sm" c="dimmed" ml={4}>
             <Group gap={4} wrap="nowrap" component="span">
               <IconTrash size={14} aria-hidden />

@@ -1,6 +1,6 @@
 // Scenario (g) of docs/UI.md §7: a comment thread from creation to undelete,
 // and the "Open comments" quick filter of the projects table.
-import { ALICE, expect, test, uniqueSuffix } from './fixtures';
+import { expect, test, uniqueSuffix } from './fixtures';
 import { clickLabel, expectSearch, tableRows } from './helpers';
 
 test('(g) comment thread: create, reply, resolve, delete and undelete; the open comments quick filter', async ({
@@ -18,7 +18,7 @@ test('(g) comment thread: create, reply, resolve, delete and undelete; the open 
   await expect(page).toHaveURL(/[?&]comments=open/);
   const panel = page.getByRole('complementary', { name: 'Comments' });
 
-  // Create: Markdown, rendered and sanitised by the server.
+  // Create: Markdown, rendered by the server.
   await panel.getByRole('textbox', { name: 'New comment', exact: true }).fill(`Synthetic **thread** ${suffix}`);
   await panel.getByRole('button', { name: 'Comment', exact: true }).click();
   const thread = panel.getByRole('article').filter({ hasText: rootText });
@@ -47,7 +47,7 @@ test('(g) comment thread: create, reply, resolve, delete and undelete; the open 
   await thread.getByRole('button', { name: 'Resolve thread' }).click();
   await expect(thread).toBeHidden();
   await clickLabel(panel.getByRole('radiogroup', { name: 'Status' }), 'All');
-  await expect(thread).toContainText(`Resolved by ${ALICE}`);
+  await expect(thread).toContainText('Resolved at');
   await expect(thread.getByRole('button', { name: 'Reopen thread' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Comments', exact: true })).toBeVisible();
 
@@ -69,7 +69,7 @@ test('(g) comment thread: create, reply, resolve, delete and undelete; the open 
 
   // Undelete: the thread comes back with its reply.
   await panel.getByRole('switch', { name: 'Show deleted' }).check();
-  await expect(thread).toContainText(`Deleted by ${ALICE}`);
+  await expect(thread).toContainText('Deleted at');
   await thread.getByRole('button', { name: 'Undelete comment' }).click();
   const undeleteDialog = page.getByRole('dialog', { name: 'Undelete comment' });
   await undeleteDialog.getByRole('button', { name: 'Undelete', exact: true }).click();

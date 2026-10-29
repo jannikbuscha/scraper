@@ -1,23 +1,17 @@
 // Edit a vocabulary term (docs/UI.md §5): a generic PATCH of
 // `vocabulary_term` with the registry's editable fields; vocabulary and code
-// are read-only. The form starts from a fresh copy of the term (a frozen
-// base) and sends only the fields that differ from it, with
-// expected_version = the base version. On 409 the confirmation is shown
-// again with the intervening revisions (docs/UI.md §1.3).
+// are read-only. The form starts from the term's values and sends only the
+// fields that differ from them.
 import { Alert, Button, Group, Loader, Modal, Stack, Text, TextInput, Textarea } from '@mantine/core';
-import { useQueryClient } from '@tanstack/react-query';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 
-import { isApiError, isConflictError, validationErrors } from '../../api/client';
-import { queryKeys, useEntity, usePatchEntity } from '../../api/queries';
-import type { ConflictPayload, FieldSpec, Item, JsonObject, JsonValue, Vocabulary } from '../../api/types';
+import { validationErrors } from '../../api/client';
+import { useEntity, usePatchEntity } from '../../api/queries';
+import type { FieldSpec, Item, JsonObject, JsonValue, Vocabulary } from '../../api/types';
 import { fieldValueError, isMissingRequired } from '../../lib/field-validation';
 import { asString } from '../../lib/format';
-import { ChangedMeanwhileAlert } from '../history/ChangedMeanwhileAlert';
 import { errorMessage, ErrorAlert, notifySuccess } from '../feedback';
 import { FieldLabel } from '../fields/FieldInput';
-import { StaleRecordNotice } from '../StaleRecordNotice';
-import { ConflictingFields } from './ConflictingFields';
 import { TermAttributes } from './TermAttributes';
 import { ModificationSwitch, TermFieldInputs } from './TermFieldInputs';
 import {
@@ -55,11 +49,11 @@ export function TermEditModal({ termId, onClose, ...context }: TermEditModalProp
   );
 }
 
-/** Loads the term fresh (not from the cache) before the form freezes its base. */
+/** Loads the term with all its registry fields. */
 function TermEditLoader({ termId, onDone, ...context }: TermFormContext & { termId: string; onDone: () => void }) {
-  const term = useEntity('vocabulary_term', termId, { refetchOnMount: 'always' });
+  const term = useEntity('vocabulary_term', termId);
   if (term.isError) return <ErrorAlert title="Could not load the term" error={term.error} onRetry={() => void term.refetch()} />;
-  if (!term.isFetchedAfterMount || !term.data) return <Loader size="sm" aria-label="Loading the term" />;
+  if (!term.data) return <Loader size="sm" aria-label="Loading the term" />;
   return <TermEditForm item={term.data.item} {...context} onDone={onDone} />;
 }
 
@@ -69,28 +63,22 @@ interface TermEditFormProps extends TermFormContext {
 }
 
 function TermEditForm({ item, fields, maxNoteChars, vocabulary, onDone }: TermEditFormProps) {
-  const client = useQueryClient();
   const patch = usePatchEntity('vocabulary_term');
   const editable = editableTermFields(fields);
-  // Frozen base: refetches never change it or the form values (docs/UI.md §4.1).
-  const [base] = useState(() => ({
-    version: item.version,
-    fields: structuredClone(pickValues(item.fields, [...editable.map((field) => field.name), 'attributes'])),
-  }));
-  const [values, setValues] = useState<JsonObject>(base.fields);
+  // The term's values when the form opened; a save sends what differs from them.
+  const [initial] = useState(() => pickValues(item.fields, [...editable.map((field) => field.name), 'attributes']));
+  const [values, setValues] = useState<JsonObject>(initial);
   const [note, setNote] = useState('');
-  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const [serverErrors, setServerErrors] = useState<Record<string, ReactNode>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [stale, setStale] = useState(false);
   const [submitted, setSubmitted] = useState(false);
 
-  const changes = changedValues(base.fields, values);
+  const changes = changedValues(initial, values);
   const hasChanges = Object.keys(changes).length > 0;
-  const fixed = isFixedTerm(vocabulary, base.fields.attributes);
+  const fixed = isFixedTerm(vocabulary, initial.attributes);
   const code = asString(item.fields.code);
   const withModificationSwitch = vocabulary.name === MODIFICATION_VOCABULARY;
-  const baseCounts = attributesOf(base.fields.attributes)[COUNTS_AS_MODIFICATION] === true;
+  const initialCounts = attributesOf(initial.attributes)[COUNTS_AS_MODIFICATION] === true;
   const counts = attributesOf(values.attributes)[COUNTS_AS_MODIFICATION] === true;
 
   const clientErrors: Record<string, string> = {};
@@ -117,44 +105,22 @@ function TermEditForm({ item, fields, maxNoteChars, vocabulary, onDone }: TermEd
     if (invalid || !hasChanges) return;
     setFormError(null);
     try {
-      const result = await patch.mutateAsync({
-        id: item.id,
-        expected_version: conflict ? conflict.current_version : base.version,
-        changes,
-        note: note.trim() || null,
-      });
+      const result = await patch.mutateAsync({ id: item.id, changes, note: note.trim() || null });
       const summary = result.changed ? `Saved ${item.label}.` : `Nothing changed in ${item.label}.`;
       notifySuccess([summary, ...result.warnings.map((warning) => warning.message)].join(' '));
       onDone();
     } catch (error) {
-      if (isConflictError(error)) setConflict(error.payload);
-      else if (isApiError(error, 'entity_deleted') || isApiError(error, 'invalid_state')) setStale(true);
-      else {
-        const details = validationErrors(error);
-        if (details) {
-          const { byField, other } = splitValidationErrors(details, editable.map((field) => field.name));
-          setServerErrors(byField);
-          setFormError(other.length > 0 ? other.join('\n') : null);
-        } else setFormError(errorMessage(error));
-      }
+      const details = validationErrors(error);
+      if (details) {
+        const { byField, other } = splitValidationErrors(details, editable.map((field) => field.name));
+        setServerErrors(byField);
+        setFormError(other.length > 0 ? other.join('\n') : null);
+      } else setFormError(errorMessage(error));
     }
   };
 
-  if (stale) {
-    return (
-      <StaleRecordNotice
-        type="vocabulary_term"
-        id={item.id}
-        onReload={() => {
-          void client.invalidateQueries({ queryKey: queryKeys.vocab });
-          onDone();
-        }}
-      />
-    );
-  }
-
   const otherAttributes = Object.fromEntries(
-    Object.entries(attributesOf(base.fields.attributes)).filter(([key]) => !withModificationSwitch || key !== COUNTS_AS_MODIFICATION),
+    Object.entries(attributesOf(initial.attributes)).filter(([key]) => !withModificationSwitch || key !== COUNTS_AS_MODIFICATION),
   );
   return (
     <form onSubmit={(event) => void submit(event)} noValidate>
@@ -171,11 +137,6 @@ function TermEditForm({ item, fields, maxNoteChars, vocabulary, onDone }: TermEd
             />
           ))}
         </Group>
-        {conflict && (
-          <ChangedMeanwhileAlert revisions={conflict.intervening} question="Save your changes anyway?">
-            <ConflictingFields conflict={conflict} fields={fields} changes={changes} />
-          </ChangedMeanwhileAlert>
-        )}
         <TermFieldInputs
           fields={editable}
           values={values}
@@ -188,11 +149,11 @@ function TermEditForm({ item, fields, maxNoteChars, vocabulary, onDone }: TermEd
         {withModificationSwitch && (
           <ModificationSwitch
             checked={counts}
-            changed={counts !== baseCounts}
+            changed={counts !== initialCounts}
             onChange={(checked) => {
               setValue(
                 'attributes',
-                checked === baseCounts ? base.fields.attributes ?? null : withAttribute(values.attributes, COUNTS_AS_MODIFICATION, checked),
+                checked === initialCounts ? initial.attributes ?? null : withAttribute(values.attributes, COUNTS_AS_MODIFICATION, checked),
               );
             }}
           />
@@ -225,7 +186,7 @@ function TermEditForm({ item, fields, maxNoteChars, vocabulary, onDone }: TermEd
             Cancel
           </Button>
           <Button type="submit" loading={patch.isPending} disabled={!hasChanges || (submitted && invalid)}>
-            {conflict ? 'Save anyway' : 'Save'}
+            Save
           </Button>
         </Group>
       </Stack>

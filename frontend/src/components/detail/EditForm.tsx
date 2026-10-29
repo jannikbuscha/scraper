@@ -1,49 +1,24 @@
-// Edit mode of the detail page (docs/UI.md §4.1). The frozen base is taken
-// when the form mounts and lives in component state, never in the query
-// cache: refetches change `item` but neither the base nor the form values.
-// The PATCH sends only the changed fields with expected_version = base
-// version; a conflict opens the three-way dialog, which re-sends against the
-// current version.
+// Edit mode of the detail page (docs/UI.md §4.1). The form starts from the
+// record's fields and keeps its values in component state; the PATCH sends
+// only the changed fields.
 import { Alert, Button, Group, Modal, Stack, Text } from '@mantine/core';
-import { useQueryClient } from '@tanstack/react-query';
 import { useBlocker, type ShouldBlockFn } from '@tanstack/react-router';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
 
-import { isApiError, isConflictError, referenceDeleted, uniqueViolation, validationErrors } from '../../api/client';
-import { queryKeys, usePatchEntity } from '../../api/queries';
-import type {
-  ConflictPayload,
-  EntityTypeMeta,
-  Item,
-  JsonObject,
-  JsonValue,
-  Meta,
-  RecordType,
-} from '../../api/types';
+import { referenceDeleted, uniqueViolation, validationErrors } from '../../api/client';
+import { usePatchEntity } from '../../api/queries';
+import type { EntityTypeMeta, Item, JsonValue, Meta, RecordType } from '../../api/types';
 import { DETAIL_PATHS, isRecordPageType, isTableType, RECORD_PATH, type DetailEntityType } from '../../lib/entity';
 import { asString, pluralize } from '../../lib/format';
 import { requiresScopeNote, requiresVerificationNote } from '../../lib/write-rules';
 import { AnchorLink } from '../AnchorLink';
-import { ConflictDialog } from '../conflict/ConflictDialog';
-import type { ConflictResolution } from '../conflict/conflict-resolution';
 import { errorMessage, notifyError, notifySuccess } from '../feedback';
-import { StaleRecordNotice } from '../StaleRecordNotice';
-import { Timestamp } from '../Timestamp';
-import {
-  changedValues,
-  editableFields,
-  editErrors,
-  hasEditErrors,
-  sessionFromResolution,
-  startEditSession,
-  type EditSession,
-} from './edit-session';
+import { changedValues, editableFields, editErrors, hasEditErrors, startEditSession, type EditSession } from './edit-session';
 import { EditFields } from './EditFields';
 import { SaveBar } from './SaveBar';
 
 interface EditFormProps {
   type: DetailEntityType;
-  /** The latest item from the query cache; only read for display and the newer-version banner. */
   item: Item;
   meta: Meta;
   typeMeta: EntityTypeMeta;
@@ -75,22 +50,18 @@ function NewTabLink({ type, id, label }: { type: RecordType; id: string; label: 
 }
 
 export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps) {
-  const client = useQueryClient();
   const patch = usePatchEntity(type);
   const [session, setSession] = useState<EditSession>(() => startEditSession(item));
   const [note, setNote] = useState('');
   const [submitted, setSubmitted] = useState(false);
   const [serverErrors, setServerErrors] = useState<Record<string, ReactNode>>({});
   const [formError, setFormError] = useState<ReactNode>(null);
-  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
-  const [stale, setStale] = useState(false);
 
   const editable = editableFields(typeMeta);
   const editableNames = new Set(editable.map((field) => field.name));
   const changes = changedValues(session, editable);
   const errors = editErrors(session, typeMeta, changes, note);
   const dirty = Object.keys(changes).length > 0;
-  const deletedMeanwhile = item.deleted_at !== null;
 
   // Unsaved changes trigger a prompt when leaving the page or edit mode.
   const allowLeave = useRef(false);
@@ -154,15 +125,16 @@ export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps)
     }
   };
 
-  const send = async (current: EditSession, toSend: JsonObject) => {
+  const save = async () => {
+    setSubmitted(true);
+    if (hasEditErrors(errors)) return;
+    if (!dirty) {
+      leave(true);
+      return;
+    }
     setFormError(null);
     try {
-      const result = await patch.mutateAsync({
-        id: item.id,
-        expected_version: current.base.version,
-        changes: toSend,
-        note: note.trim() || null,
-      });
+      const result = await patch.mutateAsync({ id: item.id, changes, note: note.trim() || null });
       notifySuccess(
         [
           result.changed ? `Saved as version ${result.item.version}.` : 'Nothing changed on the server.',
@@ -171,44 +143,8 @@ export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps)
       );
       leave(true);
     } catch (error) {
-      if (
-        isConflictError(error) &&
-        error.payload.action === 'patch' &&
-        error.payload.current_state.deleted_at === null
-      ) {
-        setConflict(error.payload);
-      } else if (isConflictError(error) || isApiError(error, 'entity_deleted') || isApiError(error, 'invalid_state')) {
-        setStale(true);
-      } else showServerError(error);
+      showServerError(error);
     }
-  };
-
-  const save = () => {
-    setSubmitted(true);
-    if (hasEditErrors(errors)) return;
-    if (!dirty) {
-      leave(true);
-      return;
-    }
-    void send(session, changes);
-  };
-
-  const applyResolution = (resolution: ConflictResolution) => {
-    const next = sessionFromResolution(resolution);
-    setSession(next);
-    setConflict(null);
-    setServerErrors({});
-    if (Object.keys(resolution.changes).length === 0) {
-      notifySuccess('Nothing left to save: the current version already has the chosen values.');
-      leave(true);
-      return;
-    }
-    void send(next, resolution.changes);
-  };
-
-  const reloadAndLeave = () => {
-    void client.invalidateQueries({ queryKey: queryKeys.item(type, item.id) });
-    leave(true);
   };
 
   const setValue = (field: string, value: JsonValue) => {
@@ -221,21 +157,6 @@ export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps)
 
   return (
     <Stack gap="md">
-      {stale && <StaleRecordNotice type={type} id={item.id} onReload={reloadAndLeave} />}
-      {deletedMeanwhile ? (
-        <Alert color="red" variant="light" title="Deleted while you were editing">
-          Deleted by <bdi>{item.deleted_by ?? 'unknown'}</bdi> at <Timestamp value={item.deleted_at} />. Your changes
-          cannot be saved; undelete the record in another tab first, or discard them.
-        </Alert>
-      ) : (
-        item.version > session.base.version && (
-          <Alert color="yellow" variant="light" title="A newer version exists">
-            Changed by <bdi>{item.updated_by}</bdi> at <Timestamp value={item.updated_at} />; saving will open the
-            conflict dialog.
-          </Alert>
-        )
-      )}
-
       <EditFields
         type={type}
         item={item}
@@ -243,7 +164,6 @@ export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps)
         typeMeta={typeMeta}
         editable={editableNames}
         values={session.values}
-        baseFields={session.base.fields}
         errors={fieldErrors}
         alsoRequired={scopeNoteRequired ? new Set(['scope_note']) : new Set()}
         onChange={setValue}
@@ -274,21 +194,9 @@ export function EditForm({ type, item, meta, typeMeta, onLeave }: EditFormProps)
         }
         maxNoteChars={meta.limits.max_note_chars}
         saving={patch.isPending}
-        saveDisabled={deletedMeanwhile || stale}
-        onSave={save}
+        onSave={() => void save()}
         onCancel={() => {
           leave(false);
-        }}
-      />
-
-      <ConflictDialog
-        payload={conflict}
-        typeMeta={typeMeta}
-        pending={patch.isPending}
-        onApply={applyResolution}
-        onDiscard={reloadAndLeave}
-        onClose={() => {
-          setConflict(null);
         }}
       />
 

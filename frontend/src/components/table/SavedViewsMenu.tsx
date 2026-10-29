@@ -1,7 +1,6 @@
 // Saved views (docs/UI.md §3): listed from GET /api/entities/saved_view,
-// applied by navigation, saved and (soft-)deleted by everyone. The list
-// scrolls inside the dropdown (the team's views keep growing); "Save current
-// view…" stays below it, always visible.
+// applied by navigation, saved and (soft-)deleted. The list scrolls inside
+// the dropdown; "Save current view…" stays below it, always visible.
 import {
   ActionIcon,
   Button,
@@ -19,11 +18,9 @@ import { useState } from 'react';
 
 import { useSavedViews } from '../../api/queries';
 import type { Item } from '../../api/types';
-import { useAuthor } from '../../hooks/useAuthor';
 import { asString } from '../../lib/format';
 import { canonicalQuery, DETAIL_PAGE_PARAMS, searchFromQuery } from '../../lib/query-string';
 import { errorMessage } from '../feedback';
-import { WriteButton } from '../WriteButton';
 import { DeleteViewModal } from './DeleteViewModal';
 import { SaveViewModal } from './SaveViewModal';
 import classes from './toolbar.module.css';
@@ -34,7 +31,6 @@ export const VIEW_LIST_MAX_HEIGHT = 'min(60vh, 420px)';
 
 export function SavedViewsMenu() {
   const { type, search, setSearch } = useTableContext();
-  const author = useAuthor();
   const views = useSavedViews(type);
   const [opened, setOpened] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -105,7 +101,6 @@ export function SavedViewsMenu() {
                       </UnstyledButton>
                       <ActionIcon
                         aria-label={`Delete saved view ${asString(view.fields.name) ?? view.label}`}
-                        disabled={author === null}
                         onClick={() => {
                           setOpened(false);
                           setDeleting(view);
@@ -119,7 +114,7 @@ export function SavedViewsMenu() {
               </Stack>
             </ScrollArea.Autosize>
             <Divider my={4} />
-            <WriteButton
+            <Button
               variant="subtle"
               justify="flex-start"
               leftSection={<IconDeviceFloppy size={14} />}
@@ -129,7 +124,7 @@ export function SavedViewsMenu() {
               }}
             >
               Save current view…
-            </WriteButton>
+            </Button>
           </Stack>
         </Popover.Dropdown>
       </Popover>

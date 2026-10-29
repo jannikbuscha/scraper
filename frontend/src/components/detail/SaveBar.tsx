@@ -22,8 +22,6 @@ interface SaveBarProps {
   scopeNote: ScopeNoteInput | null;
   maxNoteChars: number;
   saving: boolean;
-  /** Saving is impossible (e.g. the record was deleted meanwhile). */
-  saveDisabled: boolean;
   onSave: () => void;
   onCancel: () => void;
 }
@@ -37,7 +35,6 @@ export function SaveBar({
   scopeNote,
   maxNoteChars,
   saving,
-  saveDisabled,
   onSave,
   onCancel,
 }: SaveBarProps) {
@@ -81,7 +78,7 @@ export function SaveBar({
           <Button variant="default" onClick={onCancel}>
             Cancel
           </Button>
-          <Button onClick={onSave} loading={saving} disabled={saveDisabled}>
+          <Button onClick={onSave} loading={saving}>
             Save
           </Button>
         </Group>

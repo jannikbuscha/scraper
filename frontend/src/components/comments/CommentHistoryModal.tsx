@@ -1,26 +1,21 @@
 // The revision list of a comment, opened from its "edited" label (docs/UI.md
 // §4.3): word diffs of each revision and "Restore this version" with an
-// optional note; a conflict is confirmed again (docs/UI.md §1.3).
+// optional note.
 import { Alert, Button, Group, Loader, Modal, Paper, Stack, Text, Textarea } from '@mantine/core';
 import { IconRestore } from '@tabler/icons-react';
 import { useState } from 'react';
 
-import { isApiError, isConflictError } from '../../api/client';
 import { useRestoreComment, useRevision, useRevisions } from '../../api/queries';
-import type { Comment, ConflictPayload } from '../../api/types';
+import type { Comment } from '../../api/types';
 import { syntheticField } from '../../lib/format';
-import { ChangedMeanwhileAlert } from '../history/ChangedMeanwhileAlert';
 import { errorMessage, ErrorAlert, notifySuccess } from '../feedback';
 import { DiffView } from '../history/DiffView';
 import { RevisionList } from '../history/RevisionList';
-import { WriteButton } from '../WriteButton';
-import { CommentChangedNotice } from './CommentChangedNotice';
 
 /** The tracked fields of a comment (docs/DATA_MODEL.md §6.6), for diff labels. */
 const COMMENT_FIELDS = [
   syntheticField('body_md', 'text', 'Text'),
   syntheticField('status', 'string', 'Status'),
-  syntheticField('resolved_by', 'string', 'Resolved by'),
   syntheticField('resolved_at', 'datetime', 'Resolved at'),
 ];
 
@@ -67,7 +62,7 @@ function CommentHistory({ comment, maxNoteChars }: { comment: Comment; maxNoteCh
           setSelected(row.version);
         }}
         renderActions={(row) => (
-          <WriteButton
+          <Button
             size="compact-xs"
             variant="subtle"
             leftSection={<IconRestore size={12} />}
@@ -78,7 +73,7 @@ function CommentHistory({ comment, maxNoteChars }: { comment: Comment; maxNoteCh
             }}
           >
             Restore
-          </WriteButton>
+          </Button>
         )}
       />
       {restoring !== null && (
@@ -120,32 +115,18 @@ function RestoreCommentForm({
 }) {
   const restore = useRestoreComment();
   const [note, setNote] = useState('');
-  const [expected, setExpected] = useState(comment.version);
-  const [conflict, setConflict] = useState<ConflictPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [stale, setStale] = useState(false);
 
   const submit = async () => {
     setError(null);
     try {
-      const result = await restore.mutateAsync({
-        id: comment.id,
-        expected_version: expected,
-        version,
-        note: note.trim() || null,
-      });
+      const result = await restore.mutateAsync({ id: comment.id, version, note: note.trim() || null });
       notifySuccess(`Restored version ${version} of the comment as version ${result.comment.version}.`);
       onDone();
     } catch (failure) {
-      if (isConflictError(failure) && failure.payload.current_state.deleted_at === null) {
-        setConflict(failure.payload);
-        setExpected(failure.payload.current_version);
-      } else if (isConflictError(failure) || isApiError(failure, 'entity_deleted')) setStale(true);
-      else setError(errorMessage(failure));
+      setError(errorMessage(failure));
     }
   };
-
-  if (stale) return <CommentChangedNotice comment={comment} onReloaded={onDone} />;
 
   return (
     <Paper withBorder p="sm">
@@ -153,13 +134,6 @@ function RestoreCommentForm({
         <Text size="sm" fw={600}>
           Restore version {version}
         </Text>
-        {conflict && (
-          <ChangedMeanwhileAlert
-            revisions={conflict.intervening}
-            fieldLabels={FIELD_LABELS}
-            question="Restore it anyway?"
-          />
-        )}
         <Textarea
           label="Note (optional)"
           autosize
@@ -180,7 +154,7 @@ function RestoreCommentForm({
             Cancel
           </Button>
           <Button loading={restore.isPending} onClick={() => void submit()}>
-            {conflict ? 'Restore anyway' : 'Restore'}
+            Restore
           </Button>
         </Group>
       </Stack>

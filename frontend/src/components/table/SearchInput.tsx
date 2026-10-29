@@ -38,7 +38,6 @@ export function SearchInput() {
         aria-label={`Search ${typeMeta.label_plural.toLowerCase()}`}
         leftSection={<IconSearch size={14} />}
         value={text}
-        maxLength={200}
         onChange={(event) => {
           setText(event.currentTarget.value);
           commitLater(event.currentTarget.value);

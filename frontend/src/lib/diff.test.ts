@@ -69,7 +69,7 @@ describe('valuesEqual and listDiff', () => {
 describe('diff rows', () => {
   const diff: RevisionDiff = {
     fields: { status: ['planned', 'active'], name_en: ['Old', 'New'], extra: [null, 1] },
-    meta: { name_en: { verified: ['unverified', 'verified'], evidence_id: [null, 'evd_1'] } },
+    meta: { name_en: { by: ['seed', 'user'], verified: ['unverified', 'verified'], evidence_id: [null, 'evd_1'] } },
     state: { deleted_at: [null, '2026-10-28T17:00:00.000000Z'] },
   };
 
@@ -80,6 +80,14 @@ describe('diff rows', () => {
       { field: 'name_en', key: 'evidence_id', oldValue: null, newValue: 'evd_1' },
     ]);
     expect(stateDiffRows(diff)).toEqual([{ key: 'deleted_at', oldValue: null, newValue: '2026-10-28T17:00:00.000000Z' }]);
+  });
+
+  it('leaves out attribution that names the one user: resolved_by and the provenance by', () => {
+    const comment: RevisionDiff = {
+      fields: { status: ['open', 'resolved'], resolved_by: [null, 'user'], resolved_at: [null, '2026-10-28T17:00:00.000000Z'] },
+    };
+    expect(fieldDiffRows(comment).map((row) => row.field)).toEqual(['resolved_at', 'status']);
+    expect(metaDiffRows(diff).map((row) => row.key)).not.toContain('by');
   });
 
   it('detects empty diffs', () => {

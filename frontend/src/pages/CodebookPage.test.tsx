@@ -2,7 +2,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { EntityTypeMeta, Item, JsonObject, Meta, Vocabulary, VocabTerm } from '../api/types';
-import { AUTHOR_STORAGE_KEY } from '../lib/author';
 import { callsTo, jsonBody, mockApi, requestsTo } from '../test/api-mock';
 import { exampleItem, exampleMeta, fieldSpec } from '../test/fixtures';
 import { renderRoute } from '../test/render';
@@ -110,16 +109,14 @@ function termItem(source: VocabTerm, vocabulary: string, version: number, overri
   );
 }
 
-/** Server state of the edited terms; tests change it to simulate a colleague. */
+/** Server state of the edited terms. */
 let items: Record<string, Item>;
-/** What GET /api/vocab returns; tests replace it to simulate a colleague. */
-let vocabularies: Vocabulary[];
 
 const termRevision = (version: number, changed: string[]) => ({
   id: 70 + version,
   version,
   at: `2026-01-0${version}T10:00:00.000000Z`,
-  author: version === 1 ? 'seed' : 'Example Colleague',
+  author: version === 1 ? 'seed' : 'user',
   channel: version === 1 ? ('seed' as const) : ('ui' as const),
   action: version === 1 ? ('create' as const) : ('update' as const),
   note: null,
@@ -172,7 +169,7 @@ function mockCodebookApi() {
     const history = termHistory(url, init);
     if (history !== undefined) return history;
     if (url.pathname === '/api/meta') return meta;
-    if (url.pathname === '/api/vocab') return { vocabularies };
+    if (url.pathname === '/api/vocab') return { vocabularies: VOCABULARIES };
     if (url.pathname === '/api/comments') return { threads: [] };
     if (url.pathname === '/api/entities/vocabulary_term/voc_b') return { item: termItem(CLUSTER_B, 'example_cluster', 1) };
     if (url.pathname === '/api/entities/vocabulary_term' && init?.method === 'POST') {
@@ -193,8 +190,6 @@ const patchBodies = (fetchMock: ReturnType<typeof mockApi>, id: string) =>
 
 describe('Codebook', () => {
   beforeEach(() => {
-    window.localStorage.setItem(AUTHOR_STORAGE_KEY, 'Example Person');
-    vocabularies = VOCABULARIES;
     items = {
       voc_a: termItem(CLUSTER_A, 'example_cluster', 3),
       voc_mod: termItem(CHANGE_TYPE, 'event_type', 5),
@@ -203,7 +198,7 @@ describe('Codebook', () => {
 
   it('edits a term with code and vocabulary read-only and sends only the changed fields', async () => {
     const fetchMock = mockCodebookApi();
-    const { user, queryClient } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
+    const { user } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
 
     await user.click(await screen.findByRole('button', { name: 'Edit cluster_a' }));
     const dialog = await screen.findByRole('dialog', { name: 'Edit term example_cluster:cluster_a' });
@@ -221,15 +216,12 @@ describe('Codebook', () => {
 
     await user.clear(label);
     await user.type(label, 'Example cluster A, revised');
-    // A colleague's save refetches the term; the form keeps its base and values.
-    items.voc_a = termItem(CLUSTER_A, 'example_cluster', 4, { definition: 'Changed elsewhere' });
-    await queryClient.invalidateQueries({ queryKey: ['item'] });
     await user.type(within(dialog).getByRole('textbox', { name: /Change note/ }), 'Example note');
     await user.click(within(dialog).getByRole('button', { name: 'Save' }));
 
     await waitFor(() => {
       expect(patchBodies(fetchMock, 'voc_a')).toEqual([
-        { expected_version: 3, changes: { label_en: 'Example cluster A, revised' }, note: 'Example note' },
+        { changes: { label_en: 'Example cluster A, revised' }, note: 'Example note' },
       ]);
     });
     await waitFor(() => {
@@ -237,29 +229,16 @@ describe('Codebook', () => {
     });
   });
 
-  it('deactivates with the version shown when the dialog opened, also after a refetch', async () => {
+  it('deactivates a term', async () => {
     const fetchMock = mockCodebookApi();
-    const { user, queryClient } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
+    const { user } = renderRoute(CodebookPage, { url: '/codebook?vocabulary=example_cluster', path: '/codebook' });
 
     await user.click(await screen.findByRole('button', { name: 'Deactivate cluster_b' }));
     const dialog = await screen.findByRole('dialog', { name: 'Deactivate example_cluster:cluster_b' });
-    // A colleague edits the term meanwhile; the vocabularies are refetched with version 4.
-    vocabularies = VOCABULARIES.map((vocabulary) => ({
-      ...vocabulary,
-      terms: vocabulary.terms.map((candidate) =>
-        candidate.id === CLUSTER_B.id ? { ...candidate, version: 4, definition: 'Changed elsewhere' } : candidate,
-      ),
-    }));
-    await queryClient.invalidateQueries({ queryKey: ['vocab'] });
-    await waitFor(() => {
-      expect(requestsTo(fetchMock, '/api/vocab')).toHaveLength(2);
-    });
     await user.click(within(dialog).getByRole('button', { name: 'Deactivate' }));
 
-    // Version 3 was shown when the dialog opened: the server answers with the
-    // confirmation listing the colleague's revision instead of a silent write.
     await waitFor(() => {
-      expect(patchBodies(fetchMock, 'voc_b')).toEqual([{ expected_version: 3, changes: { active: false }, note: null }]);
+      expect(patchBodies(fetchMock, 'voc_b')).toEqual([{ changes: { active: false }, note: null }]);
     });
   });
 
@@ -296,14 +275,8 @@ describe('Codebook', () => {
       expect(
         callsTo(fetchMock, '/api/entities/vocabulary_term/voc_a/restore').map((call) => jsonBody(call.init)),
       ).toEqual([
-        { expected_version: 3, version: 1, dry_run: true },
-        {
-          expected_version: 3,
-          version: 1,
-          fields: ['definition'],
-          note: 'Back to the original definition',
-          dry_run: false,
-        },
+        { version: 1, dry_run: true },
+        { version: 1, fields: ['definition'], note: 'Back to the original definition', dry_run: false },
       ]);
     });
     await waitFor(() => {
@@ -331,7 +304,7 @@ describe('Codebook', () => {
 
     await waitFor(() => {
       expect(patchBodies(fetchMock, 'voc_mod')).toEqual([
-        { expected_version: 5, changes: { attributes: { counts_as_modification: false } }, note: null },
+        { changes: { attributes: { counts_as_modification: false } }, note: null },
       ]);
     });
   });

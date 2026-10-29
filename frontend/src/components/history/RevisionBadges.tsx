@@ -2,6 +2,8 @@
 import { Badge, type MantineColor } from '@mantine/core';
 
 import type { Channel, RevisionAction } from '../../api/types';
+import { HIDDEN_FIELDS } from '../../lib/diff';
+import { channelLabel } from '../changes/record-labels';
 import classes from './history.module.css';
 
 const CHANNEL_COLORS: Record<Channel, MantineColor> = {
@@ -29,7 +31,7 @@ const ACTION_COLORS: Record<RevisionAction, MantineColor> = {
 export function ChannelBadge({ channel }: { channel: Channel }) {
   return (
     <Badge size="xs" variant="outline" color={CHANNEL_COLORS[channel]} title="Channel">
-      {channel}
+      {channelLabel(channel)}
     </Badge>
   );
 }
@@ -50,10 +52,11 @@ interface ChangedFieldChipsProps {
 }
 
 export function ChangedFieldChips({ fields, labels = {} }: ChangedFieldChipsProps) {
-  if (fields.length === 0) return null;
+  const shown = fields.filter((field) => !HIDDEN_FIELDS.has(field));
+  if (shown.length === 0) return null;
   return (
     <span className={classes.chips}>
-      {fields.map((field) => (
+      {shown.map((field) => (
         <Badge key={field} size="xs" variant="default" title={field}>
           {labels[field] ?? field}
         </Badge>

@@ -30,16 +30,18 @@ export function recordTypePlural(meta: Meta | undefined, type: RecordType): stri
   return meta?.entity_types[type]?.label_plural ?? `${fallbackLabel(type)}s`;
 }
 
-/** Channel and action codes as shown in the revision badges. */
+/** Channel and action codes as shown in the revision badges; changes made in the app are "manual". */
 const CHANNEL_LABELS: Record<Channel, string> = {
-  seed: 'seed',
-  ui: 'ui (web app)',
-  collector: 'collector',
-  import: 'import',
+  ui: 'manual',
   restore: 'restore',
+  seed: 'seed',
+  import: 'import',
+  collector: 'collector',
   merge: 'merge',
   system: 'system',
 };
+
+export const channelLabel = (channel: Channel): string => CHANNEL_LABELS[channel];
 
 const ACTION_LABELS: Record<RevisionAction, string> = {
   create: 'create',
@@ -62,7 +64,6 @@ export const ACTION_OPTIONS = options(ACTION_LABELS);
 const COMMENT_FIELDS: readonly FieldSpec[] = [
   syntheticField('body_md', 'text', 'Text'),
   syntheticField('status', 'string', 'Status'),
-  syntheticField('resolved_by', 'string', 'Resolved by'),
   syntheticField('resolved_at', 'datetime', 'Resolved at'),
 ];
 

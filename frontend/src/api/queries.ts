@@ -1,5 +1,5 @@
 // TanStack Query hooks, query keys (docs/UI.md §6) and the invalidation rules
-// after writes. Writes never retry; conflicts surface as ConflictError.
+// after writes. Writes never retry.
 import {
   keepPreviousData,
   useMutation,
@@ -21,7 +21,6 @@ import type {
   CommentStatusResponse,
   CommentThreadsQuery,
   CommentThreadsResponse,
-  CommentVersionRequest,
   CreateCommentRequest,
   CreateRequest,
   CreateResponse,
@@ -41,7 +40,6 @@ import type {
   RestorePreviewResponse,
   RestoreRequest,
   RestoreResponse,
-  RevisionAuthorsResponse,
   RevisionByIdResponse,
   RevisionListResponse,
   RevisionResponse,
@@ -158,27 +156,11 @@ export function useFacets(type: EntityType, field: string, qs: string, enabled: 
   });
 }
 
-interface EntityOptions {
-  enabled?: boolean;
-  /** `'always'` refetches on mount even if the cache looks fresh (e.g. after a 409). */
-  refetchOnMount?: boolean | 'always';
-}
-
-export function useEntity(type: EntityType, id: string, options: EntityOptions = {}) {
+export function useEntity(type: EntityType, id: string, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: queryKeys.item(type, id),
     queryFn: ({ signal }) => apiGet<ItemResponse>(entityPath(type, id), '', signal),
     enabled: options.enabled ?? true,
-    refetchOnMount: options.refetchOnMount ?? true,
-  });
-}
-
-/** Reads a record fresh from the server (and updates its cached query), e.g. right before a write. */
-export async function fetchEntity(client: QueryClient, type: EntityType, id: string): Promise<ItemResponse> {
-  return client.query({
-    queryKey: queryKeys.item(type, id),
-    queryFn: ({ signal }) => apiGet<ItemResponse>(entityPath(type, id), '', signal),
-    staleTime: 0,
   });
 }
 
@@ -215,7 +197,7 @@ export function useCommentThreads(subjectId: string, query: CommentThreadsQuery 
   });
 }
 
-/** Thread feed without subject (CommentsPage, trash): `status, entity_type, author, q, deleted, page, page_size`. */
+/** Thread feed without subject (CommentsPage, trash): `status, entity_type, q, deleted, page, page_size`. */
 export function useCommentFeed(search: SearchRecord) {
   const qs = canonicalQuery(search);
   return useQuery({
@@ -232,7 +214,7 @@ export function useComment(id: string) {
   });
 }
 
-/** Recent changes: `author, entity_type, channel, action, since, until, entity_id, batch_id, page, page_size`. */
+/** Recent changes: `entity_type, channel, action, since, until, entity_id, batch_id, page, page_size`. */
 export function useChangeFeed(search: SearchRecord, options: ListOptions = {}) {
   const qs = canonicalQuery(search);
   return useQuery({
@@ -249,13 +231,6 @@ export function useRevisionById(revisionId: number | null) {
     queryFn: ({ signal }) => apiGet<RevisionByIdResponse>(`/api/revisions/${revisionId ?? 0}`, '', signal),
     enabled: revisionId !== null,
     staleTime: Infinity,
-  });
-}
-
-export function useRevisionAuthors() {
-  return useQuery({
-    queryKey: [...queryKeys.changes, 'authors'],
-    queryFn: ({ signal }) => apiGet<RevisionAuthorsResponse>('/api/revisions/authors', '', signal),
   });
 }
 
@@ -423,8 +398,7 @@ export function useEditComment() {
 
 function useCommentStatus(action: 'resolve' | 'reopen') {
   return useWrite(
-    ({ id, ...body }: WithId<CommentVersionRequest>) =>
-      apiWrite<CommentStatusResponse>('POST', `${recordPath('comment', id)}/${action}`, body),
+    ({ id }: { id: string }) => apiWrite<CommentStatusResponse>('POST', `${recordPath('comment', id)}/${action}`, {}),
     (_vars, { comment }) => commentScope(comment.id, comment.subject_id, comment.subject_type),
   );
 }

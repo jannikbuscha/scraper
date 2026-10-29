@@ -1,5 +1,5 @@
-// Revision list of one record (docs/UI.md §4.2): version, time, author,
-// channel and action, note, changed fields. Optionally selectable (show one
+// Revision list of one record (docs/UI.md §4.2): version, time, channel and
+// action, note, changed fields. Optionally selectable (show one
 // revision's diff) and with a compare mode that picks two versions.
 import { Badge, Checkbox, Table, Text, UnstyledButton } from '@mantine/core';
 import type { ReactNode } from 'react';
@@ -52,7 +52,6 @@ export function RevisionList({
             {compare && <Table.Th w={70}>Compare</Table.Th>}
             <Table.Th w={80}>Version</Table.Th>
             <Table.Th w={130}>Time</Table.Th>
-            <Table.Th>Author</Table.Th>
             <Table.Th>Change</Table.Th>
             <Table.Th>Note</Table.Th>
             <Table.Th>Changed fields</Table.Th>
@@ -106,9 +105,6 @@ export function RevisionList({
                 </Table.Td>
                 <Table.Td>
                   <Timestamp value={revision.at} />
-                </Table.Td>
-                <Table.Td>
-                  <bdi>{revision.author}</bdi>
                 </Table.Td>
                 <Table.Td>
                   <ChannelBadge channel={revision.channel} /> <ActionBadge action={revision.action} />

@@ -16,10 +16,10 @@ describe('Recent changes URL state', () => {
   it('reads and writes comma-separated list filters and returns to page 1', () => {
     const search = { entity_type: 'project,comment', page: '3', page_size: '100' };
     expect(listParam(search, 'entity_type')).toEqual(['project', 'comment']);
-    expect(listParam(search, 'author')).toEqual([]);
-    expect(withListParam(search, 'author', ['Example Person', 'seed'])).toEqual({
+    expect(listParam(search, 'channel')).toEqual([]);
+    expect(withListParam(search, 'channel', ['ui', 'seed'])).toEqual({
       entity_type: 'project,comment',
-      author: 'Example Person,seed',
+      channel: 'ui,seed',
       page_size: '100',
     });
     expect(withListParam(search, 'entity_type', [])).toEqual({ page_size: '100' });
@@ -43,7 +43,7 @@ describe('Recent changes URL state', () => {
   it('knows whether filters are active and clears them but keeps the page size', () => {
     expect(hasChangeFilters({ page: '2', page_size: '25' })).toBe(false);
     expect(hasChangeFilters({ batch_id: 'b1' })).toBe(true);
-    expect(clearFilterParams({ author: 'Example Person', since: '2026-10-01', page: '4', page_size: '25' })).toEqual({
+    expect(clearFilterParams({ action: 'update', since: '2026-10-01', page: '4', page_size: '25' })).toEqual({
       page_size: '25',
     });
   });
@@ -60,6 +60,6 @@ describe('Comments page URL state', () => {
       page: '2',
     });
     expect(hasCommentFilters({ page_size: '25' })).toBe(false);
-    expect(hasCommentFilters({ author: 'Example Person' })).toBe(true);
+    expect(hasCommentFilters({ q: 'example' })).toBe(true);
   });
 });

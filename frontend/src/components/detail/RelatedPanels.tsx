@@ -4,7 +4,7 @@
 // of types with a page link to it (evidence and the other record-page types
 // open `/records/$id`, where they are edited, deleted, restored and
 // commented on).
-import { Group, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Stack, Text, Title } from '@mantine/core';
 import { IconPlus } from '@tabler/icons-react';
 import { useState } from 'react';
 
@@ -15,7 +15,6 @@ import { searchFromQuery } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
 import { EntityLink } from '../EntityLink';
 import { CreateEntityModal } from '../table/CreateEntityModal';
-import { WriteButton } from '../WriteButton';
 import { DocumentTextPanel } from './DocumentTextPanel';
 import { RelatedList, type RelatedListProps } from './RelatedList';
 
@@ -218,7 +217,7 @@ export function RelatedPanels({ type, item, meta }: { type: DetailEntityType; it
           meta={meta}
           action={
             add && (
-              <WriteButton
+              <Button
                 variant="subtle"
                 leftSection={<IconPlus size={14} />}
                 // A deleted record cannot be referenced (409 reference_deleted).
@@ -228,7 +227,7 @@ export function RelatedPanels({ type, item, meta }: { type: DetailEntityType; it
                 }}
               >
                 Add {meta.entity_types[add.type]?.label.toLowerCase() ?? add.type}
-              </WriteButton>
+              </Button>
             )
           }
         />

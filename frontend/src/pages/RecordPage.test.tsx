@@ -2,7 +2,6 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import type { Comment, EntityTypeMeta, Item, Meta } from '../api/types';
-import { AUTHOR_STORAGE_KEY } from '../lib/author';
 import { callsTo, jsonBody, mockApi } from '../test/api-mock';
 import { exampleItem, exampleMeta, exampleVocabularies, fieldSpec, listResponse, projectMeta } from '../test/fixtures';
 import { renderRoute } from '../test/render';
@@ -64,9 +63,9 @@ const thread: Comment = {
   resolved_by: null,
   resolved_at: null,
   created_at: '2026-01-02T10:00:00.000000Z',
-  created_by: 'Example Colleague',
+  created_by: 'user',
   updated_at: '2026-01-02T10:00:00.000000Z',
-  updated_by: 'Example Colleague',
+  updated_by: 'user',
   version: 1,
   edited: false,
   deleted_at: null,
@@ -97,7 +96,6 @@ function mockRecordApi() {
 }
 
 beforeEach(() => {
-  window.localStorage.setItem(AUTHOR_STORAGE_KEY, 'Example Person');
   responses = {};
   evidence = exampleItem(
     EVIDENCE_ID,
@@ -151,7 +149,7 @@ describe('the generic record page', () => {
         callsTo(fetchMock, EVIDENCE_PATH)
           .filter((call) => call.init?.method === 'PATCH')
           .map((call) => jsonBody(call.init)),
-      ).toEqual([{ expected_version: 1, changes: { quote: 'Example project (corrected)' }, note: null }]);
+      ).toEqual([{ changes: { quote: 'Example project (corrected)' }, note: null }]);
     });
   });
 

@@ -95,10 +95,9 @@ export const projectMeta: EntityTypeMeta = {
 
 export const exampleMeta: Meta = {
   app_version: '0.0.0-test',
-  team_members: ['Example Person'],
   focal_org_id: null,
   parameters: { ministry_founded: '2000-01-01', full_scale_invasion: '2001-01-01' },
-  limits: { max_comment_chars: 10000, max_note_chars: 2000, max_page_size: 500, max_bulk_items: 500, max_export_rows: 1000 },
+  limits: { max_comment_chars: 10000, max_note_chars: 2000 },
   groups: [
     { key: 'basics', label: 'Basics' },
     { key: 'classification', label: 'Classification' },
@@ -151,9 +150,9 @@ export function exampleItem(id: string, fields: JsonObject, overrides: Partial<I
     label: typeof fields.name_en === 'string' ? fields.name_en : id,
     version: 1,
     created_at: '2026-01-01T00:00:00.000000Z',
-    created_by: 'Example Person',
+    created_by: 'user',
     updated_at: '2026-01-01T00:00:00.000000Z',
-    updated_by: 'Example Person',
+    updated_by: 'user',
     deleted_at: null,
     deleted_by: null,
     merged_into: null,

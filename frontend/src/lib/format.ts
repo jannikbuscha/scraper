@@ -249,8 +249,8 @@ export const pluralize = (count: number, singular: string, plural = `${singular}
   `${count} ${count === 1 ? singular : plural}`;
 
 /**
- * Label of a referenced ID. Revision and conflict payloads key `refs` by ID;
- * items key them by field name, which only labels the item's current value.
+ * Label of a referenced ID. Revision payloads key `refs` by ID; items key
+ * them by field name, which only labels the item's current value.
  */
 export function findRef(refs: Refs | undefined, field: string, id: string): RefLabel | undefined {
   const byId = refs?.[id];

@@ -1,52 +1,40 @@
 // Scenarios (c) and (d) of docs/UI.md §7: an edit with a note shows up in the
-// history with author and note; diff and restore with the dry-run preview.
-import { ALICE, BOB, expect, test, uniqueSuffix } from './fixtures';
+// history as a manual change with its note; diff and restore with the dry-run
+// preview.
+import { expect, test, uniqueSuffix } from './fixtures';
 import { fieldInput } from './helpers';
 
-test.describe('without a stored author name', () => {
-  test.use({ author: null });
+test('(c) edit a field with a note; the history shows the manual change and its note', async ({ page, api }) => {
+  const suffix = uniqueSuffix();
+  const description = `Synthetic description ${suffix}`;
+  const note = `Synthetic change note ${suffix}`;
 
-  test('(c) edit a field with a note; the history shows author and note', async ({ page, api }) => {
-    const suffix = uniqueSuffix();
-    const author = 'E2E Carol';
-    const description = `Synthetic description ${suffix}`;
-    const note = `Synthetic change note ${suffix}`;
+  await page.goto('/projects');
+  await page.getByRole('link', { name: 'Open PlayCity', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'PlayCity' })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit', exact: true }).click();
+  await expect(page).toHaveURL(/[?&]edit=1/);
 
-    // First visit: the app asks who you are (docs/UI.md §1.5).
-    await page.goto('/projects');
-    const who = page.getByRole('dialog', { name: 'Who are you?' });
-    await expect(who).toBeVisible();
-    await who.getByRole('textbox', { name: 'Or enter your name' }).fill(author);
-    await who.getByRole('button', { name: 'Save name' }).click();
-    await expect(who).toBeHidden();
-    await expect(page.getByRole('button', { name: `Author: ${author}. Change name` })).toBeVisible();
+  const saveBar = page.getByRole('region', { name: 'Save changes' });
+  await fieldInput(page, 'Description (English)').fill(description);
+  await saveBar.getByRole('textbox', { name: 'Change note (optional)' }).fill(note);
+  await saveBar.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect(saveBar).toBeHidden();
+  await expect(page).not.toHaveURL(/[?&]edit=1/);
+  await expect(page.getByRole('tabpanel', { name: 'Details' }).getByText(description)).toBeVisible();
 
-    await page.getByRole('link', { name: 'Open PlayCity', exact: true }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'PlayCity' })).toBeVisible();
-    await page.getByRole('button', { name: 'Edit', exact: true }).click();
-    await expect(page).toHaveURL(/[?&]edit=1/);
+  await page.getByRole('tab', { name: 'History' }).click();
+  await expect(page).toHaveURL(/[?&]tab=history/);
+  const revision = page.getByRole('row').filter({ hasText: note });
+  await expect(revision).toHaveCount(1);
+  await expect(revision).toContainText('manual');
+  await expect(revision).toContainText('Description (English)');
+  await expect(revision).toContainText('current');
 
-    const saveBar = page.getByRole('region', { name: 'Save changes' });
-    await fieldInput(page, 'Description (English)').fill(description);
-    await saveBar.getByRole('textbox', { name: 'Change note (optional)' }).fill(note);
-    await saveBar.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(saveBar).toBeHidden();
-    await expect(page).not.toHaveURL(/[?&]edit=1/);
-    await expect(page.getByRole('tabpanel', { name: 'Details' }).getByText(description)).toBeVisible();
-
-    await page.getByRole('tab', { name: 'History' }).click();
-    await expect(page).toHaveURL(/[?&]tab=history/);
-    const revision = page.getByRole('row').filter({ hasText: note });
-    await expect(revision).toHaveCount(1);
-    await expect(revision).toContainText(author);
-    await expect(revision).toContainText('Description (English)');
-    await expect(revision).toContainText('current');
-
-    // The stored revision has the same attribution.
-    const project = await api.project('playcity');
-    const [newest] = await api.revisions('project', project.id);
-    expect(newest).toMatchObject({ author, note, changed_fields: ['description_en'] });
-  });
+  // The stored revision: a change made in the app, with the note.
+  const project = await api.project('playcity');
+  const [newest] = await api.revisions('project', project.id);
+  expect(newest).toMatchObject({ channel: 'ui', note, changed_fields: ['description_en'] });
 });
 
 test('(d) diff of a revision, compare two versions, restore with the dry-run preview', async ({ page, api }) => {
@@ -55,12 +43,10 @@ test('(d) diff of a revision, compare two versions, restore with the dry-run pre
   const second = `Synthetic second description ${suffix}`;
   const notes = `Synthetic notes ${suffix}`;
   const project = await api.project('virtual-assets');
-  // Two changes by two team members: vA sets the description, vB changes it and adds notes.
-  const vA = (await api.patch('project', project.id, { description_en: first }, `Synthetic setup A ${suffix}`, ALICE))
+  // Two changes: vA sets the description, vB changes it and adds notes.
+  const vA = (await api.patch('project', project.id, { description_en: first }, `Synthetic setup A ${suffix}`)).version;
+  const vB = (await api.patch('project', project.id, { description_en: second, notes }, `Synthetic setup B ${suffix}`))
     .version;
-  const vB = (
-    await api.patch('project', project.id, { description_en: second, notes }, `Synthetic setup B ${suffix}`, BOB)
-  ).version;
   const before = vA - 1;
 
   await page.goto(`/projects/${project.id}?tab=history`);
@@ -105,7 +91,7 @@ test('(d) diff of a revision, compare two versions, restore with the dry-run pre
   // The preview is a dry run: nothing is written yet.
   expect((await api.item('project', project.id)).version).toBe(vB);
   await dialog.getByRole('checkbox', { name: 'Restore Notes' }).uncheck();
-  await expect(dialog).toContainText(`Undoes changes by: ${BOB} (1 revision)`);
+  await expect(dialog).toContainText('Undoes later changes: manual (1 revision)');
   await dialog.getByRole('textbox', { name: 'Note' }).fill(`Synthetic restore note ${suffix}`);
   await dialog.getByRole('button', { name: 'Restore', exact: true }).click();
   await expect(dialog).toBeHidden();
@@ -114,7 +100,7 @@ test('(d) diff of a revision, compare two versions, restore with the dry-run pre
   // A new revision (the history is never rewritten): description restored, notes kept.
   const restored = page.getByRole('row').filter({ hasText: `Synthetic restore note ${suffix}` });
   await expect(restored).toContainText(`from v${vA}`);
-  await expect(restored).toContainText(ALICE);
+  await expect(restored).toContainText('restore');
   const item = await api.item('project', project.id);
   expect(item.version).toBe(vB + 1);
   expect(item.fields.description_en).toBe(first);

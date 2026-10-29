@@ -1,15 +1,11 @@
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';
 
-// The backend's same-origin check compares Origin with Host (docs/API.md §1.1),
-// so the proxy must keep the browser's Host header: changeOrigin stays false.
-const apiProxy = {
-  '/api': { target: 'http://127.0.0.1:8000', changeOrigin: false },
-};
+// `make dev`: the Vite dev server forwards /api to the backend.
+const apiProxy = { '/api': 'http://127.0.0.1:8000' };
 
-// Libraries change less often than the app: separate chunks stay cached
-// (/assets is served as immutable, docs/API.md §6) and each stays below
-// Vite's chunk size warning.
+// Libraries change less often than the app: separate chunks stay cached and
+// each stays below Vite's chunk size warning.
 const vendorChunks = [
   { name: 'react', test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 3 },
   { name: 'mantine', test: /node_modules[\\/](@mantine|@floating-ui)[\\/]/, priority: 2 },

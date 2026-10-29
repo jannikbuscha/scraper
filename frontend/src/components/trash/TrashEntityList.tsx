@@ -33,7 +33,6 @@ function TrashRows({ type, items, onUndelete }: TrashRowsProps) {
         label: item.label,
         record: <TargetLink target={pageTarget(type, item.id)} label={item.label} />,
         deletedAt: item.deleted_at,
-        deletedBy: item.deleted_by,
         info: info?.get(item.id),
         onUndelete: () => {
           onUndelete({ type, item, info: info?.get(item.id) });

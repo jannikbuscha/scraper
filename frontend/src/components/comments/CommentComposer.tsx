@@ -6,7 +6,6 @@ import { useEffect, useRef, useState, type SubmitEvent } from 'react';
 
 import { useCreateComment } from '../../api/queries';
 import { errorMessage } from '../feedback';
-import { WriteButton } from '../WriteButton';
 import { ENTITY_LEVEL, type FieldOptionGroup } from './comment-fields';
 
 interface CommentComposerProps {
@@ -109,9 +108,9 @@ export function CommentComposer({
                 Cancel
               </Button>
             )}
-            <WriteButton type="submit" loading={create.isPending} disabled={text.trim() === ''}>
+            <Button type="submit" loading={create.isPending} disabled={text.trim() === ''}>
               {parentId === undefined ? 'Comment' : 'Reply'}
-            </WriteButton>
+            </Button>
           </Group>
         </Group>
       </Stack>

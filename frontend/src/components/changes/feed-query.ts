@@ -8,14 +8,14 @@ import { isIsoDate } from '../../lib/partial-date';
 import { splitList, type SearchRecord } from '../../lib/query-string';
 
 /** List filters of GET /api/revisions, comma-separated in the URL and the request. */
-const CHANGE_LIST_PARAMS = ['author', 'entity_type', 'channel', 'action'] as const;
+const CHANGE_LIST_PARAMS = ['entity_type', 'channel', 'action'] as const;
 export type ChangeListParam = (typeof CHANGE_LIST_PARAMS)[number];
 
 /** Every filter of the Recent changes page (paging excluded). */
 const CHANGE_FILTER_PARAMS: readonly string[] = [...CHANGE_LIST_PARAMS, 'since', 'until', 'batch_id'];
 
 /** Filters of the Comments page: GET /api/comments without `subject_id`. */
-const COMMENT_FILTER_PARAMS: readonly string[] = ['status', 'entity_type', 'author', 'q', 'deleted'];
+const COMMENT_FILTER_PARAMS: readonly string[] = ['status', 'entity_type', 'q', 'deleted'];
 
 const PAGING_PARAMS: readonly string[] = ['page', 'page_size'];
 

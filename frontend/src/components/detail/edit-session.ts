@@ -1,31 +1,20 @@
-// Edit mode of the detail page (docs/UI.md §4.1): a frozen base taken when
-// editing starts (kept in component state, never in the query cache), form
-// values, and the PATCH changes = the values that differ from the base.
+// Edit mode of the detail page (docs/UI.md §4.1): the record's fields when
+// editing started, the form values, and the PATCH changes = the values that
+// differ from the starting fields.
 import type { EntityTypeMeta, FieldSpec, Item, JsonObject, JsonValue } from '../../api/types';
 import { valuesEqual } from '../../lib/diff';
 import { fieldValueError, isMissingRequired } from '../../lib/field-validation';
 import { isEmptyValue } from '../../lib/format';
 import { requiresScopeNote, requiresVerificationNote } from '../../lib/write-rules';
-import type { ConflictResolution, EditBase } from '../conflict/conflict-resolution';
 import { isReadOnlyType } from '../fields/FieldInput';
 
 export interface EditSession {
-  base: EditBase;
+  /** The record's fields when editing started. */
+  initial: JsonObject;
   values: JsonObject;
 }
 
-/** Entering edit mode: `base = {fields: structuredClone(item.fields), version}`. */
-export function startEditSession(item: Item): EditSession {
-  return {
-    base: { fields: structuredClone(item.fields), version: item.version },
-    values: structuredClone(item.fields),
-  };
-}
-
-/** After a resolved conflict: the current state becomes the base, the chosen values the form. */
-export function sessionFromResolution({ base, changes }: ConflictResolution): EditSession {
-  return { base, values: { ...structuredClone(base.fields), ...structuredClone(changes) } };
-}
+export const startEditSession = (item: Item): EditSession => ({ initial: item.fields, values: item.fields });
 
 /** Fields the inline form edits; doc_links, json, derived, virtual and system fields stay read-only. */
 export function editableFields(typeMeta: EntityTypeMeta): FieldSpec[] {
@@ -34,12 +23,12 @@ export function editableFields(typeMeta: EntityTypeMeta): FieldSpec[] {
 
 const valueIn = (object: JsonObject, field: string): JsonValue => object[field] ?? null;
 
-/** Only the form values that differ from the frozen base. */
+/** Only the form values that differ from the fields when editing started. */
 export function changedValues(session: EditSession, fields: readonly FieldSpec[]): JsonObject {
   const changes: JsonObject = {};
   for (const field of fields) {
     const value = valueIn(session.values, field.name);
-    if (!valuesEqual(value, valueIn(session.base.fields, field.name))) changes[field.name] = value;
+    if (!valuesEqual(value, valueIn(session.initial, field.name))) changes[field.name] = value;
   }
   return changes;
 }

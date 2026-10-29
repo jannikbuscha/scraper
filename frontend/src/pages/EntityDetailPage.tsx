@@ -74,14 +74,8 @@ function DetailScreen({ type, item, meta, typeMeta }: DetailScreenProps) {
   const deleted = item.deleted_at !== null;
   const commentsOpen = search.comments === 'open';
 
-  // Edit mode starts only on a live record; once started it stays mounted
-  // (with its frozen base) even if the record is deleted meanwhile, so the
-  // user does not lose typed values silently.
-  const editRequested = search.edit === '1';
-  const [editing, setEditing] = useState(editRequested && !deleted);
-  if (editRequested && !deleted && !editing) setEditing(true);
-  if (!editRequested && editing) setEditing(false);
-
+  // Edit mode is only available on a live record.
+  const editing = search.edit === '1' && !deleted;
   const tab = editing ? 'details' : detailTab(search);
 
   /** Opens the comments panel with the composer set to a field (null: the whole record). */

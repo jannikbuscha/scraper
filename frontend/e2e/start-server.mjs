@@ -41,8 +41,6 @@ const env = {
   CODEBOOK_DIR: join(repoRoot, 'codebook'),
   SEED_DIR: join(repoRoot, 'seed'),
   FRONTEND_DIST: frontendDist,
-  ALLOWED_HOSTS: '127.0.0.1,localhost',
-  TEAM_MEMBERS: 'E2E Alice,E2E Bob',
   MAX_COMMENT_CHARS: '10000',
   FOCAL_ORG_SEED_KEY: 'ministry-of-digital-transformation',
   LOG_LEVEL: 'WARNING',

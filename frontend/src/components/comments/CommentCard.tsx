@@ -1,15 +1,13 @@
-// One comment (docs/UI.md §4.3): author and time, field chip and status for
-// roots, the sanitised body, the "edited" label (opens the revision history)
-// and the actions reply, edit, resolve/reopen, delete/undelete.
+// One comment (docs/UI.md §4.3): time, field chip and status for roots, the
+// rendered body, the "edited" label (opens the revision history) and the
+// actions reply, edit, resolve/reopen, delete/undelete.
 import { Badge, Button, Group, Stack, Text } from '@mantine/core';
 import { useState } from 'react';
 
-import { isConflictError } from '../../api/client';
 import type { Comment } from '../../api/types';
 import { notifyError } from '../feedback';
 import { Timestamp } from '../Timestamp';
-import { WriteButton } from '../WriteButton';
-import { CommentActionModal, useCommentAction, type CommentActionRequest } from './CommentActionModal';
+import { CommentActionModal, useCommentAction, type CommentDeletion } from './CommentActionModal';
 import { CommentBody } from './CommentBody';
 import { CommentEditor } from './CommentEditor';
 import { CommentHistoryModal } from './CommentHistoryModal';
@@ -29,27 +27,22 @@ export function CommentCard({ comment, fieldLabel, maxChars, maxNoteChars, onRep
   const { run, pending } = useCommentAction();
   const [editing, setEditing] = useState(false);
   const [history, setHistory] = useState(false);
-  const [request, setRequest] = useState<CommentActionRequest | null>(null);
+  const [deletion, setDeletion] = useState<CommentDeletion | null>(null);
   const isRoot = comment.parent_id === null;
   const deleted = comment.deleted_at !== null;
 
-  // Resolve and reopen are idempotent and need no confirmation; a 409 is
-  // shown like delete (docs/UI.md §1.3).
+  // Resolve and reopen need no confirmation.
   const setStatus = async (action: 'resolve' | 'reopen') => {
     try {
-      await run(action, comment.id, comment.version, null);
+      await run(action, comment.id, null);
     } catch (error) {
-      if (isConflictError(error)) setRequest({ action, conflict: error.payload });
-      else notifyError(error, `Could not ${action} the thread`);
+      notifyError(error, `Could not ${action} the thread`);
     }
   };
 
   return (
     <Stack gap={4} className={deleted ? classes.deleted : undefined}>
       <Group gap={6} wrap="wrap">
-        <Text span size="sm" fw={600}>
-          <bdi>{comment.created_by}</bdi>
-        </Text>
         <Text span size="xs" c="dimmed">
           <Timestamp value={comment.created_at} />
         </Text>
@@ -93,25 +86,25 @@ export function CommentCard({ comment, fieldLabel, maxChars, maxNoteChars, onRep
       ) : (
         <CommentBody html={comment.body_html} />
       )}
-      {isRoot && comment.status === 'resolved' && comment.resolved_by && (
+      {isRoot && comment.status === 'resolved' && comment.resolved_at && (
         <Text size="xs" c="dimmed">
-          Resolved by <bdi>{comment.resolved_by}</bdi> at <Timestamp value={comment.resolved_at} />
+          Resolved at <Timestamp value={comment.resolved_at} />
         </Text>
       )}
       {deleted && (
         <Text size="xs" c="dimmed">
-          Deleted by <bdi>{comment.deleted_by ?? 'unknown'}</bdi> at <Timestamp value={comment.deleted_at} />
+          Deleted at <Timestamp value={comment.deleted_at} />
         </Text>
       )}
       {!editing && (
         <Group gap={4}>
           {onReply && !deleted && (
-            <WriteButton variant="subtle" size="compact-xs" aria-label="Reply to thread" onClick={onReply}>
+            <Button variant="subtle" size="compact-xs" aria-label="Reply to thread" onClick={onReply}>
               Reply
-            </WriteButton>
+            </Button>
           )}
           {!deleted && (
-            <WriteButton
+            <Button
               variant="subtle"
               size="compact-xs"
               aria-label="Edit comment"
@@ -120,10 +113,10 @@ export function CommentCard({ comment, fieldLabel, maxChars, maxNoteChars, onRep
               }}
             >
               Edit
-            </WriteButton>
+            </Button>
           )}
           {isRoot && !deleted && (
-            <WriteButton
+            <Button
               variant="subtle"
               size="compact-xs"
               loading={pending}
@@ -131,27 +124,27 @@ export function CommentCard({ comment, fieldLabel, maxChars, maxNoteChars, onRep
               onClick={() => void setStatus(comment.status === 'resolved' ? 'reopen' : 'resolve')}
             >
               {comment.status === 'resolved' ? 'Reopen' : 'Resolve'}
-            </WriteButton>
+            </Button>
           )}
-          <WriteButton
+          <Button
             variant="subtle"
             size="compact-xs"
             color={deleted ? undefined : 'red'}
             aria-label={deleted ? 'Undelete comment' : 'Delete comment'}
             onClick={() => {
-              setRequest({ action: deleted ? 'undelete' : 'delete', conflict: null });
+              setDeletion(deleted ? 'undelete' : 'delete');
             }}
           >
             {deleted ? 'Undelete' : 'Delete'}
-          </WriteButton>
+          </Button>
         </Group>
       )}
       <CommentActionModal
         comment={comment}
-        request={request}
+        action={deletion}
         maxNoteChars={maxNoteChars}
         onClose={() => {
-          setRequest(null);
+          setDeletion(null);
         }}
       />
       <CommentHistoryModal

@@ -47,7 +47,7 @@ function SaveViewForm({ type, query, onDone }: { type: TableEntityType; query: s
       await create.mutateAsync({
         data: { name: name.trim(), entity_type: type, query, description: description.trim() || null },
       });
-      notifySuccess(`Saved the view “${name.trim()}”. It is visible to everyone.`);
+      notifySuccess(`Saved the view “${name.trim()}”.`);
       onDone();
     } catch (error) {
       const details = validationErrors(error);

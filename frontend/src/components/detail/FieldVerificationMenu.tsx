@@ -1,20 +1,14 @@
 // The verification dot of a field with its menu (docs/UI.md §4.1): Verified
 // with one of the field's evidence rows (or "Add evidence…" first), Disputed
 // (note required), Unverified. The evidence list loads when the menu opens.
-// Opening the menu captures the base of the choice: the record's version and
-// the field's value as shown then. Every choice is sent with that version, so
-// a change meanwhile (a background refetch while the user copies a quote from
-// the source) leads to a 409 and the question of docs/UI.md §1.3 instead of
-// verifying a value the user has not seen.
 import { Menu, Text, UnstyledButton } from '@mantine/core';
 import { IconCheck, IconPlus } from '@tabler/icons-react';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { useEntityList } from '../../api/queries';
-import type { FieldSpec, Item, JsonValue, VerificationStatus } from '../../api/types';
-import { useAuthor } from '../../hooks/useAuthor';
+import type { FieldSpec, Item, VerificationStatus } from '../../api/types';
 import { useVocabIndex } from '../../hooks/useVocabIndex';
-import { asString, getFieldValue } from '../../lib/format';
+import { asString } from '../../lib/format';
 import { canonicalQuery } from '../../lib/query-string';
 import { urlHost } from '../../lib/urls';
 import { termLabel } from '../../lib/vocab';
@@ -22,23 +16,11 @@ import { VerificationDot } from '../fields/VerificationDot';
 import classes from './detail.module.css';
 import { fieldVerification } from './verification';
 
-/** What the user saw when the menu opened: the record's version and the field's value. */
-export interface VerificationBase {
-  version: number;
-  value: JsonValue;
-}
-
-export type VerificationChoice = (
+export type VerificationChoice =
   | { kind: 'verified'; evidenceId: string }
   | { kind: 'add-evidence' }
   | { kind: 'disputed' }
-  | { kind: 'unverified' }
-) & { base: VerificationBase };
-
-const baseOf = (item: Item, field: FieldSpec): VerificationBase => ({
-  version: item.version,
-  value: getFieldValue(item, field),
-});
+  | { kind: 'unverified' };
 
 /** GET /api/entities/evidence?f.subject_id=in:<id>&f.target=eq:field:<name> */
 const fieldEvidenceQuery = (subjectId: string, field: string): string =>
@@ -71,16 +53,11 @@ interface FieldVerificationMenuProps {
 
 export function FieldVerificationMenu({ item, field, disabled, onChoose }: FieldVerificationMenuProps) {
   const vocab = useVocabIndex();
-  const author = useAuthor();
   const [opened, setOpened] = useState(false);
-  // Set when the menu opens; read only in the choice handlers.
-  const base = useRef<VerificationBase>(baseOf(item, field));
   const status: VerificationStatus = fieldVerification(item, field.name);
   const currentEvidence = item.field_meta[field.name]?.evidence_id ?? null;
   const evidence = useEntityList('evidence', fieldEvidenceQuery(item.id, field.name), { enabled: opened });
   const statusLabel = termLabel(vocab, 'verification_status', status);
-  const blocked = disabled || author === null;
-  const title = author === null ? 'Set your name (top right) to change the verification.' : undefined;
 
   const dot = <VerificationDot status={status} label={`${field.label}: ${statusLabel}`} />;
   if (item.deleted_at !== null) return dot;
@@ -88,10 +65,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
   return (
     <Menu
       opened={opened}
-      onChange={(next) => {
-        if (next) base.current = baseOf(item, field);
-        setOpened(next);
-      }}
+      onChange={setOpened}
       position="bottom-end"
       withinPortal
       shadow="md"
@@ -100,8 +74,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
       <Menu.Target>
         <UnstyledButton
           className={classes.dotButton}
-          disabled={blocked}
-          title={title}
+          disabled={disabled}
           aria-label={`Verification of ${field.label}: ${statusLabel}. Change`}
         >
           {dot}
@@ -117,7 +90,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
             key={row.id}
             leftSection={row.id === currentEvidence ? <IconCheck size={14} aria-label="current evidence" /> : null}
             onClick={() => {
-              onChoose({ kind: 'verified', evidenceId: row.id, base: base.current });
+              onChoose({ kind: 'verified', evidenceId: row.id });
             }}
           >
             <Text size="sm" lineClamp={2}>
@@ -128,7 +101,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
         <Menu.Item
           leftSection={<IconPlus size={14} />}
           onClick={() => {
-            onChoose({ kind: 'add-evidence', base: base.current });
+            onChoose({ kind: 'add-evidence' });
           }}
         >
           Add evidence…
@@ -141,7 +114,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
             </span>
           }
           onClick={() => {
-            onChoose({ kind: 'disputed', base: base.current });
+            onChoose({ kind: 'disputed' });
           }}
         >
           Disputed…
@@ -154,7 +127,7 @@ export function FieldVerificationMenu({ item, field, disabled, onChoose }: Field
           }
           disabled={status === 'unverified'}
           onClick={() => {
-            onChoose({ kind: 'unverified', base: base.current });
+            onChoose({ kind: 'unverified' });
           }}
         >
           Unverified

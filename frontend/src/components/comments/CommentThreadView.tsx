@@ -1,5 +1,5 @@
 // A comment thread (docs/UI.md §4.3): the root with field chip, status and
-// author/time, its replies below, and the reply composer.
+// time, its replies below, and the reply composer.
 import { Stack } from '@mantine/core';
 import { useState } from 'react';
 
@@ -26,7 +26,7 @@ export function CommentThreadView({ thread, fieldLabel, highlighted, maxChars, m
       id={threadElementId(root.id)}
       className={classes.thread}
       data-highlighted={highlighted}
-      aria-label={`Thread by ${root.created_by}${fieldLabel ? ` on ${fieldLabel}` : ''}`}
+      aria-label={`Thread on ${fieldLabel ?? 'the whole record'}`}
     >
       <CommentCard
         comment={root}
