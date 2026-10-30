@@ -87,19 +87,21 @@ In practice:
 ├── PLAN.md                architecture, rationale, phases, risks, decisions (§12), notes for the paper (§13)
 ├── CLAUDE.md  README.md
 ├── Makefile  Dockerfile  docker-compose.yml  .dockerignore  .env.example
+├── sources.yaml           (Phase 2) collector settings: per-host intervals, excluded hosts, licences, options, C5's fixture capture list (docs/COLLECTORS.md §3)
 ├── docker/entrypoint.sh   container start: mdt db upgrade → mdt seed → mdt serve
 ├── docs/
 │   ├── DATA_MODEL.md      contract: entities, fields, revisions, provenance, derived fields
 │   ├── API.md             contract: HTTP API, query grammar, exports, runtime
 │   ├── UI.md              contract: routes, pages, components, frontend tests
+│   ├── COLLECTORS.md      contract (Phase 2): polite client, runs, parsers, collectors C1–C5, importer, manual documents
 │   ├── CODEBOOK.md        vocabularies and coding rules
 │   └── SOURCES.md         source register
-├── codebook/              one YAML file per vocabulary + parameters.yaml (cut-off dates)
+├── codebook/              one YAML file per vocabulary + parameters.yaml (cut-off dates); Phase 2 adds event_patterns.yaml and collector_mappings.yaml
 ├── seed/                  projects.yaml: 19 + 1 projects and the focal organisation
-├── backend/               uv project: package mdt (src/mdt), alembic.ini, migrations/, tests/
+├── backend/               uv project: package mdt (src/mdt; Phase 2 adds collectors/, importers/, documents/), alembic.ini, migrations/, tests/
 ├── frontend/              Vite app (src/, e2e/); build output frontend/dist (gitignored)
 ├── .github/workflows/ci.yml
-├── data/                  runtime data, gitignored: app.db; later raw/, backups/, import/, logs/
+├── data/                  runtime data, gitignored: app.db; Phase 2 adds raw/ (raw snapshots and uploads) and fixtures/ (fixtures captured on the server); later backups/
 └── releases/              frozen dataset releases (Phase 4; committed and tagged); until then only README.md, which keeps the bind-mount directory in every clone
 ```
 
@@ -118,12 +120,13 @@ In practice:
 | `make check` | All quality gates: lint, typecheck, unit tests, frontend build, E2E |
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | `mdt db upgrade` · `mdt seed` · `mdt recompute` · `mdt check` on the local database |
 | `uv run --project backend mdt reindex` | Rebuild both full-text search tables in batches; the app stays usable (no make target) |
+| `make collect SOURCE=<name> [MODE=full]` · `make fixtures SOURCE=wayback` · `make sources-check` | (Phase 2, once implemented) run a collector in the foreground · record its fixture list · re-check every source host from this machine (`docs/COLLECTORS.md` §11) |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose: build and start (waits until healthy) · stop · follow logs · build the image |
 
 Direct commands:
 - Backend quality gates: `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q`
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e`
-- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex`, `serve [--host] [--port] [--reload]`. `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
+- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex`, `serve [--host] [--port] [--reload]`. Phase 2 adds (once implemented): `collect <name> [--mode] [--limit N] …`, `runs [show <id>]`, `fixtures capture <name>`, `sources check`, `import <file> --type <type> [--dry-run] …` and `check --deep` (`docs/COLLECTORS.md` §11). `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
 - E2E needs Chromium: where `/opt/pw-browsers` exists, the Makefile sets `PLAYWRIGHT_BROWSERS_PATH` to it; elsewhere run `cd frontend && npx playwright install chromium` once.
 
 ## Docker and configuration
@@ -140,7 +143,7 @@ Direct commands:
 
 - **Language:** code, comments, UI text, documentation and the codebook in English (the language of the paper). The data lead is addressed in German.
 - **Commits:** Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `build:`, `ci:`, `chore:`; dataset releases later `data: release <name>`). Small, focused commits.
-- **Contracts:** `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md` are binding. Every interface change (fields, endpoints, parameters, behaviour) updates the affected contract document in the same change.
+- **Contracts:** `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md` are binding, and from Phase 2 on `docs/COLLECTORS.md`. Every interface change (fields, endpoints, parameters, behaviour) updates the affected contract document in the same change.
 - **Tests run offline** against fixtures (collector fixtures in `backend/tests/fixtures/<collector>/`). No test may depend on network access.
 - **One write path:** every change of curated data goes through `apply_change` or the other write actions of `docs/DATA_MODEL.md` §6.4, which share its machinery (write transaction, revision, field provenance, field locks); see `docs/DATA_MODEL.md` §6.
 - **No LLM calls in the app** (no automatic classification or translation) and no machine translation in the data: a missing English name stays empty.
@@ -151,5 +154,5 @@ Direct commands:
 ## Where to read more
 
 - `PLAN.md`: architecture (§3), data model rationale (§4), data acquisition (§5), versioning and reconciliation (§6), web app (§7), operations (§8), phases (§10), risks (§11), decisions (§12), notes for the paper (§13), open questions (§14).
-- `docs/DATA_MODEL.md`, `docs/API.md`, `docs/UI.md`: the Phase 1 contracts.
+- `docs/DATA_MODEL.md`, `docs/API.md`, `docs/UI.md`: the Phase 1 contracts, extended for Phase 2; `docs/COLLECTORS.md`: the Phase 2 contract for collectors, importer and manual documents.
 - `docs/CODEBOOK.md`, `codebook/README.md`, `seed/README.md`, `docs/SOURCES.md`.

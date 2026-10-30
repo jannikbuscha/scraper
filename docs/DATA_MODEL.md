@@ -1,7 +1,7 @@
 # Data model
 
-> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the clarifications of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user without concurrent editing (decision D-15, `PLAN.md` §12). Implementations must follow this document. Deviations must be agreed and the document updated in the same change.
-> **Related:** `PLAN.md` §4 and §6 (rationale), `docs/API.md` (HTTP interface), `docs/UI.md` (frontend), `docs/CODEBOOK.md` (vocabularies and coding rules).
+> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the clarifications of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user without concurrent editing (decision D-15, `PLAN.md` §12). **Extended on 2026-10-30 with the Phase 2 contract** (data acquisition): §14 system tables, §15 reconciliation, §16 proposals, §17 imports and manual documents, §18 merging, plus the marked additions in §1–§13; revised the same day after a four-lens review. Implementations must follow this document. Deviations must be agreed and the document updated in the same change.
+> **Related:** `PLAN.md` §4 and §6 (rationale), `docs/API.md` (HTTP interface), `docs/UI.md` (frontend), `docs/CODEBOOK.md` (vocabularies and coding rules), `docs/COLLECTORS.md` (collector framework, the collectors, importer and manual documents).
 
 ## 1. Conventions
 
@@ -9,7 +9,7 @@
 
 | Topic | Rule |
 |---|---|
-| **IDs** | Prefixed ULIDs as text primary keys: `<prefix>_<26-char ULID>`, e.g. `prj_01JBX3…`. The prefix determines the entity type (§3). IDs are never reused or regenerated. |
+| **IDs** | Prefixed ULIDs as text primary keys: `<prefix>_<26-char ULID>`, e.g. `prj_01JBX3…`. The prefix determines the entity type (§3). IDs are never reused or regenerated. The Phase 2 system tables use `run_` (collector run), `raw_` (raw snapshot), `prp_` (proposal), `imp_` (import run) and `mrg_` (merge log); fetch-log, run-message and observation rows have integer keys (§14). |
 | **Timestamps** | UTC. Every timestamp comes from one helper, `utc_now()`, which writes `datetime.now(UTC)` as `YYYY-MM-DDTHH:MM:SS.ffffffZ` (the year always with four digits), and is stored as TEXT through a `UtcTimestamp` type that accepts only aware UTC datetimes or exactly this pattern. There is no `server_default` and no SQLite date function. One write unit uses a single timestamp for `updated_at`, every `field_meta[*].at` and `revision.at`. "Newest first" for revisions means `ORDER BY revision.id DESC`. |
 | **Calendar dates** (type `date`) | TEXT `YYYY-MM-DD`. Publication dates are calendar dates in Europe/Kyiv. |
 | **Partial dates** (type `partial_date`) | Canonical strings only: `YYYY`, `YYYY-Qn` (uppercase `Q`, n = 1–4), `YYYY-MM`, `YYYY-MM-DD`; years 1900–2100. Anything else, e.g. `2022-q1` or `2022-02-30`, is rejected. Storage: three columns `<name>_start`, `<name>_end` (inclusive, `YYYY-MM-DD`) and `<name>_precision` (`day`, `month`, `quarter`, `year`), all derived from the string. Exception: the derived `launch` keeps the launch interval over all candidates in `launch_start`/`launch_end` next to the displayed candidate (§4, §8.3). |
@@ -73,7 +73,7 @@ A single registry module describes every entity type and its fields. Validation,
 | `datetime` | timestamp or null | TEXT (§1.1) | date-range filters compare the UTC calendar date |
 | `alias_list` | object[] | JSON | §1.2 |
 | `json` | any JSON | JSON | collector-filled structures |
-| `doc_links` | object[] | table `document_link` | items `{subject_id, origin: "auto"|"manual", state: "suggested"|"confirmed"|"rejected"}` plus read-only `matched_aliases`, `match_count`, `snippet` |
+| `doc_links` | object[] | table `document_link` | items `{subject_id, origin: "auto"\|"manual", state: "suggested"\|"confirmed"\|"rejected"}` plus read-only `matched_aliases`, `match_count`, `snippet` |
 
 ### 2.2 Field attributes
 
@@ -106,7 +106,7 @@ Every curated entity table (all tables in §3) has these columns:
 | `created_at`, `created_by` | TEXT | — | `created_by` = `user` (written in the app), `seed`, `import:<file>` or `collector:<name>` |
 | `updated_at`, `updated_by` | TEXT | — | |
 | `deleted_at`, `deleted_by` | TEXT NULL | state | soft delete |
-| `merged_into` | TEXT NULL | state | ID of the surviving entity after a merge (Phase 2); a merge always also sets `deleted_at` |
+| `merged_into` | TEXT NULL | state | ID of the surviving entity after a merge (Phase 2, projects and services); a merge always also sets `deleted_at`, and only an unmerge clears both (§18) |
 | `verification_status` | TEXT NOT NULL DEFAULT `unverified` | ✓ | record-level review status (§7); vocabulary `verification_status`; group `basics`; filter multiselect; sortable; in list |
 | `notes` | TEXT NULL | ✓ | internal notes; group `sources` |
 | `field_meta` | JSON NOT NULL DEFAULT `{}` | — | provenance per field (§5) |
@@ -121,6 +121,9 @@ The system columns are also registry fields (read-only, group `system`), so tabl
 Every curated type has these virtual fields. They are computed by correlated subqueries and are filterable, sortable and exportable like stored fields; `GET /api/meta` describes them like stored fields.
 - **`open_comments`** (int): the number of non-deleted root comments with status `open` on the entity, field-level threads included. Filter `number_range`; sortable; in list for the five table types.
 - **`comment_count`** (int): the visible comments on the entity, replies included: non-deleted comments outside deleted threads (the replies of a deleted root are hidden with their thread and not counted). Filter `number_range`; sortable.
+- **`open_proposals`** (int, Phase 2; project, service, event and document only, the types proposals concern): the open proposals (§16) whose `subject_id` or `related_id` is the entity. Filter `number_range`; sortable; not in list.
+
+Source observations (§14.5) are not fields: crawl times are not dates of a project, so they appear only in the detail panel "Seen in sources" and on the source pages (`docs/UI.md` §8), never in tables or exports.
 
 ## 3. Curated entities
 
@@ -216,6 +219,7 @@ The virtual `*_in_paper_scope` fields (here and in §3.3, §3.4) use the `in_pap
 | `published_text` | string (verbatim) | | | ✓ | So | text | | |
 | `published_at_utc` | datetime | | | system | So | date_range | ✓ | |
 | `retrieved_at` | datetime: retrieval time of the current content version (required with `url` on channel ui) | | | ✓ | So | date_range | ✓ | |
+| `source_record_at` | datetime (Phase 2): the timestamp a source attaches to its record of the document when that is not a publication date (thedigital.gov.ua documents: the site's `publishedAt`, `docs/COLLECTORS.md` §8.4); never copied into `published` | | | system | So | date_range | ✓ | |
 | `source_id`, `external_id`, `raw_snapshot_id`, `text_hash`, `extraction_method` | string | | | system | So | | | |
 | `archive_urls` | url_list | | | ✓ | So | | | |
 | `license` | vocab | `license` | | ✓ | So | multiselect | ✓ | |
@@ -264,7 +268,7 @@ The UI tables in Phase 1 cover project, service, event, document and organizatio
 | Table | Columns | Rules |
 |---|---|---|
 | `vocabulary` | `name` PK, `label`, `description`, `multi`, `fixed_codes` (bool), `source_file` | Metadata loaded from `codebook/*.yaml` by the seed. It changes only through the YAML files, which are versioned in git; the terms themselves are revisioned in the database. |
-| `revision` | `id` INTEGER PK AUTOINCREMENT, `entity_type`, `entity_id`, `version`, `at`, `author`, `channel` (`seed`, `ui`, `collector`, `import`, `restore`, `merge`, `system`), `action` (`create`, `update`, `verify`, `delete`, `undelete`, `restore`, `merge`, `resolve`, `reopen`), `note` (≤ 2 000), `run_id`, `proposal_id`, `restored_from` (revision id), `restored_from_version`, `batch_id`, `schema_revision` (Alembic head at write time), `snapshot` (JSON), `diff` (JSON) | UNIQUE (`entity_id`, `version`). **Append-only:** SQLite triggers abort every UPDATE and DELETE (`RAISE(ABORT, 'revision is append-only')`); see §11 for migrations. |
+| `revision` | `id` INTEGER PK AUTOINCREMENT, `entity_type`, `entity_id`, `version`, `at`, `author`, `channel` (`seed`, `ui`, `collector`, `import`, `restore`, `merge`, `system`), `action` (`create`, `update`, `verify`, `delete`, `undelete`, `restore`, `merge`, `unmerge`, `resolve`, `reopen`), `note` (≤ 2 000), `run_id`, `proposal_id`, `restored_from` (revision id), `restored_from_version`, `batch_id`, `schema_revision` (Alembic head at write time), `snapshot` (JSON), `diff` (JSON) | UNIQUE (`entity_id`, `version`). **Append-only:** SQLite triggers abort every UPDATE and DELETE (`RAISE(ABORT, 'revision is append-only')`); see §11 for migrations. |
 | `comment` (`cmt_`) | `id`, `subject_id`, `field`, `parent_id`, `body_md`, `status`, `resolved_by`, `resolved_at`, `version`, `created_*`, `updated_*`, `deleted_*` | rules in §6.6 |
 | `document_text` | `text_hash` PK (sha256 of the normalised text), `text`, `char_count`, `created_at` | immutable |
 | `document_link` | `id`, `document_id` FK, `subject_id`, `origin`, `state`, `matched_aliases` (JSON), `match_count`, `snippet` | UNIQUE (`document_id`, `subject_id`); managed through the document's `links` field and part of its snapshot |
@@ -274,30 +278,32 @@ The UI tables in Phase 1 cover project, service, event, document and organizatio
 | `fts_document` | FTS5 (`title`, `body`), `rowid` = `search_key.rowid`, same tokenizer | |
 | `app_state` | `key` PK, `value` | e.g. the hash of `codebook/parameters.yaml` and of the modification event types, used to trigger recomputes (§8) |
 
-Later phases add `proposal`, `collector_run`, `fetch_log`, `raw_snapshot`, `source_observation`, `release` and `merge_log` (see `PLAN.md` §4.3) through new migrations.
+Phase 2 adds `raw_snapshot`, `collector_run`, `fetch_log`, `run_message`, `source_observation`, `proposal`, `merge_log` and `import_run` (§14) in migration `0002` (§11); Phase 4 adds `release`.
 
 ## 5. Field provenance (`field_meta`)
 
 `field_meta` is a JSON object keyed by field name. There is one entry per tracked field that has ever been set:
 
 ```json
-{"name_en": {"src": "seed", "by": "seed", "at": "2026-10-28T17:00:00.000000Z", "locked": true, "verified": "unverified", "evidence_id": null, "restored_from_version": null}}
+{"name_en": {"src": "seed", "by": "seed", "at": "2026-10-28T17:00:00.000000Z", "locked": true, "verified": "unverified", "evidence_id": null, "restored_from_version": null, "raw_snapshot_ids": null}}
 ```
 
 | Channel | `src` | `by` | `locked` |
 |---|---|---|---|
 | `ui` | `manual` | `user` | true |
+| `ui`, accepting a proposal (Phase 2, §16.4) | `collector:<name>@<run_id>` of the proposal for values observed in a source and taken unchanged; `manual` for edited values, add-only list results, values the person adds and suggested interpretations | `user` | true |
 | `seed` | `seed` | `seed` | true |
-| `import` | `import:<file>` | `import:<file>` | true |
-| `collector` (Phase 2) | `collector:<name>@<run_id>` | `collector:<name>` | false. A change to a locked field is refused (`LockedFieldError`); the reconciler turns it into a proposal. |
+| `import` (Phase 2, §17.1) | `import:<file>` | `import:<file>` | true |
+| `collector` (Phase 2, §15) | `collector:<name>@<run_id>` | `collector:<name>` | false. `apply_change` refuses a change to a locked field (`LockedFieldError`), except system fields (§15.5) and appending suggested links (§15.8); the reconciler decides before it writes, so runs never hit the error (§15.11) |
 | `restore` | `src` of the restored snapshot's entry, or `manual` if it has none | `user` | true |
-| `merge` (Phase 2) | `src` of the chosen value | `user` | true |
+| `merge` (Phase 2, §18) | `manual` (a value the person chose from the merged record; entries are never copied) | `user` | true |
 | `system` | mirrors the source field (e.g. `canonical_url` mirrors `url`) | as the source field | as the source field |
 
 - **One user (D-15):** every write through the app is recorded with `by = user`; entries written before that decision may still read `src = manual:<name>` and count as `manual`.
+- **`raw_snapshot_ids`** (Phase 2): the raw snapshots (§14.1) the value was parsed from, so every collected value can be traced to a URL and a retrieval time. Set on channel `collector` from the candidate (§15.1) and, when a proposal's observed value is accepted, from the proposal (§16.4); null on every other channel and in entries written before Phase 2. Like every key except `at` it appears in meta diffs (§6.3).
 - **Entries are never removed.** Clearing a field (setting it to empty) writes an entry like any other change, so a cleared value stays protected.
 - **Exception on create:** fields that are empty on create get no entry.
-- **Value changes** set `verified = "unverified"`, `evidence_id = null` and `restored_from_version = null` (a restore then sets it).
+- **Value changes** set `verified = "unverified"`, `evidence_id = null`, `restored_from_version = null` (a restore then sets it) and `raw_snapshot_ids` as stated above.
 - **Restore** sets `verified = "unverified"`, `evidence_id = null`, `restored_from_version = <version>`. A restored value must be verified again.
 - **Field verification** (§6.4) sets `verified` and, for `verified`, `evidence_id`; it also sets `locked = true`.
 - **`evidence_id` write path:** it is written only by field verification. The evidence rows that target a field (`target = field:<name>`) are its full evidence list.
@@ -319,14 +325,17 @@ Later phases add `proposal`, `collector_run`, `fetch_log`, `raw_snapshot`, `sour
 ### 6.2 One write path
 
 **Channels:**
-- Every HTTP write uses channel `ui`; the restore endpoints use channel `restore`. Both record the fixed actor name `user` (`USER_NAME` in `mdt.domain.actor`): the app has one user and asks for no name (D-15). No header, query parameter or body field can select a channel, an author or a `src`.
-- The channels `seed`, `collector`, `import`, `merge` and `system` are reachable only from the CLI and in-process jobs.
+- Every HTTP write uses channel `ui`; the restore endpoints use channel `restore` and the merge and unmerge endpoints channel `merge` (Phase 2, §18). All three record the fixed actor name `user` (`USER_NAME` in `mdt.domain.actor`): the app has one user and asks for no name (D-15). No header, query parameter or body field can select a channel, an author or a `src`.
+- The channels `seed`, `collector`, `import` and `system` are reachable only from the CLI and in-process jobs: collector runs (also those started from the UI, which run in the server's background worker, `docs/COLLECTORS.md` §6) and imports (started from the UI, executed by the server on channel `import`, §17.1).
+- **Revision links (Phase 2):** a write on channel `collector` sets `revision.run_id`; a write that accepts a proposal sets `revision.proposal_id` (§16.4); imports set `revision.batch_id` to the import run's ID; merges share one `batch_id` (§18).
 
 Every create or update of a curated entity (including comments, vocabulary terms and saved views) goes through `apply_change`; the other actions of §6.4 (and the seed) use the same machinery of `mdt.domain.writes`: write unit, normalisation and validation, the `version` bump, `field_meta`, a revision with a full snapshot, FTS and derived refresh.
 
-`apply_change(session, entity_type, entity_id | None, changes, actor, *, note=None, batch_id=None) -> ChangeResult`
+`apply_change(session, entity_type, entity_id | None, changes, actor, *, note=None, batch_id=None, field_snapshots=None) -> ChangeResult`
 
-The channel, the collector run and the import file travel in the actor: `Actor(name, channel, run_id=None, file=None)`, built with `Actor.ui()`, `Actor.restore()`, `Actor.seed()`, `Actor.importer(file)`, `Actor.collector(name, run_id)` or `Actor.system()`. The name is `user` for `ui` and `restore`, otherwise `seed`, `import:<file>`, `collector:<name>` or `system`.
+`field_snapshots` (Phase 2) maps fields to the raw snapshots their values were parsed from; it fills `field_meta[*].raw_snapshot_ids` (§5) on channel `collector` and for observed values accepted from a proposal.
+
+The channel, the collector run and the import file travel in the actor: `Actor(name, channel, run_id=None, file=None, proposal_id=None, proposal_src=None)`, built with `Actor.ui()`, `Actor.restore()`, `Actor.seed()`, `Actor.importer(file)`, `Actor.collector(name, run_id)`, `Actor.system()` and, in Phase 2, `Actor.accept(proposal_id, proposal_src)` (channel `ui`; values listed as taken unchanged get `src = proposal_src`, §16.4) and `Actor.merge()` (channel `merge`, for merge and unmerge). The name is `user` for `ui`, `restore` and `merge`, otherwise `seed`, `import:<file>`, `collector:<name>` or `system`. `insert_revision` writes `actor.run_id` and `actor.proposal_id` into the revision.
 
 1. **Normalise and validate** (§1.2, §7):
    - field names must exist and be writable on this channel: `editable` for `ui`; `create_only` fields only on create; `system` fields never from clients;
@@ -378,15 +387,17 @@ All of these run as write units (§6.1) and create a revision, except no-ops: a 
 |---|---|
 | **Field verification** | `set_field_verification(entity, field, status, actor, note, evidence_id)`. The field must be tracked, non-system and non-empty (`verification_status` itself cannot be field-verified). `verified` requires `evidence_id` of a non-deleted evidence row with the same `subject_id` and `target = field:<name>` that quotes the source verbatim (non-empty `quote`, CODEBOOK §2.3), else 400 `evidence_required`. `disputed` requires a note. Sets `locked = true`. The revision has a `meta` diff only. A field that has no `field_meta` entry yet (e.g. a default value) gets one with `src = manual`. |
 | **Soft delete** | `soft_delete(entity, actor, note, cascade=False)`. A project with non-deleted services, or a service with non-deleted descendant services (child services at any depth), raises `HasDependentsError` (counts `{"service": n}`) unless `cascade=True`. An evidence row that a field verification rests on (its subject's `field_meta[<target field>]` has `verified = "verified"` and this `evidence_id`, whatever the subject's deletion state) raises `HasDependentsError` (`{"field_verification": 1}`) **also with `cascade=True`**: withdraw the verification (`unverified` or `disputed`) or verify the field with other evidence first, so a verified field never rests on evidence in the trash (§5). Every delete gets a new `batch_id`; a cascade deletes the dependents with the same `batch_id`, in **one transaction** (all or nothing). Events, comments and evidence are not deleted. Deleting a deleted row → 409 `invalid_state`. Vocabulary terms cannot be deleted (409 `not_deletable`; deactivate instead). |
-| **Undelete** | Clears `deleted_*`. It re-validates uniqueness (409 `unique_violation`) and required references (409 `reference_deleted` {field, id, type, label}; comment subjects and parents may stay deleted). With `cascade=True` it also undeletes the rows whose latest revision is the delete revision with this row's delete `batch_id`, in one transaction. The undelete revisions share a new `batch_id`. Undeleting a live row → 409 `invalid_state`. |
-| **Restore version** | `restore_version(entity, version, actor, note, fields=None, dry_run=False)`, all or nothing. Applies the tracked, editable, non-create-only fields present in that version's snapshot whose value differs, optionally limited to `fields`. `dry_run` returns `{field: [current, restored]}` without writing; the UI uses it as a preview. Fields missing from an old snapshot are left unchanged; `state` is never restored; dependent system fields are recomputed. On channel `restore`, inactive vocabulary codes are accepted and reported back in `warnings`. The scope rule (§7) applies: restoring `in_paper_scope` submits the snapshot's `scope_note` along (if it equals the current note, the current note is submitted); a `fields` list that restores `in_paper_scope` but leaves out a differing `scope_note` → 400. `skipped_fields` lists what is not restored: requested fields that are untracked or missing from the snapshot, and non-restorable fields (system, create-only or not editable) that differ or were requested. Errors: a requested name that is not a field of the type → 400; an unknown version → 404; 409 `unique_violation` {field, existing}; 409 `reference_deleted` {field, id, type, label}; any other validation error → 400. Not allowed on a deleted entity (409 `entity_deleted`; undelete first). |
+| **Undelete** | Clears `deleted_*`. It re-validates uniqueness (409 `unique_violation`) and required references (409 `reference_deleted` {field, id, type, label}; comment subjects and parents may stay deleted). With `cascade=True` it also undeletes the rows whose latest revision is the delete revision with this row's delete `batch_id`, in one transaction. The undelete revisions share a new `batch_id`. Undeleting a live row → 409 `invalid_state`. A merged record (`merged_into` set, Phase 2) is not undeleted but unmerged (409 `invalid_state` `{state: "merged"}`, §18). |
+| **Restore version** | `restore_version(entity, version, actor, note, fields=None, dry_run=False)`, all or nothing. Applies the tracked, editable, non-create-only fields present in that version's snapshot whose value differs, optionally limited to `fields`. `dry_run` returns `{field: [current, restored]}` without writing; the UI uses it as a preview. Fields missing from an old snapshot are left unchanged; `state` is never restored; dependent system fields are recomputed. On channel `restore`, inactive vocabulary codes are accepted and reported back in `warnings`. The scope rule (§7) applies: restoring `in_paper_scope` submits the snapshot's `scope_note` along (if it equals the current note, the current note is submitted); a `fields` list that restores `in_paper_scope` but leaves out a differing `scope_note` → 400. `skipped_fields` lists what is not restored: requested fields that are untracked or missing from the snapshot, and non-restorable fields (system, create-only or not editable) that differ or were requested. Errors: a requested name that is not a field of the type → 400; an unknown version → 404; 409 `unique_violation` {field, existing}; 409 `reference_deleted` {field, id, type, label}; any other validation error → 400. Not allowed on a deleted entity (409 `entity_deleted`; undelete first). Phase 2, documents: the text version (§15.6) is one unit: restoring `retrieved_at` from a version with another `text_hash` also restores `text_hash`, `raw_snapshot_id` and `extraction_method` (listed in `changes`, not in `skipped_fields`), and they are never restored without it. |
+| **Accept / reject a proposal** (Phase 2) | §16.4: accepting writes through `apply_change` (or the create path) with `Actor.accept`; rejecting writes no curated data. |
+| **Merge / unmerge** (Phase 2) | §18: one transaction, one `batch_id`, a revision per changed row, a `merge_log` row; unmerge reverses a merge the same way. |
 | **Bulk edit** | The request names the records by `ids`; each record runs as its own write unit with a shared `batch_id`. Operations: `set` (field → value), `add` (append missing values at the end, in the given order) and `remove` (delete values) for list fields. The whole request is rejected with 400 if a field is not `bulk_editable` (except `scope_note` in `set` next to `in_paper_scope`, §7), a field appears in more than one operation, `add`/`remove` targets a non-list field, no operation is given, `ids` is empty, or an ID is duplicated. Per record, the result is `updated`, `unchanged` or `entity_deleted` (each with the record's `version`; a deleted record is not changed) or `error` (with the error object of `docs/API.md` §1.2, e.g. `not_found`). At most 500 records. |
 
 ### 6.5 Concurrency
 
 The app has one user and does not detect conflicting edits (decision D-15): there is no optimistic locking, no `expected_version` and no conflict error.
 - Write units are serialised by SQLite's write lock (`BEGIN IMMEDIATE`, §6.1). Each one applies its changes to the row as it reads it inside the unit, so of two overlapping edits of the same field the later one wins; both stay in the history and can be compared and restored.
-- What protects data is not a version check but the field rules: automatic channels (seed, import, collector) never overwrite a locked field (§5, §9), and every change is a revision.
+- What protects data is not a version check but the field rules: automatic channels (seed, import, collector) never overwrite a locked field (§5, §9, §15.5, §17.1), collectors also leave records a person verified or disputed unchanged (§15.5), and every change is a revision. A collector reconciles each entity in one write unit that re-reads the row and its `field_meta` (§15.11), so a field a person locked a moment earlier becomes a proposal, never an overwrite.
 - A PATCH carries only the fields the user changed (UI §4.1), so other fields written meanwhile, e.g. by a collector, are not reverted.
 
 ### 6.6 Comments
@@ -560,6 +571,7 @@ terms:
 4. **Foreign keys** are `ON DELETE RESTRICT`, never CASCADE (rows are only soft-deleted anyway).
 5. **Test and E2E databases** are created with `alembic upgrade head`, never with `create_all`. A test asserts that both triggers exist and that UPDATE and DELETE on `revision` raise.
 6. **Startup self-check:** `sqlite_version` ≥ 3.40 and FTS5 available (a temporary fts5 table can be created); otherwise exit with a clear message.
+7. **Phase 2: revision `0002`** (`backend/migrations/versions/20261030_0002_data_acquisition.py`, `down_revision = "0001"`). Revision `0001` is never edited. `0002` creates the tables of §14 with their indexes and the append-only triggers of `raw_snapshot` (DDL constants in `mdt/db/ddl.py`, like the revision triggers; a later batch alteration of `raw_snapshot` re-executes them, as in item 3), adds the nullable column `document.source_record_at` with a plain `ALTER TABLE … ADD COLUMN` (`op.add_column` outside batch mode, so `document` and its partial unique index are not recreated), and creates the index `document(source_id, external_id)` (§12). It does not alter `revision`: `run_id` and `proposal_id` exist since `0001`. Its downgrade drops what it created. The startup check (API §6) then requires head `0002`; `mdt db upgrade` applies it.
 
 ## 12. Indexes
 
@@ -575,6 +587,8 @@ Unique constraints as in §7. In addition:
 
 `json_each` filters are acceptable because only project and service have list fields of noticeable size. List endpoints load refs, labels, derived rows and virtual counts per page in batches, never per row.
 
+Phase 2: `document(source_id, external_id)` and the indexes of the §14 tables (listed with each table).
+
 ## 13. Integrity checks (`mdt check`)
 
 The check reports, without changing anything, and exits non-zero if anything is found (at most 50 lines per kind of problem):
@@ -585,3 +599,359 @@ The check reports, without changing anything, and exits non-zero if anything is 
 - entities whose `version` or stored fields/`field_meta` differ from their latest revision snapshot;
 - entities with no revision;
 - fields whose `field_meta` entry says `verified` while its `evidence_id` is missing, names a deleted evidence row, names evidence of another record or field, or names evidence without a quote (kind `verification`, §5, §6.4).
+- Phase 2:
+  - `raw_snapshot` rows whose body file is missing or has another size than `size` (the file is not re-hashed; `mdt check --deep` re-hashes every file and compares `sha256`);
+  - references to missing rows: `document.raw_snapshot_id`, `evidence.raw_snapshot_id`, `proposal.raw_snapshot_id`, `fetch_log.raw_snapshot_id`, every `field_meta[*].raw_snapshot_ids` entry (§5), `document.text_hash` without a `document_text` row, observations and open proposals whose `subject_id`/`related_id` names no record;
+  - missing append-only triggers on `raw_snapshot`;
+  - more than one run in status `running`, and runs in status `running` whose `heartbeat_at` is older than the stale limit (`docs/COLLECTORS.md` §6.3);
+  - records with `merged_into` that are not deleted, or whose survivor does not exist.
+
+## 14. Data acquisition tables (Phase 2)
+
+System tables of migration `0002`. They are not curated entities: they have no `field_meta` and no revisions, and the generic entity API does not serve them (their endpoints are in `docs/API.md` §7). Timestamps follow §1.1, JSON columns §6.1 item 4. Foreign keys are `ON DELETE RESTRICT`; nothing here is ever deleted in Phase 2 (a purge is Phase 4, `PLAN.md` §6.4).
+
+### 14.1 `raw_snapshot` (prefix `raw_`)
+
+One row per response body the app has kept: every final response of a polite-client request that has a body (whatever its HTTP status), every upload and every replayed fixture response. **Rows are immutable** (append-only triggers abort `UPDATE` and `DELETE`, like those of `revision`).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | TEXT PK | `raw_<ULID>` |
+| `run_id` | TEXT NULL, FK `collector_run` | null for uploads and manual fetches |
+| `source_id` | TEXT NOT NULL | collector name (key in `sources.yaml`), or `manual` (uploads, manual fetches) |
+| `via` | TEXT NOT NULL | `live` · `wayback:<14-digit timestamp>` (an archived copy fetched by hand, `docs/COLLECTORS.md` §10.3; the capture's timestamp, taken from the final URL) · `upload` · `replay` (a fixture served by the replay transport in tests and E2E, `docs/COLLECTORS.md` §4.10) |
+| `url` | TEXT NULL | requested URL (normalised as in `docs/COLLECTORS.md` §4.1); null for uploads |
+| `final_url` | TEXT NULL | URL of the final response after redirects |
+| `redirects` | JSON NOT NULL DEFAULT `[]` | hops as `"<status> <url>"` |
+| `http_status` | INTEGER NULL | null for uploads |
+| `fetched_at` | TEXT NOT NULL | UTC; the upload time for uploads; the fixture's `retrieved_at` for `replay` |
+| `headers` | JSON NOT NULL DEFAULT `{}` | lower-case names, only `content-type`, `content-length`, `content-encoding`, `content-language`, `content-disposition`, `etag`, `last-modified`, `cache-control`, `date` (never cookies or request headers) |
+| `content_type` | TEXT NULL | media type without parameters, lower-case (from the header; for uploads from the file name and magic bytes) |
+| `filename` | TEXT NULL | original file name of an upload (base name only) |
+| `sha256` | TEXT NOT NULL | SHA-256 (hex) of the body |
+| `size` | INTEGER NOT NULL | body length in bytes |
+
+- **Body** = the HTTP entity body after removing the transfer coding (`Content-Encoding` gzip/deflate), otherwise unchanged: never re-encoded, re-serialised, trimmed or normalised; for uploads the uploaded bytes.
+- **File:** `<DATA_DIR>/raw/<sha256[0:2]>/<sha256>.gz`, gzip of the body (compression level 6, header mtime 0, no file name, so equal bodies give equal files). It is written to a temporary file in the same directory and renamed; an existing file is never rewritten (content addressing deduplicates). The row is inserted only after the file exists, so no row points to a missing file; a crash can leave an unreferenced file, which is harmless.
+- **Indexes:** `(url)`, `(sha256)`, `(run_id)`, `(source_id, fetched_at)`.
+- Raw snapshots never leave the server: no export or release contains them (`PLAN.md` §6.7, D-5); the snapshot body endpoint (API §7.3) serves them to the app's user only.
+
+### 14.2 `collector_run` (prefix `run_`)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | TEXT PK | `run_<ULID>` |
+| `collector` | TEXT NOT NULL | key in `sources.yaml` (`docs/COLLECTORS.md` §3), including the built-in `tagger` |
+| `trigger` | TEXT NOT NULL | `cli` · `ui` (Phase 4 adds `schedule`) |
+| `mode` | TEXT NOT NULL | `incremental` · `full` (meaning per collector, `docs/COLLECTORS.md` §6.4) |
+| `params` | JSON NOT NULL DEFAULT `{}` | parameters given at start (`limit`, `refetch`, `recall_sample`, `recall_seed`, `document_ids`); `replay: true` in replay mode |
+| `status` | TEXT NOT NULL | `running` · `succeeded` · `partial` · `failed` · `cancelled` |
+| `started_at` | TEXT NOT NULL | |
+| `finished_at`, `heartbeat_at`, `cancel_requested_at` | TEXT NULL | |
+| `complete_listing` | INTEGER NOT NULL DEFAULT 0 | the run parsed every listing unit of its collector (`docs/COLLECTORS.md` §8), whatever its end status (§15.7) |
+| `stats` | JSON NOT NULL DEFAULT `{}` | counters, below |
+| `error` | TEXT NULL | fatal error of a `failed` run (≤ 2 000 characters) |
+| `code_version` | TEXT NOT NULL | app version and `GIT_COMMIT` (e.g. `0.2.0+3f2c1a9`) |
+| `config_hash` | TEXT NOT NULL | SHA-256 of the collector's `sources.yaml` entry and of the codebook files it uses (`collector_mappings.yaml`, `event_patterns.yaml`) |
+
+- **Status rules:** a run is inserted as `running` and ends as `succeeded` (finished without error-level messages), `partial` (finished, but some requests, pages or items failed), `failed` (stopped by a fatal error, including an interrupted process, `docs/COLLECTORS.md` §6.3) or `cancelled`. Finished runs never change again.
+- **At most one running run** in the whole database (CLI and server alike): partial unique index `uq_collector_run_running` on `(status) WHERE status = 'running'`. A start while another run is running is refused (`docs/COLLECTORS.md` §6.1).
+- **`stats` keys** (integers, all present, 0 by default): `requests`, `not_modified`, `robots_disallowed`, `bytes`, `snapshots`, `pages_parsed`, `parse_errors`, `items_seen`, `entities_created`, `entities_updated`, `revisions`, `proposals_opened`, `proposals_seen_again`, `proposals_superseded`, `observations_new`, `observations_missing`, `links_suggested`, `messages_suppressed`, `errors`, `warnings`; collector-specific counters go under `extra` (an object).
+- **Indexes:** `(collector, started_at)`, `(status)`.
+
+### 14.3 `fetch_log`
+
+One row per HTTP request attempt (robots.txt, redirect hops and retries included), and one row per URL the client decided not to request.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `run_id` | TEXT NULL, FK `collector_run` | null for manual fetches |
+| `at` | TEXT NOT NULL | start of the attempt (UTC) |
+| `method` | TEXT NOT NULL | `GET` or `HEAD` |
+| `url`, `host` | TEXT NOT NULL | normalised URL and host |
+| `purpose` | TEXT NOT NULL | `robots` · `content` |
+| `attempt` | INTEGER NOT NULL DEFAULT 1 | 2, 3 … for retries |
+| `status` | INTEGER NULL | HTTP status; null without a response |
+| `outcome` | TEXT NOT NULL | `ok` · `not_modified` · `redirect` · `http_error` · `network_error` · `robots_disallowed` · `blocked` · `too_large` · `refused` (not requested: excluded host, trap path, host blocked or throttled earlier in the run, robots.txt unavailable, no fixture in replay mode) |
+| `bytes` | INTEGER NULL | body bytes received |
+| `duration_ms` | INTEGER NULL | |
+| `raw_snapshot_id` | TEXT NULL, FK `raw_snapshot` | the stored body; for `not_modified` the earlier snapshot that is still current |
+| `retry_after_s` | REAL NULL | parsed `Retry-After` |
+| `error` | TEXT NULL | short reason (≤ 500 characters) |
+
+Indexes: `(run_id, id)`, `(host, at)`, `(url)`.
+
+### 14.4 `run_message`
+
+Notable events of a run (errors, warnings, notes), shown in the UI.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `run_id` | TEXT NOT NULL, FK `collector_run` | |
+| `at` | TEXT NOT NULL | |
+| `level` | TEXT NOT NULL | `info` · `warning` · `error` |
+| `code` | TEXT NOT NULL | from the list in `docs/COLLECTORS.md` §6.6 |
+| `message` | TEXT NOT NULL | ≤ 2 000 characters, plain text |
+| `url`, `raw_snapshot_id`, `subject_id` | TEXT NULL | context |
+| `details` | JSON NOT NULL DEFAULT `{}` | |
+
+At most 200 messages per run and `code`; further ones only increase `stats.messages_suppressed`. Index: `(run_id, level, id)`.
+
+### 14.5 `source_observation`
+
+What a collector saw in its source, per stable key. The table is also the **binding between a source's keys and curated records**: once a key is bound to a record, later runs update that record (§15.3).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `collector` | TEXT NOT NULL | |
+| `key` | TEXT NOT NULL | collector-defined stable key (≤ 500 characters), e.g. `entry:brave1`, `service:RD4U`, `news:<slug>` |
+| `entity_type` | TEXT NOT NULL | the curated type the key describes |
+| `subject_id` | TEXT NULL | the bound record; null while unbound (e.g. a C4b page judged not relevant, an unmatched C1 entry with its proposal) |
+| `bound_by` | TEXT NULL | `auto` (a matching rule or a direct create, §15.3, §15.4) · `proposal` (an accepted `create_entity`, §16.4) |
+| `bound_at` | TEXT NULL | |
+| `external_id` | TEXT NULL | identifier given by the source (e.g. the project UUID on thedigital.gov.ua) |
+| `url`, `label` | TEXT NULL | where and under which title the key was last seen |
+| `first_seen_at`, `first_seen_run`, `last_seen_at`, `last_seen_run` | TEXT NOT NULL | |
+| `present` | INTEGER NOT NULL DEFAULT 1 | false after a run with a complete listing that did not see the key |
+| `missing_since_at`, `missing_since_run` | TEXT NULL | first such run (cleared when seen again) |
+| `missing_runs` | INTEGER NOT NULL DEFAULT 0 | consecutive such runs |
+| `last_snapshot_id` | TEXT NULL, FK `raw_snapshot` | |
+| `details` | JSON NOT NULL DEFAULT `{}` | collector-specific latest details (e.g. rubric, sitemap `lastmod`, discard reason, recall sample seed) |
+
+- UNIQUE `(collector, key)`; indexes `(subject_id)`, `(collector, present)`, `(collector, external_id)`.
+- Rows are updated in place by runs of their collector; they are never deleted. An observation of a merged record keeps its `subject_id`; runs follow `merged_into` (§15.3), and an unmerge needs no change here (§18).
+
+### 14.6 `proposal` (prefix `prp_`)
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | TEXT PK | `prp_<ULID>` |
+| `kind` | TEXT NOT NULL | `create_entity` · `update_field` · `create_event` · `possible_duplicate` · `possibly_discontinued` (§16.1) |
+| `state` | TEXT NOT NULL | `open` · `accepted` · `accepted_modified` · `rejected` · `superseded` (§16.2) |
+| `entity_type` | TEXT NOT NULL | type of the subject, or of the record to create |
+| `subject_id` | TEXT NULL | existing record concerned; null for `create_entity` |
+| `related_id` | TEXT NULL | `possible_duplicate`: the other record |
+| `field` | TEXT NULL | `update_field`: the field (`text_hash` for a text version, §15.6) |
+| `current_value` | JSON NULL | `update_field`: the field's value when the proposal was last raised; bulk accept compares it with the live value (§16.4) |
+| `proposed_value` | JSON NULL | `update_field`: the proposed value (for add-only URL lists only the URLs to add); `possibly_discontinued`: `{"status": "discontinued"}` |
+| `payload` | JSON NOT NULL DEFAULT `{}` | kind-specific (§16.1) |
+| `collector` | TEXT NOT NULL | the collector (or `tagger`) that proposed it |
+| `first_run_id`, `last_run_id` | TEXT NOT NULL, FK `collector_run` | first and latest run that proposed it |
+| `raw_snapshot_id` | TEXT NULL, FK `raw_snapshot` | latest source snapshot (shown as the proposal's "Snapshot") |
+| `source_url` | TEXT NULL | |
+| `quote` | TEXT NULL | verbatim from the source, ≤ 1 000 characters |
+| `locator` | TEXT NULL | |
+| `observation_id` | INTEGER NULL, FK `source_observation` | `create_entity`, `possibly_discontinued` |
+| `dedup_key` | TEXT NOT NULL | §16.3 |
+| `seen_count` | INTEGER NOT NULL DEFAULT 1 | runs that proposed it |
+| `created_at`, `last_seen_at` | TEXT NOT NULL | |
+| `decided_at` | TEXT NULL | |
+| `decided_by` | TEXT NULL | `user` (accept, reject) or `system` (superseded) |
+| `decision_note` | TEXT NULL | ≤ 2 000; required for reject; the reason for `superseded` |
+| `result_id` | TEXT NULL | record written by the acceptance (the created record, the merge survivor, the document marked as duplicate, the record linked instead of created) |
+
+- Partial unique index on `(dedup_key) WHERE state = 'open'`; indexes `(state, kind)`, `(subject_id, state)`, `(related_id, state)`, `(collector, state)`, `(last_run_id)`.
+- Proposal rows have no revisions: their lifecycle is recorded in the row (`decided_*`), and the curated writes they cause carry `revision.proposal_id`.
+
+### 14.7 `merge_log` (prefix `mrg_`)
+
+Record of a merge (§18): `id`, `entity_type`, `survivor_id`, `merged_id`, `at`, `batch_id`, `proposal_id` (NULL), `note`, `field_choices` (JSON `{field: "survivor"|"merged"|"union"}`), `changes` (JSON list of `{entity_type, id, field, before, after}`: every field the merge changed, the survivor's chosen values and every repointed reference, document `links` included), `unmerged_at` and `unmerge_batch_id` (NULL; set once by the unmerge). Rows are never deleted. Indexes `(survivor_id)`, `(merged_id)`.
+
+### 14.8 `import_run` (prefix `imp_`)
+
+One row per import that was run (mapping and dry runs are not stored, `docs/COLLECTORS.md` §9.1).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | TEXT PK | `imp_<ULID>`; also the `batch_id` of every revision the import writes |
+| `upload_id` | TEXT NOT NULL, FK `raw_snapshot` | the uploaded file (`via = upload`; the CLI stores the file as an upload first) |
+| `filename` | TEXT NOT NULL | |
+| `file_label` | TEXT NOT NULL | `<filename>#<sha256[0:12]>`; provenance `import:<file_label>` (§17.1) |
+| `entity_type` | TEXT NOT NULL | one of the five table types |
+| `sheet` | TEXT NULL | XLSX sheet name |
+| `status` | TEXT NOT NULL | `done` · `failed` (a fatal error such as an unreadable file; the rows written before it stay) |
+| `mapping` | JSON NOT NULL | `{column: field}` |
+| `key_field` | TEXT NULL | `id`, `slug` or `url`; null = create every row |
+| `note` | TEXT NULL | revision note of the import's writes |
+| `stats` | JSON NOT NULL | `rows`, `create`, `update`, `unchanged`, `conflicts`, `errors` (the keys of the plan, `docs/COLLECTORS.md` §9.4) |
+| `errors` | JSON NOT NULL DEFAULT `[]` | row errors and conflicts (at most 500) |
+| `error` | TEXT NULL | the fatal error of a failed import |
+| `created_at`, `finished_at` | TEXT | |
+
+## 15. Reconciliation of collector writes (Phase 2)
+
+The reconciler turns a run's **candidates** (parser output, `docs/COLLECTORS.md` §2.1, §7) into writes, proposals and observation updates. Its rules hold for every collector; the per-collector parts (keys, matching rules, writable fields) are declared in `docs/COLLECTORS.md` §8.
+
+### 15.1 Candidates and declarations
+
+- A **candidate** names the curated type, its observation `key`, optional `external_id`, `url` and `label`, the field values it observed (API representation, normalised with §1.2 before any comparison; a value that fails normalisation or validation is dropped with the run warning `invalid_value`), the observed values of propose-only fields, the snapshots each field was parsed from (`field_snapshots`) and its main evidence (`raw_snapshot_id`, `source_url`, optional `quote` and `locator`). Document candidates also carry the extracted text with its snapshot and extraction method, and the links the source itself states (e.g. a project page and its project).
+- A candidate contains **only the fields the run actually observed**: a field whose source page could not be read in this run is left out (absent, not empty), so a transient failure never changes or clears a value.
+- Each collector declares per type: whether an unmatched candidate is created directly (`creates`) or becomes a `create_entity` proposal, the **fields it may write** (`writes`), the fields it may only propose (`propose_only`, e.g. C1's official URLs from project-page links), its matching rules (§15.3), and whether missing keys may raise `possibly_discontinued` (`discontinued`). A field outside `writes` and `propose_only` is never written or proposed by that collector.
+- A **sighting** (`ctx.observe`: a known key seen in a listing or sitemap without being fetched, or a page that yields no record) only upserts its observation (§15.7).
+
+### 15.2 Channel and provenance
+
+Direct writes use `Actor.collector(<name>, <run_id>)`: channel `collector`, `created_by`/`updated_by` = `collector:<name>`, `revision.run_id` set, `field_meta` per §5 (`src = collector:<name>@<run_id>`, `locked = false`, `raw_snapshot_ids` from the candidate's `field_snapshots`). Collector-created records start with `verification_status = unverified` (documents also `screening_status = unscreened`).
+
+### 15.3 Matching a candidate to a record
+
+1. If the observation `(collector, key)` is bound, its `subject_id` is the record. A subject merged into another (`merged_into` set) is followed to its survivor, repeatedly, without changing the observation; any other deleted subject is skipped (run message `subject_deleted`, nothing written).
+2. Otherwise the collector's match rules apply, in this order, each only where the collector declares it:
+   1. `external_id`: an observation of the same collector with the same `external_id` that is bound;
+   2. `document`: a document with the same (`source_id`, `external_id`), then one with the same `canonical_url` (§3.4);
+   3. `url_fields`: exactly one record whose URL fields contain the candidate's canonical URL (project `ministry_urls`, `official_urls`; service `urls`).
+   Each rule considers live and deleted records; a merged record counts as its survivor.
+3. A unique live match binds the observation (`bound_by = auto`) and the candidate updates that record (§15.5).
+4. A match that is **deleted** (and not merged), where the same rule finds no live record, blocks the candidate: nothing is created or proposed (run message `subject_deleted`), so a person's deletion is never undone by a collector.
+5. Several live matches bind nothing; they are listed as `candidates` in the `create_entity` proposal (§16.1) or, for types the collector creates directly, the record is created and a `possible_duplicate` proposal names the others.
+
+### 15.4 New records
+
+An unmatched candidate becomes:
+- a **direct create** if the collector declares `creates` for its type (C3 services, C1–C4 documents; `docs/COLLECTORS.md` §8), and the observation is bound to the new record (`bound_by = auto`);
+- otherwise a **`create_entity` proposal** (C1 projects), whose observation stays unbound until the proposal is accepted.
+
+A create needs every required field; a candidate without them becomes a run warning `incomplete_candidate` instead. C5's events follow §15.12.
+
+### 15.5 Updates of a bound record
+
+A field counts as **locked** for collectors when its `field_meta` entry has `locked = true` (set, accepted, imported, restored, seeded or field-verified by a person), or when the record's `verification_status` is `verified` or `disputed` (the person's judgement covers the whole record, CODEBOOK §2). For every field in the collector's `writes`, comparing the candidate value **V** with the current value **C** read inside the write unit:
+
+| V compared with C | Field | Result |
+|---|---|---|
+| V is empty | any | nothing: collectors never clear a field (a value missing from a source is no evidence that it is empty) |
+| V equals C (`values_equal`, §1.2) | any | nothing; open `update_field` proposals of this collector for this field become `superseded` ("the source agrees with the current value") |
+| V differs | not locked | direct write |
+| V differs | locked | `update_field` proposal (§16) |
+
+- **Propose-only** fields: a V that differs from C always becomes an `update_field` proposal.
+- All direct writes of one candidate to its record are **one** `apply_change` (one revision).
+- List values are compared whole and in order (§1.2); collectors emit lists in the canonical order of their declaration, so a source that only reorders produces no change.
+- **URL lists are add-only** (`ministry_urls`, `official_urls`, `urls`, `archive_urls`): only URLs the list does not contain yet (compared by canonical URL, §3.4) count as a difference; a collector never removes or reorders URLs. Not locked: the current list with the new URLs appended is written. Locked or propose-only: an `update_field` proposal whose `proposed_value` holds only the URLs to add (§16.3, §16.4).
+- **System fields** in `writes` (`source_categories`, `source_record_at`, `published_at_utc`) cannot be locked by a person, so `apply_change` does not check locks on them; they are written directly unless the record is verified or disputed, in which case the difference is proposed and the domain layer writes it on accept. `source_id` and `external_id` are set on create only and never rewritten by a later match; `canonical_url` follows `url` (§6.2); the text version follows §15.6.
+- The record-level `verification_status`, `notes`, the scope fields and the D1–D4 fields are never in a collector's `writes`.
+
+### 15.6 Change detection, text versions and idempotency
+
+- Collectors compare **parsed, normalised values**, never raw bytes. Most HTML responses change on every request (CSP nonces, tokens), so the raw `sha256` is no change signal.
+- **Volatile content never reaches a candidate.** Parsers must not emit: CSP nonces; csrf tokens; bot-manager scripts and tokens (the kmu.gov.ua `__uzdbm_*` token encodes the client's IP address); Telegram `data-view` attributes and view counts; relative times such as `publishedAt.related` ("1 день тому"); cache-busting query parameters on image and asset URLs (`?v=…`); Sentry trace and baggage values; any render or request timestamp. Every collector has a test that parses two captures differing only in volatile parts and gets identical candidates (fixture pairs in `docs/COLLECTORS.md` §12.2).
+- **Document texts:** the extracted text is normalised (NFC; CRLF and CR to LF; C0 control characters except tab and newline removed; trailing whitespace removed per line; runs of three or more line breaks reduced to two; trimmed). `text_hash` = SHA-256 of its UTF-8 bytes.
+- **Text versions:** a document's text version is `text_hash`, `raw_snapshot_id`, `retrieved_at` and `extraction_method`, and it changes only as a whole. A candidate whose text hash differs from the document's inserts a `document_text` row (if not yet present) and then
+  - writes the four fields directly, in the record's `apply_change`, when the document's `source_id` is the writing collector, `retrieved_at` is not locked and the record is not verified or disputed;
+  - otherwise (a manual document, a document of another source, a retrieval time a person corrected, a verified record) raises one `update_field` proposal on `text_hash` whose payload carries the new `raw_snapshot_id`, `retrieved_at` and `extraction_method`; accepting it writes all four (§16.4).
+  An unchanged hash changes none of them, so re-fetching an unchanged page writes nothing.
+- **No-op:** a record whose candidate yields no difference gets no `apply_change` call: no revision, no version bump.
+- **One candidate per record and run:** within one run, each record is reconciled from its first candidate. A later candidate of the same run that resolves to the same record (the same key listed twice, two keys bound to one record, a key of a merged record) only updates its own observation; where it carries a different value for a field, the run warning `conflicting_candidates` names both keys and the field (no write, no proposal). Collectors emit candidates in a deterministic order (`docs/COLLECTORS.md` §6.1), so repeated runs decide alike.
+- **Idempotency (Definition of Done 3):** running a collector twice against the same responses creates on the second run **no record, no revision and no proposal row**, and no proposal changes its state. The second run only writes log rows (`collector_run`, `fetch_log`, `run_message`, `raw_snapshot` for bodies it fetched again) and bookkeeping (`source_observation`; `proposal.last_run_id`, `last_seen_at`, `seen_count`, `current_value`, `payload`). The acceptance test is `docs/COLLECTORS.md` §12.1.
+
+### 15.7 Observations and disappearance
+
+- Every candidate and every sighting upserts its observation: `present = 1`, `last_seen_*`, `missing_runs = 0`, `missing_since_*` cleared, `url`, `label`, `external_id`, `details`, `last_snapshot_id`; a new key is inserted with `first_seen_* = last_seen_*`.
+- A run sets `complete_listing = 1` when it parsed every listing unit of its collector (definition per collector, `docs/COLLECTORS.md` §8), whatever its end status: keys come from listings, so a failed detail page cannot hide a key. After a run with a complete listing that was not cancelled, every observation of the collector that the run did not see gets `present = 0`, `missing_runs + 1`, and `missing_since_*` if it was present before. Runs without a complete listing (incremental runs, runs with `limit`, a listing page that failed) never mark keys as missing.
+- A key seen again closes the open `possibly_discontinued` proposals of this collector for its subject as `superseded` ("seen again in run …").
+- **`possibly_discontinued`:** after a run with a complete listing, a live project or service bound to observations of a collector with `discontinued: true` gets a proposal when **all** its observations of that collector have `missing_runs` ≥ `discontinued_after_runs` (`sources.yaml`, default 2). Documents get no proposal; their observations show them as missing (UI "Seen in sources").
+
+### 15.8 Document links from alias tagging
+
+- The reconciler runs the tagger (`docs/COLLECTORS.md` §7.6) for every document candidate whose text is new or changed; the built-in collector `tagger` runs it over stored texts. It yields the projects and services whose curated aliases (or names) occur in the text, each with `matched_aliases`, `match_count` and `snippet`.
+- For every suggested subject, and every subject the source itself links (a project page and its project, an official URL and its project, a service page and its service), that is **not yet in the document's links in any state**, the reconciler adds `{subject_id, origin: "auto", state: "suggested", matched_aliases, match_count, snippet}`.
+- **Adding suggestions is an add-only write outside the decision table** (§15.5): it changes no existing value, so on channel `collector` it is allowed even when `links` is locked or the record is verified, and it leaves the existing `field_meta.links` entry unchanged (a collector entry is written only when there is none). It is part of the record's `apply_change`, so the document revision carries the run.
+- Collectors never change or remove an existing link. In the app, an automatic link can be confirmed or rejected but not removed, so a rejected subject stays in the links and is never suggested again; manual links can be removed (`docs/UI.md` §8.7).
+- Only confirmed links count in analyses (`PLAN.md` §5.3).
+
+### 15.9 Event proposals from text patterns
+
+The tagger also matches the phrase patterns of `codebook/event_patterns.yaml` (CODEBOOK §4). A sentence that contains an alias match of a project or service and a pattern match yields one `create_event` proposal per (subject, event type) (§16.1), with `collector = tagger`. It is never a fact: the date is the document's publication date with basis `inferred`, because an announcement date is not automatically the event date (CODEBOOK §2.6), and the evidence is the document's current text version (`docs/COLLECTORS.md` §7.7).
+
+### 15.10 Unknown vocabulary codes
+
+A candidate code that is not an active term of the field's vocabulary is never written: the code is dropped from a list value (a scalar value is dropped whole), and the run gets the warning `unknown_code` naming the code, the source's label for it and the record. Collectors never create or propose terms: a person adds the term (Codebook page, or the codebook file and `mdt seed`), and the next run writes the code.
+
+### 15.11 Write units
+
+Each record's reconciliation (direct writes, link additions, proposals, observation update) is **one write unit** (§6.1): it re-reads the record and its `field_meta` inside the unit, decides, and writes. A `LockedFieldError` cannot occur, because the decision uses the state read inside the same unit. Run bookkeeping (`stats`, `heartbeat_at`) is written in separate small units.
+
+### 15.12 `first_archived` events (C5)
+
+C5 (`docs/COLLECTORS.md` §8.5) maps captures from the Wayback Machine's CDX index to projects and services, per subject and URL the earliest capture:
+- **Exact** matches (the subject's own ministry URL or service URL): C5 creates a `first_archived` event (unverified) together with its evidence row, in one write unit, unless a live `first_archived` event of the subject (from anyone) or a deleted one created by C5 (`created_by = collector:wayback`) has a `date_end` on or before the capture's date. A capture earlier than every existing bound therefore creates a new event; C5 never updates an event, so each event keeps the evidence of its own capture, and the derived `existed_by` takes the earliest (§8.3).
+- **Other** matches (official URLs such as domain roots, pre-relaunch or other-rubric project URLs): a `create_event` proposal with the same event and evidence values (§16.1), under the same condition, because such a capture can predate the project.
+- **Values:** `date` = the Europe/Kyiv calendar date of the 14-digit UTC timestamp, precision `day`, `date_basis = archive_upper_bound`, `date_text` = the timestamp and the archived URL, `description_en` naming the capture; evidence: subject = the event, `target = entity`, `url` = the CDX request URL (what C5 retrieved), `archive_url` = the capture URL, `raw_snapshot_id` = the CDX response, `retrieved_at` = its `fetched_at`, `quote` = the CDX row as JSON.
+
+## 16. Proposals (Phase 2)
+
+### 16.1 Kinds
+
+| Kind | Raised by | Concerns | Payload | Accept writes |
+|---|---|---|---|---|
+| `create_entity` | an unmatched candidate of a type the collector does not create (§15.4; Phase 2: C1 projects) | `entity_type`; `observation_id` | `{fields: {…observed…}, field_snapshots, candidates: [ids], observation_key, site_slug}` | creates the record from the observed `fields` plus the person's `values` and binds the observation (`bound_by = proposal`); a project needs `in_paper_scope` and `scope_note` from the person (§7); its `slug` is generated at accept time from `site_slug` (lower-cased, `_` → `-`, other characters outside `[a-z0-9-]` removed, suffixed `-2`, `-3`, … while taken, deleted rows included) unless `values` sets it. Or, as **link to existing** (`match_id`), binds the observation to that record and writes nothing else |
+| `update_field` | a differing value of a locked or propose-only field (§15.5), or a new text version (§15.6) | `subject_id`, `field` | `{field_snapshots}`; text version: `{raw_snapshot_id, retrieved_at, extraction_method, char_count}` | `apply_change {field: proposed_value}` (or the edited value); add-only URL lists: the URLs appended to the current list; text version: the four fields |
+| `create_event` | a text pattern near an alias match (§15.9; collector `tagger`), or a C5 capture that is not an exact match (§15.12) | `subject_id` (project or service) | `{event: {subject_id, event_type, date, date_basis, date_text, description_en}, evidence: {document_id, text_hash, char_start, char_end, url, archive_url, raw_snapshot_id, retrieved_at}, pattern_id, matched_alias}` (keys that do not apply are null); `quote` = the sentence or the CDX row | creates the event (edited values with edit & accept) and an evidence row (subject = the new event, `target = entity`, the payload's evidence values and the quote), two revisions with one `batch_id` |
+| `possible_duplicate` | duplicate detection (`docs/COLLECTORS.md` §7.8) | `subject_id`, `related_id` (ordered: `subject_id` < `related_id`) | `{basis: "title_date"\|"text"\|"name", similarity, details}` | documents: `values = {"duplicate_id": <one of the two>}`: that document gets `screening_status = excluded`, `screening_reason = duplicate`, `screening_note = "Duplicate of <other id>"`; services and projects: `values = {"survivor_id", "fields"}` runs the merge (§18) |
+| `possibly_discontinued` | disappearance (§15.7) | `subject_id` (project or service); `observation_id` | `{reason: "missing_from_listing", last_seen_at, missing_since_at, keys}`; `proposed_value = {"status": "discontinued"}` | `apply_change {status: "discontinued"}`, or with edit & accept another `status` code (e.g. `suspended`, `unknown`) |
+
+### 16.2 States
+
+`open` → `accepted` (accepted as proposed) · `accepted_modified` (edit & accept, or link to existing) · `rejected` (by the user, note required) · `superseded` (closed by the system, `decision_note` says why). Closed proposals never reopen; if the situation recurs, a new row may open (§16.3).
+
+### 16.3 Deduplication and superseding
+
+- `dedup_key` = SHA-256 of the canonical JSON array `[kind, scope, entity_type, target, core]`:
+
+  | Kind | `scope` | `target` | `core` |
+  |---|---|---|---|
+  | `create_entity` | collector | observation key | `null` (a changed title refreshes the open proposal instead of opening a second one) |
+  | `update_field` | collector | `subject_id` | `[field, normalised proposed value]`; add-only URL lists: `[field, sorted canonical URLs to add]` |
+  | `create_event` | `"*"` (any collector or the tagger) | `subject_id` | text evidence: `[event_type, document_id, fold(quote)]`; archive evidence: `[event_type, archive key of the captured URL]` |
+  | `possible_duplicate` | `"*"` | `subject_id` | `related_id` |
+  | `possibly_discontinued` | collector | `subject_id` | `reason` |
+
+- When a run raises a proposal whose key exists:
+  - **open** → no new row: `last_run_id`, `last_seen_at`, `seen_count`, `raw_snapshot_id`, `source_url`, `quote`, `locator`, `current_value` and `payload` are refreshed (so an open C5 proposal follows an earlier capture of its URL);
+  - **rejected** → nothing (rejection memory);
+  - **accepted** or **accepted_modified** → nothing (a value a person accepted and later changed is not proposed again), unless a newer `update_field` proposal of the same collector for the same subject and field was created after that decision, i.e. the source changed and came back; then a new proposal opens;
+  - **superseded**, or no row → a new proposal opens.
+- The system supersedes an open proposal (`decided_by = system`) when: a newer `update_field` value of the same collector for the same subject and field opens in a later run; the source value equals the current value again (§15.5); the subject is deleted (checked whenever a run touches the subject and at accept time); a `possibly_discontinued` subject is seen again (§15.7); a merge retires its subject (§18).
+
+### 16.4 Accept, edit & accept, reject
+
+- **Accept** (API §7.4) re-checks the proposal inside one write unit: the subject must be live (else `409 entity_deleted`), and if nothing is left to write (e.g. the field already holds the proposed value) the proposal becomes `superseded` and the response says `changed: false`. For the add-only URL lists, accepting appends the proposal's URLs to the **current** list (URLs already present are skipped), so URLs a person added meanwhile are kept; other values are written as proposed (the UI shows the live value next to the proposed one, API §7.4).
+- Writes use `Actor.accept(proposal_id, src)`: channel `ui`, author `user`, `revision.proposal_id` = the proposal, revision note = the decision note, else `Accepted proposal <id>`. The validation rules of §7 apply as to any edit. A text version is written by the domain layer (its fields are system fields).
+- **Field provenance** (§5): values observed in a source and taken unchanged (an `update_field` value other than an add-only list, the observed `fields` of a `create_entity` proposal) get `src = collector:<collector>@<last_run_id>` and `raw_snapshot_ids` from the payload's `field_snapshots`; edited values, add-only list results, values the person adds (e.g. the scope and slug of a new project) and suggested interpretations (`create_event`, `possibly_discontinued`, `possible_duplicate`) get `src = manual`. All get `by = user`, `locked = true`, `verified = unverified`.
+- **Evidence** written by accepting a `create_event` proposal takes `document_id`, `text_hash`, the offsets, `url`, `archive_url`, `raw_snapshot_id` and `retrieved_at` from the payload, so it records when and from which snapshot the quote was retrieved, never the time of acceptance.
+- **Edit & accept** = accept with `values` (for `create_entity` any `in_create` field of the type, validated like a create; for `update_field` the one field; for `create_event` the event fields; for `possibly_discontinued` the `status`) → state `accepted_modified`. **Link to existing** (`create_entity` with `match_id`) → `accepted_modified`, `result_id` = the linked record.
+- **Reject** requires a note (≤ 2 000 characters) and writes no curated data.
+- **Bulk** accept and reject apply the same rules per proposal (each its own write unit, one shared `batch_id` for the revisions of a bulk accept). Bulk accept takes no `values`, so it leaves proposals that need them (`create_entity` for projects, `possible_duplicate`) with the result `needs_values`, and it leaves `update_field` proposals whose live value differs from `current_value` (the field changed after the proposal was last raised) with the result `stale`; the person decides those one by one.
+- `result_id` records the created or written record. Accepting a `create_event` proposal recomputes the subject's derived values (§8.1), like any event write.
+
+## 17. Imports and manual documents (Phase 2)
+
+### 17.1 Imports (CSV and XLSX)
+
+The workflow (upload, preview, dry run, run) is in `docs/COLLECTORS.md` §9; the data rules are:
+- **Channel `import`**, actor `Actor.importer(<file_label>)` (§14.8), so `created_by`/`updated_by`, `revision.author` and `field_meta.by` read `import:<file_label>` and values get `src = import:<file_label>`, `locked = true` (§5). `revision.batch_id` = the import run's ID; the note is the import's `note`.
+- **Importable fields:** `editable` fields of the type, and `create_only` fields on create; never system, derived or virtual fields, never `links`.
+- **Never overwriting manual values:** an existing record's field is written only if the value differs and the field has **no `field_meta` entry**, or its entry is **unlocked** (a collector value), or it was written by an import and not touched by a person since (`by` starts with `import:`, `verified = unverified`, `restored_from_version = null`). Any other differing field is left unchanged and reported as a **conflict** with the reason `manual` (set in the app, accepted from a proposal or chosen in a merge), `seed`, `verified` or `restored` in the dry run and the result; imports raise no proposals.
+- Empty cells never clear a field. A row matched by `key_field` updates that record (a deleted match → row error `entity_deleted`); a row without a match creates a record (rows of an import without `key_field` always create).
+- Each row is its own write unit; a row that fails validation (§7) is reported and skipped, the others proceed. A row without differences writes nothing, so running the same import again writes 0 revisions.
+
+### 17.2 Manual documents
+
+- **Created from a snapshot** (an upload or a manual fetch, `docs/COLLECTORS.md` §10) on channel `ui`: the values the person submits get `src = manual`, locked. The server's suggested values (title, language, publisher) are only defaults in the form; they become values when the person submits them. The domain layer sets, on this create path only, the system fields `source_id = manual`, `raw_snapshot_id` = the snapshot, `text_hash` from the extracted text (§15.6) and `extraction_method` (`pdf` · `docx` · `html` · `txt` · `none`); `retrieved_at` is the fetch time for a fetched snapshot and the person's value for an upload (required with a `url`, §3.4). An archived copy also gets `archive_urls` = [the capture URL] (`docs/COLLECTORS.md` §10.3).
+- `canonical_url` uniqueness (§7) applies: adding a URL that a live document already has → `409 unique_violation` with a link to it.
+- A later collector run that matches a manual document (§15.3) treats it like any record: its fields are locked, so differences become proposals, a new text becomes one text-version proposal (§15.6), and its `source_id` never changes.
+
+## 18. Merging duplicates (Phase 2)
+
+`merge(entity_type, survivor_id, merged_id, field_choices, note, proposal_id=None)` and `unmerge(merged_id, note)`, endpoints in API §7.6, channel `merge` (`Actor.merge()`).
+
+- **Types:** project and service (organisations and components follow in Phase 3 with D3). Both records live, distinct and of the same type; otherwise `409 invalid_state`.
+- **One transaction** (all or nothing) with one new `batch_id`; every changed curated row gets its own revision on channel `merge` with that `batch_id` (and `proposal_id` when the merge accepts a `possible_duplicate` proposal).
+- **Field values:** for each tracked editable field, `field_choices[field]` is `survivor` (default), `merged` or, for list fields, `union` (the survivor's items, then the merged record's items not yet present). A value taken from the merged record, or a union, is written to the survivor as the person's choice: `src = manual`, `by = user`, `locked = true`, verification reset (§5); `field_meta` entries are never copied, so the survivor never claims evidence of another record. Validation applies to the result (e.g. the survivor keeps its own `slug`). The survivor's revision has action `merge`.
+- **Repointing:** the references held in editable fields move to the survivor: `service.project_id` and `service.parent_service_id`, `event.subject_id`, `participation.subject_id`, `relation.from_id` and `to_id`, `indicator.subject_id`, and document links (a document that links both keeps one link, to the survivor, with the stronger state, `confirmed` > `rejected` > `suggested`, and origin `manual` if either link was manual). **Evidence and comments stay on the merged record** (their `subject_id` is create-only); its page shows them under the "Merged into" banner. **Observations keep their subject**; runs follow `merged_into` (§15.3). Open proposals of the merged record become `superseded` ("merged into …"). Derived values of both records are recomputed.
+- **Refused** with `409 merge_conflict` and the list of conflicts, changing nothing, when repointing would break a rule: a relation between the two records (it would point to itself), a service whose new parent would create a cycle or lie in another project, services of the merged project or service that would end up in a different project than their parent, or a unique constraint.
+- **The merged record** is soft-deleted with `merged_into = survivor_id` (revision action `merge`). **`merge_log`** records the choices and every change with its before and after value (§14.7).
+- **Unmerge** reverses a merge in one transaction with a new `batch_id` (channel `merge`, action `unmerge`): it clears the merged record's `deleted_*` and `merged_into`; it moves every reference logged in `merge_log.changes` back where the field still holds the logged `after` value (other rows are reported as `skipped`, with their current value); it restores the survivor's fields that the merge changed and that still hold the merge's value; and it sets `merge_log.unmerged_at` and `unmerge_batch_id`. Proposals the merge superseded stay closed (later runs may raise new ones). A plain undelete of a merged record is refused (§6.4).

@@ -1,6 +1,6 @@
 # Frontend (UI)
 
-> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the decisions of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user (decision D-15, `PLAN.md` §12).
+> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the decisions of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user (decision D-15, `PLAN.md` §12). **Extended on 2026-10-30 with the Phase 2 pages** (§8: review inbox, runs, sources, import, adding documents, merge and unmerge, and the additions to detail pages) and the marked additions in §2–§7; revised the same day after a four-lens review.
 > **Stack:** React + TypeScript (strict) + Vite (base `/`), Mantine, TanStack Router, Query and Table, jsdiff, dayjs, @tabler/icons-react.
 > **Character:** English UI, sober, information-dense and readable; it is a research tool.
 > **Related:** `docs/API.md` (all data comes from there), `PLAN.md` §7 (wireframes).
@@ -72,11 +72,11 @@ stringifySearch: (o) => {
 | `/trash` | `TrashPage` (`type=` tab param: an entity type name or `comment`) |
 | `/codebook` | `CodebookPage` (`vocabulary=`, `term=` (the term's ID, `voc_…`; `vocabulary=` is optional with it), `comments=`, `thread=` params) |
 
-Review inbox, collector runs, timeline, dashboard and releases come in later phases. They are **not** shown in the navigation before then.
+Phase 2 adds `/review`, `/runs`, `/runs/$id`, `/sources`, `/sources/$collector` and `/import` (§8.1). Timeline, dashboard and releases come in later phases and are **not** shown in the navigation before then.
 
 **Header:**
 - app name "MDT Portfolio";
-- navigation (Overview, Projects, Services, Events, Documents, Organizations, Changes, Comments, Codebook, Trash);
+- navigation (Overview, Projects, Services, Events, Documents, Organizations, Review (n), Changes, Comments, Runs, Sources, Import, Codebook, Trash; the Phase 2 items are described in §8.1);
 - global search box: `GET /api/lookup?types=project,service,event,document,organization&q=…&limit=25` from two characters (debounced 250 ms), grouped by type, with "show all" links to `/<type>s?q=…&sort=relevance`.
 
 ## 3. EntityTablePage
@@ -166,6 +166,7 @@ Field groups in the order `meta.groups` (Basics · Classification · Wartime · 
   The choice is sent as `POST verify-field`.
 - **"Add evidence…"** opens a small form that posts to `/api/entities/evidence`: URL, retrieved at (default now), verbatim quote, locator, note (the evidence row's `description`); the inputs come from `meta.entity_types.evidence`. URL, retrieval time and the quote are required, because a verified field needs evidence that quotes the source (CODEBOOK §2.3, DATA_MODEL §6.4). It sets `subject_id` and `target = field:<name>`, and shows the value the evidence is for. Its button "Add evidence and mark verified" creates the evidence row and marks the field verified with it.
 - **comment-on-field** icon with the open field-comment count from `virtual.open_comments_by_field`.
+- **proposal indicator** (Phase 2, §8.7) when `virtual.open_proposals_by_field` has open proposals for the field.
 
 **Derived values** appear in the Wartime group with an explanation: basis, the reason (label and definition of its `derived_reason` term from `/api/vocab`, verbatim), links to the deciding event or participation (labels from `refs`), and, whenever it differs from the displayed candidate, the launch interval over all candidates (e.g. "2022-03 · month" with "Launch interval over all candidates: 2022-01-01 – 2022-03-31"), so a reason such as `imprecise_date` can be traced to the dates it refers to.
 
@@ -190,7 +191,7 @@ Field groups in the order `meta.groups` (Basics · Classification · Wartime · 
 | `partial_date` | TextInput with live validation and the hint "YYYY · YYYY-Qn · YYYY-MM · YYYY-MM-DD" |
 | `ref` | lookup select (`/api/lookup`); the parent-service picker passes `f.project_id=in:<project>` and excludes the service itself and its descendants |
 | `datetime` (editable ones, e.g. `retrieved_at`) | date-time input in UTC |
-| `doc_links`, `json`, system fields | read-only in Phase 1 |
+| `doc_links`, `json`, system fields | read-only in the edit form; Phase 2 adds one-click confirm and reject of document links on the document page (§8.7) |
 
 - **Sticky save bar:**
   - optional change note, required where a rule demands it: changing `in_paper_scope` asks for a new `scope_note`; setting `verification_status` to verified or disputed asks for a note;
@@ -222,7 +223,7 @@ After "+ Add service" or "+ Add event" the user stays on the page and the new ro
 
 ### 4.2 History
 
-**Revision list:** version, time, channel and action badges (§1.5), note, changed-field chips.
+**Revision list:** version, time, channel and action badges (§1.5), note, changed-field chips; Phase 2 adds the collector and run link for channel `collector`, a link to the import's changes for channel `import` and a "proposal" badge for revisions with a `proposal_id` (§8.7).
 
 **Diff view:**
 - selecting a revision shows its stored diff (the selected single revision is component state, not part of the URL);
@@ -257,7 +258,7 @@ After a successful "Disputed…" (§4.1) the panel opens with the composer set t
 ## 5. Other pages
 
 - **RecentChangesPage:**
-  - filters: record type (incl. comment, vocabulary term, saved view), channel (`ui` labelled "manual", §1.5), action, date range (local days, sent as timestamps), batch;
+  - filters: record type (incl. comment, vocabulary term, saved view), channel (`ui` labelled "manual", §1.5), action, date range (local days, sent as timestamps), batch; Phase 2: run and proposal (chips when the URL carries `run_id` or `proposal_id`, set by links from the run and review pages), and run and proposal badges on the rows;
   - the page URL keeps the API parameter names, except that `since` and `until` hold local days (`YYYY-MM-DD`); the request sends the first and last instant of those days as timestamps;
   - rows grouped by local day: time, channel and action badges, entity link (type + label), version, changed fields, note;
   - link targets: comments link to their subject with `comments=open&thread=<root id>` (a reply links to its root, `context.parent_id`), vocabulary terms to the Codebook page, saved views to their table with the view applied, the other records without a table to their record page (§2);
@@ -290,12 +291,16 @@ frontend/src/
   hooks/      useUrlSearch, useVocabIndex
   components/ layout/, table/ (incl. filters/), fields/ (display + input per type), detail/ (incl. the add-evidence form), history/,
               comments/, changes/ (recent changes and comment feed), trash/ (incl. the shared undelete dialog), codebook/, ExternalLink.tsx and small shared components
-  pages/      Overview, EntityTable, EntityDetail, Record (generic record page), RecentChanges, Comments, Trash, Codebook, NotFound, RouteError
+  pages/      Overview, EntityTable, EntityDetail, Record (generic record page), RecentChanges, Comments, Trash, Codebook, NotFound, RouteError;
+              Phase 2: Review, Runs, RunDetail, Sources, SourceDetail, Import
+  (Phase 2)   components/review/ (proposal cards, edit-and-accept forms, bulk bar), runs/ (start-run modal, stats grid, messages and fetch tables),
+              sources/ (collector cards, observation table), import/ (mapping editor, plan table, import history), documents/ (add-document modal, links panel),
+              merge/ (merge and unmerge dialogs); api/uploads.ts (raw-body uploads)
   test/       Vitest setup, fixtures and the fetch mock
 frontend/e2e/ Playwright specs and the server start script (§7)
 ```
 
-**Query keys:** `['meta']`, `['vocab']`, `['stats']`, `['list', type, canonicalQs]`, `['facets', type, field, facetQs]`, `['item', type, id]`, `['revisions', type, id, …]` (type `comment` for comment histories), `['comments', subjectId, qs]`, `['comments', 'feed', qs]`, `['changes', qs]` (also `['changes', 'revision', id]`), `['lookup', qs]`.
+**Query keys:** `['meta']`, `['vocab']`, `['stats']`, `['list', type, canonicalQs]`, `['facets', type, field, facetQs]`, `['item', type, id]`, `['revisions', type, id, …]` (type `comment` for comment histories), `['comments', subjectId, qs]`, `['comments', 'feed', qs]`, `['changes', qs]` (also `['changes', 'revision', id]`), `['lookup', qs]`; Phase 2 keys in §8.8.
 
 **Invalidation after a write:**
 - always `['stats']`, `['changes']` and `['lookup']`;
@@ -326,3 +331,107 @@ frontend/e2e/ Playwright specs and the server start script (§7)
     - (d) diff of a revision, compare two versions, restore with the dry-run preview (one field deselected; "Undoes later changes: manual (1 revision)"), and the new revision on channel `restore`;
     - (g) comment thread create, reply, resolve, delete and undelete; the "open comments" quick filter;
     - (h) export CSV and XLSX of a filtered view; after ticking a column, the export has the visible columns after the record ID.
+
+## 8. Phase 2 pages and components (data acquisition)
+
+All data comes from `docs/API.md` §7 (and the generic endpoints for records). Values are rendered as text (§1.4); stored HTML is never rendered, and raw snapshots are offered as downloads only.
+
+### 8.1 Navigation and routes
+
+- **Header navigation:** Overview · Projects · Services · Events · Documents · Organizations · **Review (n)** · Changes · Comments · **Runs** · **Sources** · **Import** · Codebook · Trash. `n` = `open_proposals` from `/api/stats` (refetched every 60 s and after writes); hidden when 0. While a run is running, "Runs" shows a small spinner.
+
+| Route | Page | Search params |
+|---|---|---|
+| `/review` | `ReviewPage` (§8.2) | `tab=proposals\|unverified`, `state` (default `open`), `kind`, `collector`, `entity_type`, `subject_id`, `run_id`, `field`, `sort`, `page`, `page_size`, `proposal` (one expanded proposal) |
+| `/runs` | `RunsPage` (§8.3) | `collector`, `status`, `trigger`, `page`, `page_size` |
+| `/runs/$id` | `RunDetailPage` (§8.3) | `tab=messages\|fetches\|changes`, `level`, `outcome`, `page` |
+| `/sources` | `SourcesPage` (§8.4) | — |
+| `/sources/$collector` | `SourceDetailPage` (§8.4) | `present`, `bound`, `q`, `page` |
+| `/import` | `ImportPage` (§8.5) | `page` (of the import history) |
+
+Apart from the page-state parameters `tab`, `proposal`, `level`/`outcome` (passed on to the fetch and message lists) and `page`, the query strings are the API's list parameters, as for tables (§1.2).
+
+### 8.2 Review inbox (`/review`)
+
+- **Tabs:** "Proposals (n)" and "New unverified". The second lists, per type (service, document, event), the number of records created by collectors that are still unverified, each linking to its table filtered with `f.created_by=contains:collector:&f.verification_status=in:unverified` (no API of its own).
+- **Header:** counts by kind and collector (`GET /api/proposals/summary`); a collapsible "Pattern precision" table for `create_event` proposals (pattern, open, accepted, rejected, precision).
+- **Filters:** state (open by default; accepted, accepted with changes, rejected, superseded, all), kind, collector, entity type; `run_id`, `subject_id` and `field` appear as removable chips when the URL carries them (links from run pages and detail pages); sort (last seen, created).
+- **Proposal card** (one per proposal, compact, newest first):
+  - header: kind badge; the subject as a link (struck through if deleted) or "New <type>" for `create_entity`; the field label (`update_field`); collector and run link; "seen n times, last <time>"; the state badge when not open (with decision note and time);
+  - body by kind:
+    - `update_field`: "Current" (`live_value` with the field's provenance badge and lock icon) next to "Proposed"; long texts as word diff (jsdiff, as in the history), lists as chips with added and removed items marked; for add-only URL lists the proposed URLs are shown as additions to the current list; a text-version proposal shows the character counts and, when expanded, a word diff of the current and the proposed text (`texts` from `GET /api/proposals/{id}`);
+    - `create_entity`: the observed field values as a definition list; "Possible matches" (`payload.candidates`, labels from `refs`), each with "Link to this";
+    - `create_event`: subject, event type, date with its basis; for text evidence the quote with the matched alias highlighted (client-side substring match, rendered as React elements) and the document as a link; for archive evidence the archived capture (`ExternalLink` to `archive_url`) with the CDX row;
+    - `possible_duplicate`: both records side by side (label, URL, published or source, collector) with basis and similarity;
+    - `possibly_discontinued`: reason, last seen, missing since, the current `status`;
+  - source line: source URL (`ExternalLink`), "Snapshot" (downloads `/api/snapshots/<id>/body`), the quote where present;
+  - **actions** (open proposals only): **Accept**, **Edit & accept…**, **Reject…**; `create_entity` adds **Link to existing…** (a lookup select restricted to the proposal's type); `possible_duplicate` offers **Mark as duplicate…** (documents: choose which of the two is the duplicate) or **Merge…** (services and projects: opens the merge dialog of §8.7 with this proposal), and **Not duplicates…** (reject with note).
+- **Edit & accept** opens a modal with the editable values, prefilled from the proposal, using the field inputs of §4.1: the one field (`update_field`); the create form of the type with its `in_create` fields and constraints (`create_entity`: a project needs `in_paper_scope` and a `scope_note`, which the proposal never contains, and an optional slug, empty = generated from the site's slug); the event form (subject, event type, date, date basis, date text, descriptions) (`create_event`); a `status` select (`possibly_discontinued`). It sends the values that differ from the proposal and the person's additions (API §7.4). **Accept** on a project's `create_entity` proposal opens the same form, because the scope is the person's decision.
+- **Reject** asks for a note (required).
+- **Bulk:** checkboxes and a bar "Accept selected" (a confirmation lists the count; the summary reports proposals that need values (new projects, duplicates) and stale ones (the field changed since the proposal was raised) as left open, to decide one by one) and "Reject selected…" (note); the result is summarised like bulk edits (§3).
+- After a decision: a notice with a link to the written record (`result_id`) and the list refetches. Empty state: "No open proposals" with a link to Runs.
+
+### 8.3 Runs (`/runs`, `/runs/$id`)
+
+- **RunsPage:**
+  - "Start run" opens a modal: collector (available collectors; unavailable ones disabled with their reason, e.g. "CONTACT_EMAIL is not set in .env"; `needs_server_check` collectors with a notice), mode (if the collector has modes), and the collector's supported parameters (`limit`, `refetch`, `recall_sample`, `recall_seed`); submitting sends `POST /api/runs` and opens the run's page; `409 run_in_progress` says that another run is running and links to it.
+  - Filters: collector, status, trigger.
+  - Table: collector, status badge (running blue, succeeded green, partial orange, failed red, cancelled grey), trigger, mode, started time, duration, requests, snapshots, created, updated, proposals opened, errors and warnings; a "replay" badge for runs with `params.replay`. Row click opens the run.
+  - While a listed run is running, the list refetches every 3 s.
+- **RunDetailPage:**
+  - header: collector label (link to its source page), status badge, started and finished times, duration, last heartbeat (running), trigger, mode, parameters, `code_version`, complete listing (yes/no); actions **Cancel** (running) and **Run again** (same mode and parameters);
+  - the fatal `error` of a failed run in an alert (e.g. "thedigital.gov.ua: blocked", which is how a blocked source is reported);
+  - stats grid with every `stats` key (labelled; `extra` keys as given);
+  - tabs: **Messages** (filter by level; time, level icon, code, message, URL, snapshot link, subject link), **Fetch log** (filter by outcome; time, method, URL, status, outcome badge, bytes, duration, attempt, snapshot link, error), **Changes** (the Recent changes feed with `run_id`, reusing its table), and a link "Proposals of this run" (`/review?run_id=<id>&state=all`);
+  - refetches every 3 s while running; when the status changes to finished it invalidates the data queries (§8.8).
+
+### 8.4 Sources (`/sources`, `/sources/$collector`)
+
+- **SourcesPage:** one card per collector: label and source ID, enabled and available (with the reason), a "needs checks from the target server" notice, hosts with their intervals and the excluded hosts, licence code and statement, last run (status, time, link) and a running indicator, observation counts (present, missing; each a link to the detail page filtered), open proposals (link to `/review?collector=<name>`), and **Run now** (the start modal with the collector preselected).
+- **SourceDetailPage:** the collector's details including its declaration (per entity type: creates or proposes new records, writable fields, propose-only fields, possibly discontinued), the recent runs, and the **observations** table: key, label, URL, the bound record (link) or "unbound", present (or "missing since <time>, n runs"), first seen, last seen; filters present, bound and text. Observations are read-only.
+
+### 8.5 Import (`/import`)
+
+- **One page, the mapping in component state** (nothing is stored before the run, API §7.9): a file input (CSV or XLSX) → `POST /api/uploads` (raw body, §8.6) → entity type (the five table types) and, for an XLSX file with several sheets, the sheet → `POST /api/imports/preview`.
+- **Mapping** table: each column with its header and three sample values from the preview, and a select (the importable fields, "id (key only)", "— ignore —"), prefilled from `suggested_mapping`; a field can be chosen only once; the key select offers `key_fields` and "none"; an optional note.
+- **Dry run** (`POST /api/imports/dry-run`) shows the plan: count tiles (rows, create, update, unchanged, conflicts, errors) and the row table (row number, action badge, record link, changes as "field: current → new", conflicts with their reason, errors).
+- **Run import** is enabled after a dry run with the current mapping and asks for confirmation with the counts; `POST /api/imports` then writes, and the result replaces the plan, with a link "Show changes" (`/changes?batch_id=<import id>`).
+- **History** below: the past imports (file, type, status, created, counts); a row expands to its stored errors and conflicts (`GET /api/imports/{id}`) and links to its changes.
+
+### 8.6 Adding documents
+
+- The Documents table toolbar has **"+ Add document"** next to "+ New"; it opens a modal with the tabs **Upload file** and **From URL**. Both first store the file and then show the server's suggested values as editable defaults; only what the person submits is written (DATA_MODEL §17.2).
+- **Upload file:** a file input (text is extracted from PDF, DOCX, HTML and TXT; other files are stored without text); choosing a file uploads it (`fetch` with the `File` as body and `filename` in the query, `api/uploads.ts`) and fills the form from `suggested`: title, language, publisher, and the warnings (e.g. "the PDF has no text layer"); further fields: source URL with "retrieved at" (default now; required with a URL), document type, published with its basis (required with a date) and verbatim text, licence, note. **Create** sends `POST /api/documents/manual` with the snapshot's ID.
+- **From URL:** URL → **Fetch** (`POST /api/documents/fetch`) → the fetched response (final URL, status, content type, size; for a Wayback capture URL the original URL and the capture time) and the form filled from `suggested`; document type, language, published, licence, note → **Create**.
+- Errors: `unique_violation` links to the existing document; `fetch_failed` shows the reason, and for `blocked`, `throttled`, `robots_disallowed` or `robots_unavailable` suggests uploading a saved copy or the URL of an archived copy; `collector_unavailable` explains that `CONTACT_EMAIL` must be set in `.env`.
+- After success: a notice and the buttons **Open** and **Tag now** (`POST /api/runs {"collector": "tagger", "params": {"document_ids": [id]}}`, then a link to the run; `409 run_in_progress` says to tag later from the Runs page).
+
+### 8.7 Additions to detail pages
+
+- **Header:** a badge "n open proposals" (`virtual.open_proposals`; project, service, event, document) linking to `/review?subject_id=<id>`. For a merged project or service, the deleted banner reads "Merged into <survivor>" with a link and an **Unmerge…** button (note; `POST …/unmerge`, then a notice listing any skipped references); Undelete is not offered for it.
+- **Field rows:** next to the provenance badge, "1 proposal" (or n) when `virtual.open_proposals_by_field` lists the field, linking to `/review?subject_id=<id>&field=<field>`. The provenance tooltip of `collector:<name>@<run_id>` names the collector, links to the run and offers the field's snapshots (`raw_snapshot_ids`) as downloads.
+- **"Seen in sources" panel** (project, service, document; in the Sources & Evidence group): the observations from `item.observations` (collector with a link to its source page, key, label, URL, first and last seen, present or missing since, bound by).
+- **Documents:** the text version's `raw_snapshot_id` renders as a "Snapshot" download link; `source_record_at` is shown in the Sources group. The **links panel** lists each link with origin, state, matched aliases, match count and snippet; suggested links have **Confirm** and **Reject**; automatic links cannot be removed (a rejected one stays, so its subject is not suggested again, DATA_MODEL §15.8), manual links have **Remove**; **Add link…** (a lookup of projects and services) adds a confirmed manual link. Each action sends `PATCH /api/entities/document/<id>` with the full `links` list in which only that link changed (channel `ui`).
+- **Merge** (project, service): "Merge…" in the actions menu opens a dialog: pick the other record (a lookup of the same type, excluding this one), then `GET …/merge-preview` shows each differing field with both values and a choice (survivor, merged, and union for lists), the references to be moved (counts; evidence and comments stay on the merged record) and any conflicts (merging is disabled while there are conflicts); a swap button exchanges survivor and merged record; a note; **Merge** sends `POST …/merge` and opens the survivor with a notice ("the other record is in the trash, marked as merged into this one; it can be unmerged there"). From the review inbox the dialog carries the proposal's ID.
+- **History:** revisions on channel `collector` show the collector and link to the run (`run_id`); channel `import` links to the import's changes (`/changes?batch_id=<batch_id>`); revisions with a `proposal_id` show a "proposal" badge linking to `/review?proposal=<id>&state=all`; channel `merge` has its own badge (actions `merge` and `unmerge`).
+
+### 8.8 Other additions, query keys and invalidation
+
+- **Overview:** tiles for open proposals (link to `/review`) and the last finished run (collector, status, time, link), plus a running-run indicator (`/api/stats.runs`).
+- **Tables:** the new quick filters come from meta ("Open proposals", "Collected"; API §3.1); the Columns menu offers the new fields (`open_proposals`, `source_record_at`).
+- **Query keys:** `['collectors']`, `['collector', name]`, `['runs', qs]`, `['run', id]`, `['run-fetches', id, qs]`, `['run-messages', id, qs]`, `['proposals', qs]`, `['proposal', id]`, `['proposals-summary']`, `['observations', qs]`, `['imports', qs]`, `['import', id]`, `['merge-preview', type, id, mergedId]`.
+- **Invalidation:**
+  - after accepting, rejecting or bulk-deciding proposals: `['proposals']`, `['proposals-summary']`, `['stats']`, `['changes']`, and the items, lists and facets of the subject's type (for `create_event` also all project and service items, lists and facets, as after any event write, §6);
+  - after starting or cancelling a run: `['runs']`, `['collectors']`, `['stats']`; when a polled run turns finished: all lists, items and facets, `['proposals']`, `['proposals-summary']`, `['observations']`, `['stats']` and `['changes']` (a run changes data);
+  - after an import run: the lists, items and facets of its type, `['imports']`, `['changes']`, `['stats']`; after a merge or unmerge: all lists, items and facets; after adding a document: the document lists and facets, `['stats']`;
+  - as in §6, invalidation never changes the values of an open edit form.
+
+### 8.9 Tests
+
+- **Vitest:** proposal value rendering (word diff for text, added and removed list items, add-only URL additions); each edit-and-accept form sends only the changed `values`, and a project's `create_entity` form requires the scope; run polling stops when the run is finished; the mapping editor applies suggestions and refuses a field twice; the merge dialog builds `fields`; uploads send the raw file with `filename` in the query; confirming or rejecting a document link sends the full `links` list with only that link changed, and an automatic link offers no Remove.
+- **Playwright E2E** (setup as in §7): the Phase 2 scenarios run in a separate Playwright project `collectors` with **its own server instance and database** (a second `webServer` entry on another free port, `e2e/start-server.mjs` with the extra settings below), in one file run serially (`e2e/collectors.spec.ts`, `test.describe.configure({ mode: 'serial' })`, in the order listed), because collector runs touch many records and would disturb the parallel Phase 1 scenarios and each other. That server sets `COLLECTOR_REPLAY_DIR` to `backend/tests/fixtures/ministry_projects` (the replay transport serves those fixtures by URL, `docs/COLLECTORS.md` §4.10; no request leaves the machine, so the `CONTACT_EMAIL` rule does not apply). Values that are not in the fixtures are synthetic (§7). Scenarios ((k), a vocabulary-term proposal, was dropped with term proposals):
+  - (i) **DoD 3:** Runs → Start run `ministry_projects` → wait until finished (status `partial`, because detail pages without fixtures are refused) → the stats show records updated, proposals opened (the official URLs linked from the Brave1 and Дія.Цифрова громада pages) and new observations; the Messages tab lists the errors and the `unknown_code` warning for `how-tos`, and the Fetch log shows the refused URLs; start the same run again → finished; its stats show 0 records created, 0 revisions and 0 proposals opened (proposals seen again > 0); the Runs list shows both runs; Recent changes filtered by the second run's ID is empty.
+  - (j) **DoD 5**, each branch on its own seed project, because an accepted value is never proposed again: the `description_uk` of `brave1`, `diia-city` and `virtual-assets` shows the collector badge; edit all three with a note (manual, locked) → run `ministry_projects` again → `brave1`'s page still shows the manual value with the manual badge and "1 proposal", and the review inbox shows the three proposals with current (manual) against proposed (collector); **Accept** on `brave1` → the field shows the collector value with the collector badge and the lock, and the history shows the revision with the "proposal" badge; **Edit & accept** on `diia-city` → the edited value with the manual badge, state "accepted with changes"; **Reject** with a note on `virtual-assets` → the value stays manual; a further run opens no new proposal for the three.
+  - (l) **Manual document:** upload a small synthetic HTML file that mentions a seeded alias → the form shows the suggested title → Create → the document page shows the extracted text → "Tag now" → after the tagger run the links panel shows a suggested link → Confirm.
+  - (m) **Import:** upload a synthetic CSV (`slug,notes` with a seeded project slug and a synthetic note) → mapping (key `slug`) → dry run shows 1 update → run → "Show changes" lists the import revision; a second CSV that sets a field the user edited manually shows a conflict in the dry run.
+  - (n) **Merge and unmerge:** two synthetic services of one seeded project created through the API → merge one into the other in the UI → the survivor shows the chosen values; the merged record is in the trash with "Merged into" → Unmerge → both services are live again and the survivor shows its former values.
