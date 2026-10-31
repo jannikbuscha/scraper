@@ -1,6 +1,6 @@
 # Codebook (draft)
 
-> **Status:** Phase 0 draft, 2026-10-28, for team review.
+> **Status:** Phase 0 draft, 2026-10-28, for team review. Phase 3 (2026-10-31, revised the same day after review) adds the coding of evidence in documents (§2.10), the vocabularies `dimension` and `analysis_code` and the portfolio roles of `participation_role` (§3), date bases for participations and indicators and the verbatim value of indicators (§2.6), and the alternative period basis `entry_period` (§2.7); the data rules are in `docs/DATA_MODEL.md` §19–§22. Exports include this file verbatim as the coding rules (`docs/API.md` §8.8.2).
 > **Generation:** the vocabulary files `codebook/*.yaml` were derived from this draft (`codebook/README.md`); `mdt seed` loads them into the database, which holds the working copy (Codebook page of the app). From the first release on (Phase 4), this file and `codebook/` are regenerated from the database (`codebook/*.yaml` → database → `docs/CODEBOOK.md`), and every release contains a frozen copy.
 > **Codes** are stable identifiers. Labels and definitions may change; a code is never renamed or deleted, only deactivated (`active = false`) and, where applicable, linked to its replacement (`replaced_by`). Every change creates a revision.
 > **Examples** come only from the paper's own assignments or, later, from collected and verified data. None comes from model knowledge.
@@ -69,6 +69,8 @@ The coded mode complements the derived `war_trajectory` (§2.7), which only look
 - **The date of an announcement is not automatically the date of the event.** If only the announcement date is known, code `inferred` and quote the announcement.
 - **Archive captures** (Wayback Machine) only show that something existed *by* that date. They are recorded only as `first_archived` events with basis `archive_upper_bound` (the app rejects any other combination) and are never a start date.
 - A dated event needs a date basis.
+- **Participations and indicators** (Phase 3): the start and end of a participation and the reference date (`as_of`) of an indicator also need a basis, `stated_in_source` or `inferred` (never `archive_upper_bound`, which belongs to `first_archived` events only); the verbatim period text of a participation goes into `period_text`. A role that changes is a new participation; the old one gets an end date.
+- **Indicator values** (Phase 3): `value` is the number as the source states it; a qualifier ("more than", "about", "up to") is never dropped but kept, verbatim together with the number, in `value_text`.
 
 ### 2.7 Derived fields (read-only, marked `derived_` in exports)
 
@@ -80,21 +82,42 @@ Cut-off dates as in §1. Disputed events and participations are ignored. An inte
 | `existed_by` | Earliest **end** of the `first_archived` events: an upper bound, displayed as "≤ date (archive)". |
 | `period` | From the launch interval [start, end]: end < `MINISTRY_FOUNDED` → `pre_ministry`; start ≥ `MINISTRY_FOUNDED` and end < `FULL_SCALE_INVASION` → `pre_invasion`; start ≥ `FULL_SCALE_INVASION` → `full_scale_war`; otherwise `unknown`. Without a launch: `existed_by` < `MINISTRY_FOUNDED` → `pre_ministry`, otherwise `unknown`. ⚑ D-3 |
 | `period_reason` | `no_date`, `imprecise_date` (the launch interval straddles a cut-off date), `archive_bound_only` |
-| `existed_before_invasion` | true if the launch interval ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION` |
+| `existed_before_invasion` | true if the launch interval ends before `FULL_SCALE_INVASION` **or** `existed_by` < `FULL_SCALE_INVASION`. False means only *not shown* (new in war, a date that straddles the invasion, or no date), never "did not exist"; the app labels it "Shown to exist before the invasion". |
 | `war_trajectory` | Rules in this order: (1) launch interval start ≥ invasion, but an archive bound shows the item existed before it → `unknown` (`conflicting_dates`); (2) launch interval start ≥ invasion → `new_in_war`; (3) existed before the invasion and a modification event starts on or after it → `adapted_in_war`; (4) existed before the invasion and every modification event ends before it, or there is none → `prewar_unchanged` ("no modification on or after the invasion recorded up to release X"); (5) otherwise `unknown`. The deciding event is linked. |
 | `trajectory_reason` | `no_date`, `imprecise_date`, `imprecise_modification_date`, `conflicting_dates`, `archive_bound_only` (the only date is an archive upper bound on or after the invasion) |
-| `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) as `initiator`, `owner` or `operator`, with the participation linked ⚑ D-10 |
+| `portfolio_entry` | Earliest start of a Participation of the focal organisation (the ministry) in a **portfolio role** (the `participation_role` terms with `attributes.portfolio_role`: `initiator`, `owner`, `operator`), with the participation linked. A service's entry comes from its own participations, never from its project's ⚑ D-10 |
+| `entry_period` | (Phase 3) The period rules of `period` applied to the portfolio-entry interval (the start interval of that participation), without an archive fallback: the alternative basis of D-10 (launch of the initiative vs. entry into the ministry's portfolio). `entry_period_reason`: `no_date` (no such participation with a start) or `imprecise_date` (the interval straddles a cut-off date). There is no trajectory on this basis. ⚑ D-10 |
+| `period` of events, documents and participations | (Phase 3) The period of an event's date, a document's publication date or a participation's start by the same interval rule (an archive bound counts as an interval ending on its date); undated or straddling → `unknown`. Evidence gets `document_period` (the cited document's period) and `case_period` (the derived `period`, on the launch basis, of the project or service it concerns). Used to count and compare by period; it does not feed the derived values above. |
+
+A project's derived values use the project's own events only, not those of its services (proposed default ⚑ D-16): a project whose services were launched or changed in war can still read `prewar_unchanged`; the project fields `services_new_in_war` and `services_adapted_in_war` show that activity, and the dashboard lists such projects as a check.
 
 ### 2.8 Screening of documents
 
 - `screening_status`: `unscreened` → `included` / `excluded`, with an exclusion reason (vocabulary `exclusion_reason`) and an optional note. The app requires the reason for `excluded` and allows it only there (`docs/DATA_MODEL.md` §7).
 - Only `included` documents go into the QDA export.
-- Counts per status and reason are reported (PRISMA-style flow).
+- Counts per status and reason are reported (PRISMA-style flow); the dashboard shows them, also per source and per period, with the included documents that are coded (`docs/UI.md` §9.5).
+- After screening, the included documents without a dimension citation form the coding queue (§2.10).
+- Screening happens in the document view (`docs/UI.md` §9.2): read the text, include or exclude it with a reason, confirm or reject the suggested project links, and decide the event proposals the text raised. A document is screened against the unit of analysis (§2.1) and the observation window, not against how useful it looks for a field.
 
 ### 2.9 Automatic suggestions (never facts)
 
 - **Project tags** come from curated aliases (including inflected forms and exclusions) and are always `suggested` until a person confirms them.
 - **Event proposals** come from phrases near a project or service mention (list in §4) and are always proposals.
+
+### 2.10 Coding evidence in documents (Phase 3)
+
+The qualitative document analysis codes passages of the collected documents along the paper's analytical framework (Table 1) [paper]. In the app, a coded passage is an **evidence row anchored in the document's text** (`docs/DATA_MODEL.md` §20).
+
+- **A passage, not a paraphrase:** select the passage in the document view; the app stores it verbatim with its character offsets in that text version. Keep it short (at most 1 000 characters; one or a few sentences) and self-contained enough to be cited. A passage may be cited several times (for different records or targets).
+- **What a passage supports** (its target):
+  - **Record** (`entity`): the passage documents the record as a whole, e.g. the source of an event, a participation, a relation or an indicator.
+  - **Field** (`field:<name>`): the passage supports the coded value of one field (e.g. `wartime_relevance`, `development_mode`, `d1_need`, a document's `published`). Set or correct the value in the capture panel while citing, so the evidence records the value it was captured for. Only such evidence can mark a field `verified` (§2.3).
+  - **Dimension** (`dimension:D1` … `D4`): the passage is a coded segment for a dimension of Table 1 (vocabulary `dimension`): it answers the dimension's analytical question for the record. Dimension evidence is the material of the thematic analysis; the free-text fields `d1_*` to `d4_*` summarise it per record.
+- **Analysis codes** (vocabulary `analysis_code`, optional) refine a dimension citation. The paper and this draft define no codes below the four dimensions, so the vocabulary starts **empty**. The team adds a code on the Codebook page, or with **New code…** in the capture panel, when a theme recurs in the material (inductive coding), with a definition, include and exclude notes, and the dimension it belongs to (`attributes.dimension`, one of `d1`…`d4`); examples come only from coded passages. Codes are never taken from general knowledge. A code that turns out to be wrong is deactivated and, where it applies, replaced by another (see the header of this codebook), never renamed; a code in use keeps its dimension.
+- **Subjects:** cite the passage for the record it is about: a project or service (or its organisation, component, event, participation, relation or indicator), or the document itself (e.g. for its publication date). If the record does not exist yet, create it from the passage (an event, participation, relation, indicator, component or organisation), so it is born with its evidence. The project or service a citation concerns is its **case**, by which codings are compared across the periods (`docs/DATA_MODEL.md` §20.5). Citing for a case that the document does not link as confirmed (a link the tagger only suggested, or none) requires confirming or adding the link first, so codings and document links agree.
+- **Coded documents:** a document counts as coded once one of its passages is cited for a dimension; citations for a record or a field (e.g. an event's source, the document's own date) do not code it. The included documents without a dimension citation are the coding queue (§2.8).
+- **Text changes:** a citation stays bound to the text version it quotes. When a page changes and the passage still makes its point in the new text, cite it there anew.
+- **Without a passage:** a document without extractable text, or a source that is not a collected document, is cited as a whole document or by URL with retrieval time and a quote typed verbatim from the source. On a document with text, a typed quote must occur in it exactly once (the app then stores it as that passage); otherwise select the passage.
 
 ---
 
@@ -299,6 +322,23 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 | `regulator` | Sets rules or policy for it, or supervises it. |
 | `coordinator` | ➕ Draft addition: coordinates the activities of a body (e.g. coordination of an agency through a minister); suggested by the PlayCity leads [search]. |
 
+**Portfolio roles** (Phase 3): `initiator`, `owner` and `operator` carry `attributes.portfolio_role: true`, the roles in which a participation of the focal organisation decides `portfolio_entry` (§2.7); whether `coordinator` counts is decided under ⚑ D-10. Changing the attribute on the Codebook page recomputes the derived values.
+
+### `dimension` (fixed codes; Phase 3)
+
+The four dimensions of the paper's analytical framework, "Table 1. Proposed Analytical Framework for Digital Innovation in Wartime Government" [paper]. Labels, definitions (the "Analytical focus" column) and theoretical sources are verbatim from the paper. Evidence targets name them as `dimension:D1` … `D4` (code `dn` ↔ target `dimension:Dn`).
+
+| Code | Label | Definition (analytical focus) | Theoretical source |
+|---|---|---|---|
+| `d1` | Emerging public needs and governmental priorities | What public problem or need motivated the initiative? Which citizens, businesses, or institutions were affected? | Gil-Garcia et al. (2018); Janowski (2015) |
+| `d2` | Digital platforms | Were existing platforms or infrastructures used or extended? | Yoo et al. (2012) |
+| `d3` | Distributed innovation | Which organizations participated, and what were their roles? | Yoo et al. (2012) |
+| `d4` | Combinatorial innovation | Were existing technologies, data, or services recombined? | Yoo et al. (2012) |
+
+### `analysis_code` (multi-valued; Phase 3)
+
+The team's analysis codes within the dimensions (§2.10). **No terms yet:** the vocabulary starts empty and grows on the Codebook page or from the capture panel during coding. Every term needs `attributes.dimension` (`d1`…`d4`), which cannot change once the code is used. The codebook export lists up to three coded passages of each code as anchor examples.
+
 ### `relation_type` (read as "from — type — to")
 
 | Code | Definition |
@@ -352,13 +392,13 @@ European Integration is not assigned in the paper [user]; its cluster is left em
 
 | Code | Definition |
 |---|---|
-| `no_date` | No dated launch, beta-launch or archive event. |
-| `imprecise_date` | The launch interval, taken over all dated launch events or, if there are none, all dated beta-launch events, straddles a cut-off date: it starts before the date and ends on or after it. |
+| `no_date` | No dated launch, beta-launch or archive event; for `entry_period_reason`: no participation of the focal organisation in a portfolio role (§2.7) with a start date. |
+| `imprecise_date` | The launch interval, taken over all dated launch events or, if there are none, all dated beta-launch events, straddles a cut-off date: it starts before the date and ends on or after it; for `entry_period_reason`: the portfolio-entry interval straddles a cut-off date. |
 | `archive_bound_only` | Only an archive upper bound is known (no dated launch or beta-launch event), and it does not decide the value: it lies on or after `MINISTRY_FOUNDED` (`period_reason`) or on or after `FULL_SCALE_INVASION` (`trajectory_reason`). |
 | `imprecise_modification_date` | A modification event is undated or straddles `FULL_SCALE_INVASION`. |
 | `conflicting_dates` | The launch interval starts on or after `FULL_SCALE_INVASION`, but an archive bound lies before `FULL_SCALE_INVASION`, so the item existed before the invasion. |
 
-**Fixed codes:** the system vocabularies `verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory` and `derived_reason`, as well as the event types `launch`, `beta_launch` and `first_archived`, are used by program logic. Their codes cannot be added to or deactivated; labels and definitions remain editable.
+**Fixed codes:** the system vocabularies `verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory`, `derived_reason` and (Phase 3) `dimension`, as well as the event types `launch`, `beta_launch` and `first_archived`, are used by program logic. Their codes cannot be added to or deactivated; labels and definitions remain editable.
 
 ### `license` (draft)
 

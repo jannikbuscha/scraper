@@ -1,6 +1,6 @@
 # HTTP API
 
-> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the clarifications of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user without an additional security layer (decision D-15, `PLAN.md` §12). **Extended on 2026-10-30 with the Phase 2 endpoints** (§7: collectors and runs, snapshots, proposals, observations, merge and unmerge, uploads, manual documents, imports) and the marked additions in §1–§6; revised the same day after a four-lens review. Base path `/api`, JSON only (one exception: uploads, §7.7). Field names, types, entity types, normalisation, limits and write semantics come from `docs/DATA_MODEL.md`; collector behaviour from `docs/COLLECTORS.md`.
+> **Status:** v1 contract for Phase 1, revised 2026-10-28 after a five-lens contract review, updated the same day with the clarifications of the Phase 1 build and integration, and simplified on 2026-10-29 for a single user without an additional security layer (decision D-15, `PLAN.md` §12). **Extended on 2026-10-30 with the Phase 2 endpoints** (§7: collectors and runs, snapshots, proposals, observations, merge and unmerge, uploads, manual documents, imports) and the marked additions in §1–§6; revised the same day after a four-lens review. **Extended on 2026-10-31 with the Phase 3 endpoints** (§8: document text and queue, evidence capture, timeline, crosstab and coverage, data revision, exports and their formats, indicator metrics) and the additions marked "Phase 3" in §1–§7; revised the same day after a four-lens review. Base path `/api`, JSON only (exceptions: uploads, §7.7, and file downloads). Field names, types, entity types, normalisation, limits and write semantics come from `docs/DATA_MODEL.md`; collector behaviour from `docs/COLLECTORS.md`.
 
 ## 1. Conventions
 
@@ -25,7 +25,7 @@ All errors use one envelope:
 | 404 | `not_found` | — |
 | 405 | `method_not_allowed` | — (the `Allow` header lists every method of all API routes that match the path; `GET, HEAD` on non-API paths) |
 | 409 | `entity_deleted` | `{deleted_at, deleted_by}` |
-| 409 | `invalid_state` | `{state}` (e.g. deleting a deleted row) |
+| 409 | `invalid_state` | `{state}` (e.g. deleting a deleted row; Phase 3 also `text_changed` with the current `text_hash`, §8.3, and `derived_out_of_date` for exports, §8.8.1) |
 | 409 | `has_dependents` | counts per kind of dependent: `{"service": 12}` (deleting a project or service without `cascade`), `{"field_verification": 1}` (deleting evidence that a field verification rests on; `cascade` does not apply, DATA_MODEL §6.4) |
 | 409 | `unique_violation` | `{field, existing: {id, label, deleted}}` |
 | 409 | `reference_deleted` | `{field, id, type, label}` |
@@ -34,6 +34,7 @@ All errors use one envelope:
 | 409 | `run_in_progress` | `{run_id}` (Phase 2: another collector run is running, §7.2) |
 | 409 | `collector_unavailable` | `{reason}`: `disabled` or `contact_email_missing` (Phase 2, §7.2, §7.8) |
 | 409 | `merge_conflict` | `{conflicts: [{kind, id, label, message}]}` (Phase 2, DATA_MODEL §18) |
+| 409 | `privacy_check_failed` | `{file, record_id}` (Phase 3: an export file contains a client identifier, §8.8.1; DATA_MODEL §23.3) |
 | 502 | `fetch_failed` | `{reason, status}`: `robots_disallowed`, `robots_unavailable`, `blocked`, `throttled`, `http_error`, `network_error` or `too_large` (Phase 2, manual fetches, §7.8) |
 | 500 | `internal_error` | `{request_id}` |
 | 503 | `frontend_not_built` | — (`GET`/`HEAD` on non-API paths when `FRONTEND_DIST` has no build, §6; the message points to `make build`) |
@@ -61,7 +62,7 @@ These are in addition to the field limits of DATA_MODEL §1.3:
 
 `{type}` is one of:
 - `project`, `service`, `event`, `document`, `organization` (also with a table view in the UI);
-- `participation`, `component`, `relation`, `indicator`, `evidence`, `vocabulary_term`, `saved_view`.
+- `participation`, `component`, `relation`, `indicator`, `evidence`, `vocabulary_term`, `saved_view` (Phase 3: the first five of these get table views too, `table_view: true` in meta; DATA_MODEL §3.5).
 
 An unknown type returns `404 not_found`. Comments have their own endpoints (§3.3).
 
@@ -95,15 +96,17 @@ An unknown type returns `404 not_found`. Comments have their own endpoints (§3.
 - **`fields`** holds every registry field that is neither derived nor virtual nor a system column, including system-set fields such as `canonical_url`. It never contains `seed_key`.
 - **System columns** (`created_at` … `version`) are top-level properties; as registry fields they can also be sorted, filtered and exported (DATA_MODEL §2.3).
 - **`derived`** is present for project and service. The `portfolio_entry_*` keys mirror the `launch_*` keys.
+  - **Phase 3:** project and service add `portfolio_entry_basis`, `entry_period` and `entry_period_reason` (DATA_MODEL §8.3 items 6–7); event, document and participation carry `derived: {"period": "<code>"}`, the computed period of their date, and evidence `derived: {"document_period", "case_period"}` (DATA_MODEL §8.4); the other types have no `derived` key.
   - **Launch interval vs. displayed launch** (DATA_MODEL §8.3): `launch_start` and `launch_end` are the **launch interval** over all launch candidates, [earliest start, earliest end]; `launch`, `launch_precision`, `launch_basis` and `launch_event_id` describe the **displayed candidate** (the one that ends first). With one candidate the interval is that candidate's own bounds; candidates of different precision can widen it, e.g. launch events `2022` and `2022-03` give `launch: "2022-03"` with the interval 2022-01-01 – 2022-03-31. The period, the trajectory and their `imprecise_date` reason, the `launch` filter and sort (§4) and the export's `derived_launch_start`/`derived_launch_end` (§5) all use the interval; the UI shows it next to the displayed value whenever the two differ. A missing derived row gives the initial values (DATA_MODEL §8.1: period and war trajectory `unknown`, reason `no_date`) with `computed_at: null`.
 - **Document `links`:** `origin` is provenance and read-only for clients; `matched_aliases`, `match_count` and `snippet` are read-only too (DATA_MODEL §1.2).
 - **`virtual`:**
   - `open_comments` and `comment_count` for every type;
   - `project_in_paper_scope` (service), `subject_in_paper_scope` (event), `linked_in_paper_scope` (document);
   - Phase 2: `open_proposals` for project, service, event and document (DATA_MODEL §2.4);
+  - Phase 3: `evidence_count` for every type that can be an evidence subject (DATA_MODEL §2.4); `period_unevidenced`, `derived_unevidenced`, `entry_unevidenced` and `adaptation_relation` (project, service), `services_new_in_war` and `services_adapted_in_war` (project), `citation_count` and `dimension_citation_count` (document), `subject_current_id`, `dimension` and `case_id` (evidence; DATA_MODEL §3);
   - detail responses add `open_comments_by_field` (`{"<field>": n, "": n for entity-level threads}`) and, in Phase 2, `open_proposals_by_field` (`{"<field>": n}` for open `update_field` proposals).
 - **`observations`** (Phase 2): detail responses of project, service and document carry, as a top-level property next to `virtual`, the source observations bound to the record or to records merged into it (§7.5 shape, at most 50).
-- **`refs`** gives the label of every non-null `ref` field, of the derived event and participation IDs (keys `derived.<name>`) and, for documents, of every link subject (key `links.<subject_id>`).
+- **`refs`** gives the label of every non-null `ref` field, of the derived event and participation IDs (keys `derived.<name>`), of the virtual refs `subject_current_id` and `case_id` (Phase 3, keys `virtual.<name>`) and, for documents, of every link subject (key `links.<subject_id>`).
 - **`search_snippet`** is set for documents when the list query has `q`: a list of segments `[{"text": "…", "hit": false}, {"text": "Дія", "hit": true}, …]` (DATA_MODEL §10).
 - **`label`** rules:
   - project, service, organization, component: `name_en` → `name_uk` → `slug`/`id`;
@@ -127,13 +130,13 @@ An unknown type returns `404 not_found`. Comments have their own endpoints (§3.
 | `GET /api/health` | `{"status": "ok", "version": "<app version>", "schema_revision": "<alembic head>"}` |
 | `GET /api/meta` | see below |
 | `GET /api/vocab` | `{"vocabularies": [{"name", "label", "description", "multi", "fixed_codes", "terms": [{"id", "code", "label_en", "label_uk", "definition", "include_note", "exclude_note", "examples", "sort_order", "active", "replaced_by", "attributes", "version", "usage_count", "open_comments"}]}]}`, vocabularies by name, terms by `sort_order` (empty last), then code. `usage_count` = non-deleted entities whose fields reference the code, including the derived `period` and `war_trajectory` values of live projects and services. `attributes` is `{}` when nothing is stored. |
-| `GET /api/stats` | `{"entities": {"project": {"total": 20, "unverified": 20, "deleted": 0}, "…": {}}, "open_comments": 3, "open_proposals": 12, "runs": {"running": {"id", "collector", "started_at"} \| null, "last_finished": {"id", "collector", "status", "finished_at"} \| null}}`. `total` and `unverified` count live rows only; `open_comments` counts the open, non-deleted root comments on all subjects; `open_proposals` and `runs` are Phase 2. |
+| `GET /api/stats` | `{"entities": {"project": {"total": 20, "unverified": 20, "deleted": 0}, "…": {}}, "open_comments": 3, "open_proposals": 12, "runs": {"running": {"id", "collector", "started_at"} \| null, "last_finished": {"id", "collector", "status", "finished_at"} \| null}}`. `total` and `unverified` count live rows only; `open_comments` counts the open, non-deleted root comments on all subjects; `open_proposals` and `runs` are Phase 2. Phase 3 adds `"documents": {"unscreened": n, "included": n, "excluded": n}` (live documents), `data_revision`, `data_as_of` and `derived_current` (§8.7). |
 | `GET /api/lookup?types=project,service&q=<text>&limit=20[&f.…]` | `{"items": [{"id", "type", "label", "deleted", "context"}]}`. Matches label, names, slug and alias texts by normalised, case-folded prefix first, then FTS; ordered by match quality, then label. Optional `f.` filters apply per type (e.g. the parent-service picker passes `f.project_id=in:<project>`). `context` is a short disambiguation (e.g. the project of a service). |
 | `GET /api/lookup?ids=a,b,c` | labels for any IDs, deleted ones included (`deleted: true`); unknown IDs are omitted |
 
 **Lookup details:**
 - Without `q` (and without `ids`) it lists non-deleted rows by label, e.g. for the parent-service picker with `f.project_id`.
-- `types` defaults to the five table types (any generic type is allowed, comments are not); `limit` is 1–100 (default 20). Rows matched by `q` are never deleted ones. Exact matches come before other prefix matches.
+- `types` defaults to the five Phase 1 table types, plus `component` from Phase 3 (any generic type is allowed, comments are not); `limit` is 1–100 (default 20). Rows matched by `q` are never deleted ones. Exact matches come before other prefix matches.
 - An `f.` filter applies to the requested types that have the field and leaves the others unfiltered; a filter that none of them has → `400 bad_filter`.
 - Prefix matching uses names, slug and alias texts; `title`/`title_en` for documents; the saved view's `name`; a term's `code`, `label_en`, `label_uk` and `vocabulary:code`. Types whose labels are composed from other records (event, participation, relation, indicator, evidence) match through FTS only. The FTS stage searches entity text, not document full texts (the list endpoint's `q` does that).
 - `context`: service → its project's label; document → `publisher · published`; vocabulary term → `label_en`; saved view → the plural label of its table; organization → country; other types `null`.
@@ -196,19 +199,25 @@ An unknown type returns `404 not_found`. Comments have their own endpoints (§3.
 - **document:** unverified, open comments, unscreened (`f.screening_status=in:unscreened`), in paper scope (`f.linked_in_paper_scope=eq:true`), period presets on `published` like events.
 - **organization:** unverified, open comments.
 - **Phase 2:** project, service, event and document add the toggle "Open proposals" (`f.open_proposals=range:1..`); service, event and document add "Collected" (`f.created_by=contains:collector:`).
+- **Phase 3:**
+  - event and document replace their period presets with the **period chips** on their computed `period` (`f.period=in:<codes>`, DATA_MODEL §8.4), which also select `unknown` (undated or straddling); no type uses the `preset` kind any more, which stays defined;
+  - "No evidence" (`f.evidence_count=eq:0`) for project, service, event, organization, component, participation, relation and indicator; project and service add "Derived from unsourced dates" (`f.derived_unevidenced=eq:true`);
+  - component, participation, relation and indicator: unverified and open comments as well; participation adds "Focal organisation" (`f.organization_id=in:<focal_org_id>`) and the period chips on its computed `period`;
+  - document adds "Undated" (`f.published=empty:true`) and "Not coded" (`f.dimension_citation_count=eq:0`, DATA_MODEL §21);
+  - evidence: unverified, open comments, "Field evidence" (`f.target=contains:field:`) and the **dimension chips** (kind `chips` on `dimension`, codes `d1`…`d4`: the dimension evidence).
 
 A toggle is active only if the URL contains exactly its key/value pair. Activating it replaces an existing filter on that field; deactivating it removes the parameter.
 
 **`bulk_editable`** is true for editable, non-create-only fields of type `vocab`, `vocab_list` and `bool`, including `verification_status`.
 
-**`exportable`** is true for fields that have a value per list row: every field except the virtual fields without one (the detail-only document `text`, which list responses omit, and the filter-only relation `endpoint`). Exactly these fields are accepted in `cols` (§5); the UI offers only them as table columns.
+**`exportable`** is true for fields that have a value per list row: every field except the virtual fields without one (the detail-only document `text`, which list responses omit, and the filter-only relation `endpoint`) and the filter-only Phase 3 reason fields (`period_reason`, `trajectory_reason`, `entry_period_reason`, exported as extra columns of their derived value, §5). Exactly these fields are accepted in `cols` (§5); the UI offers only them as table columns.
 
 ### 3.2 Generic entity endpoints
 
 | Method and path | Body | Response |
 |---|---|---|
 | `GET /api/entities/{type}` | — (query grammar §4) | `{"items": [Item], "total": n, "page": 1, "page_size": 50}` |
-| `GET /api/entities/{type}/facets?field=<name>&…` | — | `{"field": "kind", "values": [{"value": "e_service", "label": "E-service", "count": 12}], "empty_count": 3}`. All filters apply except the one on `field`. Vocabulary values include zero counts for active terms and are ordered by `sort_order`; inactive terms appear only when in use, and codes missing from the vocabulary are appended with the code as label. Boolean facets always return both values `"true"`/`"false"` (labels "Yes"/"No"). Refs are labelled and ordered by count (descending), then label. Document `links` count suggested and confirmed links (like `in:`); their `empty_count` is the number of documents without any link row. The relation `endpoint` facet counts both ends (`empty_count` 0). Allowed for fields with filter `multiselect`, `bool` or `ref`; any other `field` → `400 bad_filter`. |
+| `GET /api/entities/{type}/facets?field=<name>&…` | — | `{"field": "kind", "values": [{"value": "e_service", "label": "E-service", "count": 12}], "empty_count": 3}`. All filters apply except the one on `field`. Vocabulary values include zero counts for active terms and are ordered by `sort_order`; inactive terms appear only when in use, and codes missing from the vocabulary are appended with the code as label. Boolean facets always return both values `"true"`/`"false"` (labels "Yes"/"No"). Refs are labelled and ordered by count (descending), then label; so is document `source_id` (Phase 3), labelled with the collector labels of `sources.yaml` (`manual` → "Manual"). Document `links` count suggested and confirmed links (like `in:`); their `empty_count` is the number of documents without any link row. The relation `endpoint` facet counts both ends (`empty_count` 0). Allowed for fields with filter `multiselect`, `bool` or `ref`; any other `field` → `400 bad_filter`. |
 | `GET /api/entities/{type}/export?format=csv\|xlsx&cols=a,b&…` | — | file download, §5 (`format` defaults to `csv`) |
 | `POST /api/entities/{type}` | `{"data": {…}, "note": "…"}` | `201 {"item": Item, "revision_id": n, "warnings": []}` |
 | `GET /api/entities/{type}/{id}` | — | `{"item": Item}` (deleted items are returned too, with `deleted_at` set) |
@@ -300,7 +309,7 @@ These parameters apply to list, facets and export endpoints. The frontend keeps 
 
 **Empty** means NULL for scalars and `[]` for lists.
 
-**Derived, virtual and system fields** are filterable like stored fields; a missing derived row counts as `unknown`. A derived date filter uses the derived row's `_start`/`_end`; for `launch` that is the launch interval over all candidates (§2), not the bounds of the displayed candidate. These are `launch`, `existed_by`, `period`, `war_trajectory`, `portfolio_entry`, `open_comments`, `comment_count`, `open_proposals` (Phase 2), the `*_in_paper_scope` fields, `created_at`, `updated_at`, `deleted_at`, `created_by`, `updated_by` and `deleted_by`.
+**Derived, virtual and system fields** are filterable like stored fields; a missing derived row counts as `unknown`. A derived date filter uses the derived row's `_start`/`_end`; for `launch` that is the launch interval over all candidates (§2), not the bounds of the displayed candidate. These are `launch`, `existed_by`, `period`, `war_trajectory`, `portfolio_entry`, `open_comments`, `comment_count`, `open_proposals` (Phase 2), the `*_in_paper_scope` fields, `created_at`, `updated_at`, `deleted_at`, `created_by`, `updated_by` and `deleted_by`; Phase 3 adds `entry_period`, `existed_before_invasion`, the reason fields `period_reason`, `trajectory_reason` and `entry_period_reason`, the computed `period` of events, documents and participations, `evidence_count`, `period_unevidenced`, `derived_unevidenced`, `entry_unevidenced`, `adaptation_relation`, `services_new_in_war`, `services_adapted_in_war`, document `citation_count`, `dimension_citation_count` and `source_id`, and evidence `subject_current_id`, `dimension`, `case_id`, `document_period` and `case_period` (DATA_MODEL §19.3).
 
 A malformed filter, a repeated field, an unknown field, a field without `filter`, an operator not valid for the field, a malformed value (e.g. a date that is not `YYYY-MM-DD`, a non-number, a number out of range, a flag other than `true`/`false`), a malformed range (start after end, min > max) or `~empty` with `all` → `400 bad_filter`. Invalid values of the other parameters (§4.3) → `400 validation_error` (§1.2).
 
@@ -324,7 +333,7 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 | `vocab_list` | the key of the **first** element (the main value), like `vocab` |
 | `ref` | the target's label computed in SQL: `mdt_sortkey` of name_en → name_uk → slug → id for named types, the title for documents, the name for saved views, `vocabulary:code` for terms; polymorphic refs use one LEFT JOIN per allowed type. Targets whose labels are composed from other records (event, participation, relation, indicator, evidence; only `evidence.subject_id` can point at them) sort by ID. |
 | `partial_date` and derived dates | ascending (`_start`, `_end`); descending (`_start` DESC, `_end` DESC); for the derived `launch` these are the launch interval (§2), so a project whose candidates `2020` and `2020-06` show `2020-06` sorts before one that shows `2020-02` |
-| derived vocab (`period`, `war_trajectory`) | as `vocab`; a missing row counts as `unknown` |
+| derived vocab (`period`, `war_trajectory`; Phase 3 also `entry_period`, the reason fields and the computed periods) | as `vocab`; a missing row counts as `unknown` (the reasons as empty) |
 | virtual counts | numeric |
 
 ### 4.3 Other parameters
@@ -344,7 +353,8 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 - **Vocab fields:** the code plus `<field>_label` (the term's `label_en`, else the code); `vocab_list` fields: the joined codes plus the joined labels.
 - **`partial_date` fields:** `<name>` (canonical), `<name>_start`, `<name>_end`, `<name>_precision`.
 - **Derived fields:** prefixed `derived_`; derived partial dates and vocabularies get the same extra columns as stored ones (e.g. `derived_launch_start`, `derived_period_label`), plus `derived_<name>_basis`, `derived_<name>_reason` and `derived_<name>_event_id` where they exist; the portfolio entry has `derived_portfolio_entry_participation_id` instead of an event ID. For `launch`, `derived_launch` and `derived_launch_precision` are the displayed candidate, while `derived_launch_start` and `derived_launch_end` are the launch interval over all candidates (§2), which can be wider than the displayed value's own bounds.
-- **Virtual fields:** their values (`open_comments`, `comment_count`, the `*_in_paper_scope` booleans). **System columns:** as stored (timestamps as text).
+- **Phase 3:** `entry_period` follows the derived rules above (`derived_entry_period`, `derived_entry_period_label`, `derived_entry_period_reason`; the portfolio entry adds `derived_portfolio_entry_basis`); `existed_before_invasion` is `derived_existed_before_invasion`; the computed periods are `derived_period` (events, documents, participations), `derived_document_period` and `derived_case_period` (evidence), each with its `_label`. The reason fields are filter-only: their values are the `derived_<name>_reason` columns above.
+- **Virtual fields:** their values (`open_comments`, `comment_count`, the `*_in_paper_scope` booleans; Phase 3 `evidence_count` and the other virtual fields of DATA_MODEL §19.3; the virtual refs `subject_current_id` and `case_id` as ID plus `_label`, the virtual `dimension` as code plus `_label`). **System columns:** as stored (timestamps as text).
 - **`ref` fields:** the ID plus `<field>_label`.
 - **Document `links`:** compact JSON `[{subject_id, origin, state}]` (match details omitted) plus `links_label` = `<label> (<state>)` joined with `"; "`.
 - **Lists:** joined with `"; "`; aliases as their texts.
@@ -427,7 +437,7 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 
 | Method and path | Body / query | Response |
 |---|---|---|
-| `GET /api/proposals` | `state` (default `open`; `all`), `kind`, `collector`, `entity_type`, `subject_id` (matches `subject_id` or `related_id`), `run_id` (matches `first_run_id` or `last_run_id`), `field`, `sort` (`-last_seen_at` default, `last_seen_at`, `-created_at`, `created_at`), `page`, `page_size` | `Proposal` items with `refs` |
+| `GET /api/proposals` | `state` (default `open`; `all`), `kind`, `collector`, `entity_type`, `subject_id` (matches `subject_id` or `related_id`), `run_id` (matches `first_run_id` or `last_run_id`), `field`, Phase 3 `document_id` (§8.4), `sort` (`-last_seen_at` default, `last_seen_at`, `-created_at`, `created_at`), `page`, `page_size` | `Proposal` items with `refs` |
 | `GET /api/proposals/summary` | — | `{"open": n, "by_kind": {kind: n}, "by_collector": {collector: n}, "by_entity_type": {type: n}, "patterns": [{"pattern_id", "open", "accepted", "accepted_modified", "rejected", "precision"}]}`; `precision` = (accepted + accepted_modified) / (accepted + accepted_modified + rejected) of `create_event` proposals per pattern, null without decisions |
 | `GET /api/proposals/{id}` | — | `{"proposal": Proposal, "refs": {…}, "texts": {"current", "proposed"} \| null}`; `texts` holds both document texts for a text-version proposal (DATA_MODEL §15.6), else null |
 | `POST /api/proposals/{id}/accept` | `{"values": null, "match_id": null, "note": null}` | `{"proposal": Proposal, "changed": true, "result_id", "revision_ids": [n], "batch_id"}` |
@@ -455,7 +465,7 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 | `POST /api/entities/{type}/{id}/merge` | `{"merged_id", "fields": {"name_en": "merged", "aliases": "union"}, "note", "proposal_id": null}` | `{"item": Item, "merge_id", "batch_id", "revision_ids": [n]}` (the survivor) |
 | `POST /api/entities/{type}/{id}/unmerge` | `{"note"}` | `{"item": Item, "merge_id", "batch_id", "revision_ids": [n], "skipped": [{"entity_type", "id", "field", "current"}]}` (the restored record) |
 
-- `type` must be `project` or `service` (else `400 validation_error`). For merge, `{id}` is the survivor; `fields` maps field names to `survivor` (default), `merged` or `union` (list fields only). Rules and errors: DATA_MODEL §18 (`409 invalid_state`, `409 merge_conflict`, `409 unique_violation`). `proposal_id` names an open `possible_duplicate` proposal of the pair; it is then accepted with `result_id` = the survivor.
+- `type` must be `project` or `service` (else `400 validation_error`; merging organisations and components is deferred, `docs/COLLECTORS.md` §14). For merge, `{id}` is the survivor; `fields` maps field names to `survivor` (default), `merged` or `union` (list fields only). Rules and errors: DATA_MODEL §18 (`409 invalid_state`, `409 merge_conflict`, `409 unique_violation`). `proposal_id` names an open `possible_duplicate` proposal of the pair; it is then accepted with `result_id` = the survivor.
 - For unmerge, `{id}` is the merged record; it must be deleted with `merged_into` set and its latest merge not yet unmerged (else `409 invalid_state {state}`). `skipped` lists the references that changed after the merge and were left as they are. The plain undelete endpoint refuses a merged record (`409 invalid_state {state: "merged"}`).
 
 ### 7.7 Uploads
@@ -487,3 +497,257 @@ A malformed filter, a repeated field, an unknown field, a field without `filter`
 - `Plan` = `{stats: {rows, create, update, unchanged, conflicts, errors}, rows: [{row, action, id, changes, conflicts, errors}]}` (`docs/COLLECTORS.md` §9.4; at most 500 row items).
 - `entity_type` is one of the five table types; an upload that is neither CSV nor XLSX, a CSV that is not UTF-8, a missing sheet or duplicate headers → `400 validation_error`; an invalid mapping (unknown or non-importable field, a field mapped twice, a `key_field` the type does not support) → `400 validation_error` (paths `mapping.<column>`, `key_field`).
 - The run executes synchronously in the request (each row one write unit on channel `import`, DATA_MODEL §17.1). Running the same file again is a new import; rows without differences write nothing.
+
+## 8. Phase 3 endpoints (analysis)
+
+### 8.1 Conventions
+
+As in §7.1: strict bodies, `note` ≤ 2 000 characters, `refs` for every record ID a response mentions, lists with `page`/`page_size` where they page, plain query parameters except where a section says that the list grammar of §4 applies. Writes use channel `ui` (DATA_MODEL §6.2). Data rules: DATA_MODEL §19–§23.
+
+### 8.2 Document text and queue
+
+| Method and path | Query | Response |
+|---|---|---|
+| `GET /api/documents/{id}/text` | `text_hash` (optional; default the current version) | `DocumentText` |
+| `GET /api/documents/{id}/neighbours` | the list grammar of the document type (§4: `f.*`, `q`, `sort`) = the queue | `{"in_queue", "position", "total", "unscreened", "previous_id", "next_id", "next_unscreened_id", "refs"}` |
+
+`DocumentText` =
+
+```json
+{
+  "document_id": "doc_…", "text_hash": "…", "current": true,
+  "text": "…", "char_count": 18452,
+  "retrieved_at": "…", "raw_snapshot_id": "raw_…", "extraction_method": "turbo-stream",
+  "marks": [
+    {"kind": "evidence", "start": 120, "end": 245, "id": "evd_…", "subject_id": "prj_…", "target": "dimension:D1", "codes": [], "label": "…"},
+    {"kind": "proposal", "start": 300, "end": 411, "id": "prp_…", "subject_id": "svc_…", "event_type": "launch", "label": "…"}
+  ],
+  "marks_truncated": false,
+  "refs": {}
+}
+```
+
+- **Text:** `text` is the stored text of the version (never HTML; the UI renders it as plain text); a document without text answers `text: null`, `char_count: 0`, no marks. `current` says whether the version is the document's current one; `retrieved_at`, `raw_snapshot_id` and `extraction_method` are those of the requested version (for an earlier one, from the first revision that recorded it). A `text_hash` that is not a text version of the document (DATA_MODEL §21) → 404. Deleted documents are served too (read-only in the UI).
+- **Marks** (offsets in code points of this version, DATA_MODEL §20.1; sorted by `start`, `end`, `kind`, `id`): `evidence` = the live anchored evidence rows of this document and version (`label` = the evidence label, §2); `proposal` = the open `create_event` proposals whose `payload.evidence` names this document and version (`label` = `<event type label> · <subject label>`). At most 5 000 marks, evidence first; `marks_truncated` says whether some were left out.
+- **Neighbours** (DATA_MODEL §21, queue): `deleted` is ignored (a queue never holds deleted documents); `in_queue` = the document matches the queue's filters and `q`; `position` = its 1-based place in the queue order evaluated with `OR id = <id>`; `total` = the documents matching the queue (the current one counted only when it matches); `unscreened` = the unscreened documents in the queue; `previous_id`, `next_id` = its neighbours in that order (null at the ends); `next_unscreened_id` per DATA_MODEL §21 (null when the queue has no other unscreened document). A malformed filter or sort → `400 bad_filter` / `bad_sort`; an unknown document → 404.
+
+### 8.3 Evidence capture
+
+| Method and path | Body | Response |
+|---|---|---|
+| `POST /api/evidence/capture` | `Capture` (below) | `201 {"evidence": Item, "record": Item \| null, "subject": Item, "revision_ids": [n], "batch_id", "warnings": []}` |
+
+`Capture` =
+
+```json
+{
+  "subject_id": "prj_…", "record": null, "values": null,
+  "target": "dimension:D1", "codes": [],
+  "document_id": "doc_…", "text_hash": "…", "char_start": 120, "char_end": 245, "quote": "…",
+  "url": null, "retrieved_at": null, "archive_url": null,
+  "locator": null, "description": null,
+  "verify_field": false, "note": null
+}
+```
+
+- **Subject:** exactly one of `subject_id` (an existing record of a type evidence can concern: project, service, event, document, organization, participation, component, relation or indicator, DATA_MODEL §3.5) and `record` = `{"type", "data"}` with `type` one of `event`, `participation`, `relation`, `indicator`, `component`, `organization` and `data` as in `POST /api/entities/{type}` (errors with paths `record.data.<field>`). **`values`** (only with `subject_id`): fields of the subject in the form of a PATCH's `changes` (§3.2), written first (errors with paths `values.<field>`); given with a `field:` target, it must contain that field (DATA_MODEL §20.2 step 1).
+- **Source**, exactly one form (else `400 validation_error` on `document_id`): a **passage** (`document_id`, `text_hash`, `char_start`, `char_end`, optional `quote`; all four or none of the first group), a **whole document** (`document_id` alone, optional `quote`), or a **URL** (`url` and `retrieved_at`, optional `archive_url` and `quote`). Rules: DATA_MODEL §20.2 and §7 (citing a document: `retrieved_at` comes from the document, and a typed quote on a document with text must occur in it exactly once and is then anchored).
+- `target` defaults to `entity`; `codes` only with a `dimension:` target; `verify_field` only with a `field:` target (DATA_MODEL §20.2 step 4, §20.5).
+- **One write unit** with one new `batch_id`: the optional record or the subject's `values`, the evidence row, the optional field verification (`revision_ids` in that order; `values` that change nothing write no revision); `note` is the revision note of each of them. `subject` is the subject after the write (with its new `virtual.evidence_count` and, after `values` or a verification, its fields and `field_meta`).
+- **Errors:** `400 validation_error` (paths `subject_id`, `record`, `record.data.<field>`, `values`, `values.<field>`, `target`, `codes`, `document_id`, `char_start`, `char_end`, `quote`, `url`, `retrieved_at`, `verify_field`); `409 reference_deleted` for a deleted subject or document; `409 invalid_state {state: "text_changed", text_hash: <current>}` when `text_hash` is not the document's current version (the UI reloads the text and keeps the person's choices); `409 unique_violation` (e.g. a duplicate relation, an organisation slug); unknown IDs are validation errors on their field, as for entity writes. Capture never changes the document's links (DATA_MODEL §20.2).
+- The generic endpoints keep working for evidence: PATCH edits the editable fields (the anchor fields of anchored evidence are refused, DATA_MODEL §20.3), and `POST /api/entities/evidence` creates URL and document citations under the same rule for citing a document; it refuses `char_start` and `char_end`, which are system fields from Phase 3.
+
+### 8.4 Proposals concerning a document
+
+`GET /api/proposals?document_id=<id>` (with the other parameters of §7.4) returns the proposals whose `subject_id` or `related_id` is the document, or whose `payload.evidence.document_id` is it (`create_event` proposals that cite a passage of it). The document view lists them (`docs/UI.md` §9.2); decisions use §7.4.
+
+### 8.5 Timeline
+
+`GET /api/timeline` returns the events of a set of projects or services, grouped into lanes, with everything the client needs to draw them deterministically (`docs/UI.md` §9.4).
+
+| Parameter | Values | Meaning |
+|---|---|---|
+| `subject_type` | `project` (default) · `service` | one lane per subject of this type |
+| list grammar of that type | `f.*`, `q`, `sort` (§4) | selects the subjects; `sort` orders the lanes within a group (default: label, `mdt_sortkey`); `deleted` is ignored (live subjects only) |
+| `ids` | comma-separated IDs of that type (≤ 500) | combined with the filters by AND |
+| `event_types` | comma-separated `event_type` codes | default all; an unknown code → 400 |
+| `include_services` | `true` · `false` (default; projects only) | project lanes also show the events of the project's live services; such events name their service (`service_id`) |
+| `group_by` | `cluster` (default for project; services: their project's cluster) · `project` (default for service) · `none` | lane groups |
+| `from`, `to` | `YYYY-MM-DD` (each optional) | the window: dated events whose interval does not intersect it are left out and counted; undated events are listed whatever the window |
+| `disputed` | `exclude` (default) · `include` | disputed events, which derived values ignore (DATA_MODEL §8.2) |
+| `evidence` | `all` (default) · `with` | `with` shows only events with at least one live evidence row |
+
+Response:
+
+```json
+{
+  "subject_type": "project",
+  "parameters": {"ministry_founded": "2019-08-29", "full_scale_invasion": "2022-02-24"},
+  "periods": [
+    {"code": "pre_ministry", "label": "Before the ministry", "start": null, "end": "2019-08-28"},
+    {"code": "pre_invasion", "label": "Ministry, before the full-scale invasion", "start": "2019-08-29", "end": "2022-02-23"},
+    {"code": "full_scale_war", "label": "Full-scale war", "start": "2022-02-24", "end": null}
+  ],
+  "domain": {"start": "2019-01-01", "end": "2026-12-31"},
+  "groups": [{"key": "digital_public_services_infrastructure", "label": "…", "lane_ids": ["prj_…"]}],
+  "lanes": [{
+    "id": "prj_…", "type": "project", "label": "Diia", "group_key": "…", "project_id": null,
+    "derived": {"period": "…", "period_reason": null, "entry_period": "…", "war_trajectory": "…", "trajectory_reason": null, "launch": "2020-02", "launch_start": "…", "launch_end": "…", "existed_by": null, "portfolio_entry": null},
+    "events": [Event], "undated": [Event],
+    "portfolio": [{"participation_id": "par_…", "role": "operator", "start": "2023-01", "start_start": "…", "start_end": "…", "start_basis": "stated_in_source", "end": null, "end_start": null, "end_end": null, "end_basis": null}]
+  }],
+  "event_types": [{"code": "launch", "label": "Launch", "counts_as_modification": false, "sort_order": 40}],
+  "counts": {"lanes": 20, "events": 57, "undated": 4, "by_period": {"pre_ministry": 1, "pre_invasion": 18, "full_scale_war": 30, "unknown": 8}, "without_evidence": 12, "disputed_excluded": 1, "outside_window": 0},
+  "data_revision": 4812, "data_as_of": "2026-11-02T10:00:00.000000Z",
+  "refs": {}
+}
+```
+
+- `Event` = `{id, subject_id, subject_label, service_id, event_type, date, date_start, date_end, date_precision, date_basis, date_text, description_en, verification_status, period, evidence_count}`; `period` is its computed period (DATA_MODEL §8.4); `service_id` is set only for a service's event shown in its project's lane (`include_services`); `undated` holds the events without a date.
+- `portfolio`: the focal organisation's live, not disputed participations in a portfolio role whose subject is the lane's subject (DATA_MODEL §8.3 item 6), ordered by start; `end` null = open-ended. The lane `derived` values are those of the subject itself (project values use project events only, DATA_MODEL §8.2).
+- **Domain** (deterministic, never from the current date): `from`/`to` when given; otherwise 1 January of the earliest of the year of the earliest shown event start (an archive bound counts with its `date_end`), the year of the earliest portfolio start and the year of `ministry_founded`, to 31 December of the latest of the year of the latest shown event end, the year of the latest portfolio end and the year of `full_scale_invasion`.
+- **Order:** groups by the cluster vocabulary's `sort_order` (subjects without a cluster last, as "No cluster"), by project label for `project`, one group for `none`; lanes as stated above; events by `date_start`, `date_end`, the event type's `sort_order`, `id`; undated events by `id`.
+- `counts.by_period` counts the shown dated and undated events by their computed period and `counts.without_evidence` the shown events without evidence, so a figure can state both; `data_revision` and `data_as_of` stamp the data state (§8.7).
+- **Limits:** more than 500 lanes or 20 000 events → `400 validation_error` `{"lanes": [...]}` or `{"events": [...]}` ("narrow the filters"). Malformed filters → `400 bad_filter`/`bad_sort`; other invalid parameters → `400 validation_error`.
+
+### 8.6 Crosstab and coverage
+
+| Method and path | Query | Response |
+|---|---|---|
+| `GET /api/entities/{type}/crosstab` | `row`, `col` (field names) and the list grammar (§4: `f.*`, `q`, `deleted`) | `Crosstab` |
+| `GET /api/entities/{type}/coverage` | the list grammar | `Coverage` |
+
+These two generic endpoints serve the dashboard (`docs/UI.md` §9.5) for any table type. Every crosstab count and coverage's `filled` and `empty` counts are reproduced by the list endpoint with a filter the client can build; coverage's `verified`, `disputed` and `with_evidence` read `field_meta` and evidence, which no list filter expresses, so they have no table link (the dataset bundle's `provenance_summary.csv`, `field_provenance.csv` and `csv/evidence.csv` recompute them).
+
+```json
+{
+  "type": "project",
+  "row": {"field": "paper_cluster", "label": "Paper cluster", "multi": false},
+  "col": {"field": "period", "label": "Period", "multi": false},
+  "rows": [{"value": "digital_public_services_infrastructure", "label": "…", "count": 6}, {"value": null, "label": "(empty)", "count": 1}],
+  "cols": [{"value": "pre_ministry", "label": "…", "count": 1}, {"value": "pre_invasion", "…": "…"}, {"value": "full_scale_war", "…": "…"}, {"value": "unknown", "…": "…"}],
+  "cells": [[1, 4, 1, 0], [0, 0, 0, 1]],
+  "total": 20,
+  "data_revision": 4812, "data_as_of": "…",
+  "refs": {}
+}
+```
+
+- **Records:** those the list endpoint returns for the same `f.*`, `q` and `deleted`; every filter applies, also one on `row` or `col`.
+- **Fields:** `row` and `col` are two different fields that facets accept (filter `multiselect`, `bool` or `ref`, §3.2; Phase 3 adds the derived and virtual fields of DATA_MODEL §19.3 and document `source_id`); anything else → `400 validation_error` on `row` or `col`. A field with more than 500 values → `400 validation_error`.
+- **Values** as in facets (§3.2): every active vocabulary term in `sort_order` (inactive terms and unknown codes only when used), booleans `true`/`false`, refs and document `source_id` by count, then label; an `(empty)` value (`value: null`) when a record has none. `rows[].count` and `cols[].count` are the totals per value, `total` counts records. **Multi-valued** fields (`vocab_list`, document links) count a record once per value (`multi: true`), so the totals per value can exceed `total`.
+- **Cell links:** the records of a cell are those of the list endpoint with the request's query plus the row and the column filter, written as the table writes a facet value (UI §3): `in:` for vocab, ref and `source_id`, `any:` for `vocab_list`, `eq:` for bool, `empty:true` for the `(empty)` value, `in:` for document links (suggested and confirmed, as facets count them); a filter on the same field in the request is replaced by the cell's.
+- `Coverage` = `{"type", "records", "fields": [{field, label, group, filled, empty, verified, disputed, with_evidence}], "data_revision", "data_as_of"}` for the same records: one entry per tracked, editable field of the type except `notes` and `verification_status`, in registry order; `filled` and `empty` by the meaning of empty (DATA_MODEL §1.2); `verified` and `disputed` = records whose `field_meta` entry for the field says so; `with_evidence` = records with at least one live evidence row with `target = field:<name>` whose `subject_id` is the record (field evidence supports the value of the record it was captured for, so a merged record's field evidence does not count for its survivor, DATA_MODEL §18).
+
+### 8.7 Data revision
+
+- `data_revision` (integer) is the highest `revision.id` and `data_as_of` that revision's `at`, read in the same transaction as the data they stamp (DATA_MODEL §23.5). `GET /api/stats`, the timeline, crosstab and coverage responses, the export manifests and the codebook export carry them, and figure captions and crosstab files print them with the cut-off dates and the app version, on which derived and computed values also depend (DATA_MODEL §23.5), so every number can be matched with a bundle of the same data revision.
+- `GET /api/stats` also carries `derived_current` (bool): false while the stored derived-inputs hash differs from the current inputs (DATA_MODEL §8.1); the UI then shows the banner "Derived values are out of date: run mdt recompute", and exports are refused (§8.8.1).
+
+### 8.8 Exports
+
+#### 8.8.1 Downloads
+
+| Method and path | Query | Response |
+|---|---|---|
+| `GET /api/exports/dataset` | — | the dataset bundle (ZIP, §8.8.2), built in the request |
+| `GET /api/exports/qda` | — | the QDA corpus (ZIP, §8.8.3), built in the request |
+| `GET /api/codebook/export` | `format` = `md` (default) · `csv` | the codebook file (§8.8.4), generated in the request |
+
+- **Building** (DATA_MODEL §23.4): the derived-values check, one read transaction, a temporary file, the privacy guard, then the download with `Content-Length`; the temporary file is deleted afterwards. A request takes as long as the build (seconds; about a minute for a large dataset with its XLSX file), so a reverse proxy should allow that read timeout (§1.4). There is no job list: the app has one user (D-15).
+- **Errors:** derived values out of date → `409 invalid_state {state: "derived_out_of_date"}`; a privacy-guard hit → `409 privacy_check_failed {file, record_id}` (`record_id` null for files without records); an invalid `format` → `400 validation_error`.
+- **Headers:** `Content-Type: application/zip` (codebook: `text/markdown; charset=utf-8` or `text/csv; charset=utf-8`), `Content-Disposition: attachment; filename="mdt-dataset-<YYYYMMDD-HHMMSS>.zip"` (likewise `mdt-qda-…` and `codebook-<…>.<md|csv>`; UTC), `Cache-Control: no-store`. The UI downloads them like view exports (§5: `fetch` → Blob → `a[download]`).
+
+#### 8.8.2 Dataset bundle
+
+```
+mdt-dataset-<YYYYMMDD-HHMMSS>.zip
+  README.md                     what the bundle holds, conventions, content policy, attribution, how to verify
+  manifest.json                 counts, files with size, SHA-256 and rows, provenance of the export
+  SHA256SUMS                    "<sha256>  <path>" per file except itself, sorted by path
+  dataset.json                  every record as JSON (below)
+  dataset.xlsx                  one sheet per table (below)
+  csv/<type>.csv                project, service, event, document, organization, component,
+                                participation, relation, indicator, evidence
+  csv/document_link.csv         the documents' links
+  csv/field_provenance.csv      one row per exported record and field with provenance and licence
+  csv/provenance_summary.csv
+  csv/merges.csv                the merge log
+  csv/sources.csv               the source register with licences
+  csv/source_observation.csv    what the collectors saw in their sources (crawl times)
+  codebook/codebook.md  codebook/codebook.csv  codebook/parameters.yaml  codebook/CODEBOOK.md
+```
+
+- **Records:** the live records of the ten table types (DATA_MODEL §23.2), sorted by `id`.
+- **`csv/<type>.csv`:** `id`, then every `exportable` field of the type in registry order with the column rules of §5 (vocab codes plus `_label`, partial dates as four columns, refs plus `_label`, derived fields prefixed `derived_` with their extra columns, lists joined with `"; "`, booleans `true`/`false`, UTF-8 with BOM, `QUOTE_ALL`), except: the document `links` (in `document_link.csv`), the counts `open_comments`, `comment_count` and `open_proposals`, and `deleted_at`/`deleted_by` (only live rows are exported). The other virtual fields are included, e.g. `evidence_count`, the `*_in_paper_scope` flags and evidence `subject_current_id` (the survivor of a merged subject) and `case_id`. `csv/evidence.csv` adds a last column `licence`: the cited document's `license` code, the licence under which the quote was published (empty for URL citations and documents without one).
+- **`csv/document_link.csv`:** `document_id`, `subject_id`, `subject_type`, `subject_label`, `origin`, `state`, `match_count`, `matched_aliases` (`"; "`), every state, sorted by `document_id`, `subject_id`. Only confirmed links count in analyses (DATA_MODEL §15.8); the column `state` tells them apart.
+- **`csv/field_provenance.csv`:** per exported record and `field_meta` entry: `entity_type`, `entity_id`, `field`, `src_kind` (`seed` · `collector` · `manual` · `import`, from `src`; `manual:<name>` entries count as `manual`), `src`, `licence` (the licence code that applies to the value: for the fields of a document, the document's `license`; for a collected value of another record, its collector's licence from `sources.csv`; empty otherwise, because values written by a person, the seed or an import record no source licence), `by`, `at`, `locked`, `verified`, `evidence_id`, `restored_from_version`, `raw_snapshot_ids` (`"; "`), `snapshot_refs` (compact JSON `[{id, url, final_url, fetched_at, via}]` of those snapshots: where and when a collected value was read; never the body). Sorted by `entity_type`, `entity_id`, `field`.
+- **`csv/provenance_summary.csv`:** `entity_type`, `field`, `src_kind` (plus `none` for records without an entry), `records`, `locked`, `verified`, `disputed`, sorted by those three keys.
+- **`csv/merges.csv`:** one row per `merge_log` row: `merge_id`, `entity_type`, `survivor_id`, `merged_id`, `at`, `unmerged_at`, sorted by `at`, `merge_id`.
+- **`csv/sources.csv`:** one row per collector in `sources.yaml` plus `manual`, `seed` and `import` (with empty licence columns): `source_key`, `label`, `register_id` (the SOURCES ID, e.g. `S3`), `licence` and `licence_statement` (verbatim), sorted by `source_key`.
+- **`csv/source_observation.csv`:** one row per observation (DATA_MODEL §14.5): `collector`, `key`, `entity_type`, `subject_id`, `subject_label`, `external_id`, `url`, `label`, `first_seen_at`, `last_seen_at`, `present`, `missing_since_at`, `missing_runs`, `details` (compact JSON), sorted by `collector`, `key`. The README says that these are crawl times, never dates of an initiative.
+- **`dataset.json`:** `{"format": "mdt-dataset", "format_version": 1, "parameters", "data_revision", "data_as_of", "entities": {"<type>": [Record, …]}, "codebook": {"vocabularies": [{name, label, description, multi, fixed_codes, terms: [...]}]}}`, where Record is the **list** item of §2 (no `fields.text`, no `*_by_field` counts, no `observations`, no `search_snippet`) without `refs` and the counts `open_comments`, `comment_count` and `open_proposals`; documents keep their `links` with origin, state and match details, and every record its `field_meta` and, where present, `derived`. It holds no export ID or time (those are in `manifest.json`), so it is byte-identical for an unchanged data state (DATA_MODEL §23.5). Written as a stream.
+- **`dataset.xlsx`:** a first sheet `README` (the README's lines), one sheet per type with the CSV columns, and the sheets `document_link`, `provenance_summary`, `merges`, `sources` and `codebook`, with the cell rules of §5; `field_provenance` and `source_observation` are in the CSV files only (their row counts can exceed what spreadsheets handle well).
+- **`codebook/`:** the two files of §8.8.4, the loaded `codebook/parameters.yaml`, and `CODEBOOK.md`, the coding rules and codebook draft (`docs/CODEBOOK.md`, verbatim; where the exporter finds it: §8.10). Its vocabulary tables are the draft; the vocabularies used for the data are `codebook.md` and `codebook.csv`, which the README says.
+- **`manifest.json`:**
+
+  ```json
+  {
+    "format": "mdt-dataset", "format_version": 1, "export_id": "exp_…", "created_at": "…",
+    "app_version": "…", "code_version": "…", "schema_revision": "0003",
+    "parameters": {"ministry_founded": "2019-08-29", "full_scale_invasion": "2022-02-24"},
+    "data_revision": 4812, "data_as_of": "…", "derived_inputs_hash": "…",
+    "counts": {"project": {"total": 20, "verification_status": {"unverified": 18, "verified": 2, "disputed": 0}}, "evidence": {"total": 210, "anchored": 160, "target": {"entity": 40, "field": 70, "dimension": 100}}, "document_link": {"total": 900, "state": {"suggested": 600, "confirmed": 250, "rejected": 50}}},
+    "files": [{"path": "csv/project.csv", "bytes": 48211, "sha256": "…", "rows": 20}],
+    "references_outside_bundle": {"event.subject_id": 0},
+    "collector_runs": [{"id": "run_…", "collector": "ministry_projects", "status": "succeeded", "started_at": "…", "finished_at": "…", "code_version": "…"}],
+    "imports": [{"id": "imp_…", "file_label": "…", "created_at": "…"}],
+    "excluded": ["deleted and merged records", "comments", "proposals", "raw snapshots", "run, fetch and import logs", "saved views", "document full texts"],
+    "privacy_check": {"contact_email": "passed", "user_agent_token": "passed", "bot_manager_token": "passed"}
+  }
+  ```
+
+  `files` lists every file except `manifest.json` and `SHA256SUMS` (`rows` for tabular files, the number of records for `dataset.json`, null otherwise); `collector_runs` and `imports` are those named in the exported `field_meta.src` values (`collector:<name>@<run_id>`, `import:<file_label>`); `privacy_check` gives `passed` or, for the address when `CONTACT_EMAIL` is unset or blank, `not_checked` (DATA_MODEL §23.3).
+- **`README.md`** (generated, English): the export ID, time, code version, schema revision and data revision; the file list with one line per file; the conventions (encoding, list separator, partial dates and their four columns, the `derived_` prefix and the derivation rules in `codebook/CODEBOOK.md` §2.7, provenance kinds, offsets of evidence quotes, crosstab counting: a multi-valued field counts a record once per value, so every dashboard number can be recomputed from the CSV files); the content policy (exclusions; quotes and the `licence` column of `csv/evidence.csv`; the `license` column of documents and the `licence` column of field provenance; outside documents, values written by a person, the seed or an import carry no licence but can contain source text); **attribution**: values whose `licence` is `cc_by_4_0` (field provenance, quotes) are to be credited when reused, and the README lists the sources they come from (collectors and the documents' `source_id`) with the licence statements of `sources.csv`; verification (`sha256sum -c SHA256SUMS`); and a citation line ("MDT Portfolio dataset, export <id>, data revision <n>, <date>"; Phase 4 releases add the release name and git tag).
+
+#### 8.8.3 QDA corpus
+
+```
+mdt-qda-<YYYYMMDD-HHMMSS>.zip
+  README.md  manifest.json  SHA256SUMS
+  metadata.csv              one row per included document (document variables)
+  cases.csv                 one row per project and service (case variables)
+  links.csv                 confirmed links between documents and cases
+  codings.csv               the evidence rows that cite these documents (coded passages)
+  texts/<document name>.txt one UTF-8 text file per document with a text (current version)
+  texts/<document name>.<text_hash[:12]>.txt   earlier text versions that a coding quotes
+  codebook/                 the four files of the dataset bundle's codebook/ folder
+```
+
+- **Documents:** live documents with `screening_status = included`, with the texts of every licence (an internal working corpus, DATA_MODEL §23.2). Sorted by document name. There are no parameters.
+- **Document name:** `<published_start>_<document id>`, or `undated_<document id>` (e.g. `2022-03-01_doc_01JC…`): ASCII, unique, sortable by date. Titles are metadata, not file names.
+- **Text files:** the current text version exactly as stored (`document_text.text`), and every earlier version that one of the document's codings quotes, UTF-8 **with a byte order mark** (QDA programs on Windows detect UTF-8 by it), LF line ends. Offsets in `codings.csv` count code points from the first character after the BOM; `text_hash` is the SHA-256 of a file's content without the BOM. A document without text has no file.
+- **`metadata.csv`:** `document_name`, `document_group` (the slug of the first confirmed linked project in slug order, else empty), `document_id`, `title`, `title_en`, `doc_type`, `doc_type_label`, `language`, `published`, `published_start`, `published_end`, `published_precision`, `published_basis`, `published_text`, `derived_period`, `derived_period_label`, `publisher`, `url`, `archive_urls`, `retrieved_at`, `license`, `source_id`, `text_hash`, `char_count`, `text_file` (empty without text), `linked_projects` (slugs, `"; "`), `linked_services` (labels), `linked_clusters` (codes), all three from confirmed links only, like `document_group` and `links.csv`, `linked_in_paper_scope`, `citation_count`, `dimension_citation_count`, `screening_note`, `verification_status`. The first two columns are a document's name and group, the shape QDA programs read as document variables (the exact import steps depend on the program, README).
+- **`cases.csv`:** one row per live project and service: `case_id`, `case_type`, `case_label`, `slug` (projects), `project_id` and `project_slug` (a service's project), `project_paper_cluster` and `project_in_paper_scope` (the project's values: a project's own, a service's project's; services have no such fields, so the names say whose values they are), `status`, `development_mode`, `wartime_relevance`, `derived_period`, `derived_entry_period`, `derived_war_trajectory`, with `_label` columns for the codes; sorted by `case_id`. The case variables of QDA programs (classifications, case attributes). `existed_before_invasion` is left out: its `false` means "not shown", which a case variable would read as "did not exist" (DATA_MODEL §3.1); the period and the trajectory with their reasons carry that information, and the dataset bundle exports the field with its definition.
+- **`links.csv`:** `document_name`, `document_id`, `subject_id`, `subject_type`, `subject_label`, `project_slug`, `paper_cluster`, one row per confirmed link (document sets per project or cluster; links between documents and cases).
+- **`codings.csv`:** one row per live evidence row that cites an exported document: `evidence_id`, `document_name`, `document_id`, `document_published` (with `_start`, `_end`, `_precision`), `derived_document_period`, `text_hash`, `text_version` (`current` · `earlier`), `text_file`, `char_start`, `char_end` (code points in that text version and its file), `quote`, `subject_id`, `subject_type`, `subject_label`, `subject_current_id`, `case_id`, `case_type`, `case_label`, `derived_case_period`, `target`, `target_kind` (`entity` · `field` · `dimension`), `field`, `dimension` and `dimension_label` (the code `d1`…`d4` and its label, empty for other targets), `codes` and `codes_label` (`"; "`), `locator`, `description`, `licence` (the document's `license`), `verification_status`, `created_at`, with the column conventions of the dataset bundle; whole-document evidence has empty offsets. Sorted by document name, `char_start`, `char_end`, `evidence_id`.
+- **`manifest.json`:** as for the dataset with `"format": "mdt-qda"`, plus `"internal": true`, `"documents": {"included": n, "texts": n, "earlier_versions": n, "without_text": n}`, `"licences": {"<code>": n}` and `"codings_outside_corpus": {"<screening status>": n}` (codings of documents that are not included).
+- **`README.md`:** the purpose; the notice "Internal working corpus: contains full texts of sources that are not openly licensed (column `license`); do not publish or share it"; the text and offset conventions (BOM, code points, `text_hash`); how the files map to a QDA program in general (texts as documents, `metadata.csv` as document variables, `cases.csv` as case variables, `links.csv` as document sets or document–case links, `codebook/` as the code system); that links and the `linked_*` columns count confirmed links only and that the `project_*` columns of `cases.csv` hold the project's values; and that `codings.csv` is meant for analysis tools, because no exchange format for codings (REFI-QDA) is produced.
+
+#### 8.8.4 Codebook
+
+Generated from the database's working copy (the terms as edited on the Codebook page), never from the YAML files, except `parameters.yaml`.
+- **`codebook.md`:** a title with "working copy, data revision <n> (<data_as_of>)" (no export time, so the same data state gives the same file); the parameters (code, value, source); one section per vocabulary in name order (`## <label> (`<name>`)`, its description, `multi` and `fixed_codes`, and a table of its terms by `sort_order`: code, English label, Ukrainian label, definition, include note, exclude note, examples, status (`active`, or `inactive → <replaced_by>`), attributes as compact JSON); for each analysis code up to three **anchor examples** from its live coded passages (the quote, at most 300 characters, with the document ID, publication date and `license` code; oldest evidence first); a closing pointer to the coding rules (`CODEBOOK.md`, which the bundles include).
+- **`codebook.csv`:** one row per term: `vocabulary`, `vocabulary_label`, `multi`, `fixed_codes`, `code`, `label_en`, `label_uk`, `definition`, `include_note`, `exclude_note`, `examples`, `sort_order`, `active`, `replaced_by`, `attributes` (compact JSON, sorted keys), `usage_count`, `version`; sorted by vocabulary and `sort_order`, then code; the CSV rules of §5.
+
+### 8.9 Indicator metrics
+
+`GET /api/indicators/metrics?q=` → `{"metrics": [{"metric": "…", "count": n, "units": [{"unit": "…", "count": n}]}]}` over live indicators, by count (descending), then metric (`mdt_sortkey`); `q` filters by a case-folded substring of the metric. The indicator forms offer these values (`docs/UI.md` §9.3); nothing is suggested from outside the data.
+
+### 8.10 Runtime and settings
+
+- **Exports** are built inside the request (DATA_MODEL §23.4); temporary files live in `DATA_DIR/exports/.tmp/` (in the `./data` bind mount) and are removed after each build (a file left behind by a crash by a later build, once it is older than a day). Phase 3 adds no setting.
+- **`CODEBOOK.md`:** the exporter reads `docs/CODEBOOK.md` below the repository root, the root that relative settings resolve against (`REPO_ROOT`; `/app` in the image), so development, tests and Docker find the same file whatever `CODEBOOK_DIR` is; a missing file fails the export with `error: docs/CODEBOOK.md not found` (API `500`, logged). The image contains it as `/app/docs/CODEBOOK.md` (the `.dockerignore` allowlist adds `!docs/CODEBOOK.md`, and the Dockerfile copies it; `tests/test_docker_layout.py` checks it).
+- **CLI** (CLAUDE.md, "Commands"): `mdt export dataset [--out DIR]` and `mdt export qda [--out DIR]` build the bundle in the foreground and write it into `DIR` (default `DATA_DIR/exports/`), printing the path, the export ID and the SHA-256 of the ZIP; `mdt export codebook [--format md|csv] [--out FILE]` writes the codebook (default standard output). Each exits 0, or 1 with `error: …` on failure (a privacy-guard hit, derived values out of date). Makefile: `make export KIND=dataset|qda|codebook`.
+- **Startup self-check** (§6): the database must be at head `0003`.
+- **Guides** (`backend/tests/test_docs.py`): README.md names the new commands (`export dataset`, `export qda`, `export codebook`) with their options and the `make export` target.

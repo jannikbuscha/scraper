@@ -70,7 +70,7 @@ In practice:
 - After each phase: all tests green, clean commits (Conventional Commits), and a short status report to the data lead **in German** with three parts: *fertig* (done), *offen* (open), *Entscheidungen* (decisions the data lead has to make).
 - **No `git push` without the data lead's approval.**
 - If a source behaves differently than described, document it (`docs/SOURCES.md`) and propose an alternative instead of improvising silently.
-- Team decisions are D-1 to D-15 in `PLAN.md` §12; for the open ones the proposed defaults apply until the team decides.
+- Team decisions are D-1 to D-16 in `PLAN.md` §12; for the open ones the proposed defaults apply until the team decides.
 
 ## Stack
 
@@ -93,14 +93,14 @@ In practice:
 │   ├── API.md             contract: HTTP API, query grammar, exports, runtime
 │   ├── UI.md              contract: routes, pages, components, frontend tests
 │   ├── COLLECTORS.md      contract (Phase 2): polite client, runs, parsers, collectors C1–C5, importer, manual documents
-│   ├── CODEBOOK.md        vocabularies and coding rules
+│   ├── CODEBOOK.md        vocabularies and coding rules (Phase 3: also in the Docker image, because export bundles include it)
 │   └── SOURCES.md         source register
-├── codebook/              one YAML file per vocabulary + parameters.yaml (cut-off dates); Phase 2 adds event_patterns.yaml and collector_mappings.yaml
+├── codebook/              one YAML file per vocabulary + parameters.yaml (cut-off dates); Phase 2 adds event_patterns.yaml and collector_mappings.yaml; Phase 3 adds dimension.yaml and analysis_code.yaml
 ├── seed/                  projects.yaml: 19 + 1 projects and the focal organisation
-├── backend/               uv project: package mdt (src/mdt; Phase 2 adds collectors/, importers/, documents/), alembic.ini, migrations/, tests/
+├── backend/               uv project: package mdt (src/mdt; Phase 2 adds collectors/, importers/, documents/; Phase 3 adds exports/), alembic.ini, migrations/, tests/
 ├── frontend/              Vite app (src/, e2e/); build output frontend/dist (gitignored)
 ├── .github/workflows/ci.yml
-├── data/                  runtime data, gitignored: app.db; Phase 2 adds raw/ (raw snapshots and uploads) and fixtures/ (fixtures captured on the server); later backups/
+├── data/                  runtime data, gitignored: app.db; Phase 2 adds raw/ (raw snapshots and uploads) and fixtures/ (fixtures captured on the server); Phase 3 adds exports/ (export bundles); later backups/
 └── releases/              frozen dataset releases (Phase 4; committed and tagged); until then only README.md, which keeps the bind-mount directory in every clone
 ```
 
@@ -120,12 +120,13 @@ In practice:
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | `mdt db upgrade` · `mdt seed` · `mdt recompute` · `mdt check` on the local database |
 | `uv run --project backend mdt reindex` | Rebuild both full-text search tables in batches; the app stays usable (no make target) |
 | `make collect SOURCE=<name> [MODE=full]` · `make fixtures SOURCE=wayback` · `make sources-check` | run a collector in the foreground · record its fixture list · re-check every source host from this machine (`docs/COLLECTORS.md` §11) |
+| `make export KIND=dataset\|qda\|codebook` | (Phase 3) build an export in the foreground: the dataset bundle or the QDA corpus as a ZIP in `data/exports/`, or the codebook as Markdown (`docs/API.md` §8.8, §8.10) |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose: build and start (waits until healthy) · stop · follow logs · build the image |
 
 Direct commands:
 - Backend quality gates: `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q`
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e`
-- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check [--deep]`, `reindex`, `serve [--host] [--port] [--reload]`, and for data acquisition `collect <name> [--mode] [--limit N] …`, `runs [show <id>]`, `fixtures capture <name>`, `sources check`, `import <file> --type <type> [--dry-run] …` (`docs/COLLECTORS.md` §11). Collector runs with network access and manual fetches need `CONTACT_EMAIL` in `.env` (the placeholder is refused); `COLLECTOR_REPLAY_DIR` makes collectors replay the test fixtures instead. `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
+- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check [--deep]`, `reindex`, `serve [--host] [--port] [--reload]`, and for data acquisition `collect <name> [--mode] [--limit N] …`, `runs [show <id>]`, `fixtures capture <name>`, `sources check`, `import <file> --type <type> [--dry-run] …` (`docs/COLLECTORS.md` §11), and from Phase 3 `export dataset|qda|codebook …` (`docs/API.md` §8.10). Collector runs with network access and manual fetches need `CONTACT_EMAIL` in `.env` (the placeholder is refused); `COLLECTOR_REPLAY_DIR` makes collectors replay the test fixtures instead. `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
 - E2E needs Chromium: where `/opt/pw-browsers` exists, the Makefile sets `PLAYWRIGHT_BROWSERS_PATH` to it; elsewhere run `cd frontend && npx playwright install chromium` once.
 
 ## Docker and configuration

@@ -1,6 +1,6 @@
 # Codebook files
 
-One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus three files that are not vocabularies (no `vocabulary` key, so `mdt seed` skips them): `parameters.yaml`, `event_patterns.yaml` and `collector_mappings.yaml`. The format is defined in `docs/DATA_MODEL.md` §9; the coding rules are in `docs/CODEBOOK.md`.
+One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files; 28 from Phase 3, below) plus three files that are not vocabularies (no `vocabulary` key, so `mdt seed` skips them): `parameters.yaml`, `event_patterns.yaml` and `collector_mappings.yaml`. The format is defined in `docs/DATA_MODEL.md` §9; the coding rules are in `docs/CODEBOOK.md`.
 
 ## Where the values come from
 
@@ -10,15 +10,19 @@ One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus thr
 - **`label_uk`:** `null` everywhere, because CODEBOOK.md gives no confirmed Ukrainian label. The page title "Досягнення" for the ministry category `progress` was only seen in search results and is recorded as unconfirmed in that term's `include_note`. Collector C1 captures the category labels shown on the ministry site.
 - **`include_note`:** for `wartime_relevance`, the "Rule" column of CODEBOOK.md §2.4; otherwise only the unconfirmed title above.
 - **`examples`:** only for `paper_cluster`: the projects the paper assigns to each cluster. CODEBOOK.md allows examples only from the paper's own assignments or from collected and verified data.
+- **Phase 3 files** (`docs/DATA_MODEL.md` §19.2, CODEBOOK.md §2.10 and §3):
+  - `dimension.yaml`: the four dimensions of the paper's Table 1, codes `d1`…`d4`, `fixed_codes: true`; `label_en` is the dimension's name and `definition` its "Analytical focus" text, both verbatim from the paper; `attributes` = `target` (the evidence target `dimension:D1` … `D4`) and `theoretical_source` (the table's column, verbatim). Nothing else is added.
+  - `analysis_code.yaml`: the team's analysis codes, `multi: true`, `fixed_codes: false`, with **no terms** (`terms: []`): the paper and the codebook draft define no codes below the dimensions, so codes are added on the Codebook page (or from the capture panel of the document view) during coding, each with `attributes.dimension` (`d1`…`d4`), never from general knowledge.
 - **`sort_order`:** the order in CODEBOOK.md, in steps of 10.
 - **`active`:** `true` for all terms, including the candidate beneficiaries.
 - **`multi`:** `true` for the vocabularies of multi-valued fields (`ministry_category`, `policy_domain`, `beneficiary`, `channel`).
-- **`fixed_codes`:** `true` for the system vocabularies that program logic uses (`verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory`, `derived_reason`): their terms cannot be added or deactivated in the app; labels and definitions stay editable.
+- **`fixed_codes`:** `true` for the system vocabularies that program logic uses (`verification_status`, `screening_status`, `date_basis`, `date_precision`, `period`, `war_trajectory`, `derived_reason`, and from Phase 3 `dimension`): their terms cannot be added or deactivated in the app; labels and definitions stay editable.
 - **`attributes`:**
   - `event_type`: `counts_as_modification` (true/false) exactly as in the CODEBOOK.md table. The derived `war_trajectory` reads it (decision D-2). `fixed: true` marks `launch`, `beta_launch` and `first_archived`, which program logic uses (`docs/DATA_MODEL.md` §7); this attribute can only be changed here, not in the app.
   - `policy_domain`: `cofog`, the COFOG division number ("01" to "10"). The label is the COFOG division name without the number. The labels still have to be checked against the official COFOG publication (decision D-7).
   - `beneficiary`: `candidate: true` for the candidate codes; `paper_basis` (CODEBOOK.md column "Basis in the paper") for the codes grounded in the paper.
-  - `participation_role`: `draft_addition: true` for `coordinator`.
+  - `participation_role`: `draft_addition: true` for `coordinator`; from Phase 3 `portfolio_role: true` for `initiator`, `owner` and `operator`, the roles in which a participation of the focal organisation decides the derived portfolio entry (the rule of CODEBOOK.md §2.7; `docs/DATA_MODEL.md` §8.3 item 6; decision D-10).
+  - `dimension`: `target` and `theoretical_source` (Phase 3); `analysis_code`: `dimension`, required for every term (Phase 3).
 - Decision IDs (D-n) refer to `PLAN.md` §12. `[search]` marks information that was only seen in search results (legend of `docs/CODEBOOK.md`).
 
 ## parameters.yaml

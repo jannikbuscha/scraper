@@ -1,6 +1,6 @@
 # Collectors, importer and manual documents
 
-> **Status:** Phase 2 contract, 2026-10-30, revised the same day after a four-lens review (integrity, source fit, completeness, simplicity), and updated the same day with the clarifications of the Phase 2 build and integration (including two corrections after the first live runs: empty subcategory pages and a redirecting service page on diia.gov.ua, §8.3, recorded in SOURCES S3). Binding like `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md`: implementations follow it, and every interface change updates it in the same change.
+> **Status:** Phase 2 contract, 2026-10-30, revised the same day after a four-lens review (integrity, source fit, completeness, simplicity), and updated the same day with the clarifications of the Phase 2 build and integration (including two corrections after the first live runs: empty subcategory pages and a redirecting service page on diia.gov.ua, §8.3, recorded in SOURCES S3). **Extended on 2026-10-31 with the Phase 3 additions** (§15: the tagger's quote rule and the optional Telegram collector C7a); §1, §7.6, §7.7 and §14 are updated; revised the same day after a four-lens review, which deferred the cross-check collectors C3b and C2a and the data.gov.ua collector C7b (§14). Binding like `docs/DATA_MODEL.md`, `docs/API.md` and `docs/UI.md`: implementations follow it, and every interface change updates it in the same change.
 > **Related:** data rules in `docs/DATA_MODEL.md` §14–§18 (tables, reconciliation, proposals, imports, merging); HTTP endpoints in `docs/API.md` §7; pages in `docs/UI.md` §8; source facts and evidence in `docs/SOURCES.md` (cited here by section, e.g. SOURCES S1); fixtures in `backend/tests/fixtures/` (`fixtures/<dir>/<name>` below).
 > **Rules that apply everywhere:** no value from model knowledge (CLAUDE.md, "Data integrity"); collectors never overwrite a value a person set, accepted, imported, restored, seeded or verified (DATA_MODEL §15.5); every collected value names the snapshot it was parsed from (§5); robots.txt and the politeness rules of §4 are never relaxed; no circumvention of protections; tests run without network.
 
@@ -22,7 +22,15 @@ The tagger also runs inside every run that collects documents (C1–C4), so thei
 
 Plus: the polite HTTP client (§4), the raw snapshot store (§5), runs with fetch log and messages (§6), reconciliation and proposals (DATA_MODEL §15, §16), the review inbox, runs and sources pages (UI §8), merging duplicate projects and services (DATA_MODEL §18), the tabular importer (§9) and manual documents, including archived copies from the Wayback Machine (§10).
 
-**Deferred** (§14): the cross-check collectors C2a (Digital State UA) and C3b (Diia service guide) while decision D-12 is open; C6 legal acts and C7 Telegram and data.gov.ua; Wayback reconstruction of the catalogues and an automatic Wayback fallback inside collectors; schedules (Phase 4).
+**Deferred in Phase 2** (§14): the cross-check collectors C2a (Digital State UA) and C3b (Diia service guide) while decision D-12 is open; C6 legal acts and C7 Telegram and data.gov.ua; Wayback reconstruction of the catalogues and an automatic Wayback fallback inside collectors; schedules (Phase 4).
+
+**Phase 3** (§15) builds no collector that Definition of Done 7 needs. It adds the tagger's quote rule (§15.2) and specifies one optional collector, built last, after the Phase 3 E2E scenarios pass and once the data lead confirms that Telegram posts belong in the screening corpus:
+
+| Key | Collector | Source (SOURCES) | Creates directly | Proposes |
+|---|---|---|---|---|
+| `telegram` | C7a the ministry's Telegram preview (optional) | S7a | documents (announcements) | field updates, possible duplicates |
+
+C2a, C3b, C6 and C7b stay deferred (§14).
 
 ## 2. Architecture
 
@@ -388,7 +396,7 @@ Depth-first over `content` [node types and attributes checked on the C1 and C4 f
 - **Aliases:** the `aliases` items of live projects and services (all kinds), plus each record's `name_en` and `name_uk` as case-sensitive aliases of kind `name` (so services created by C3, which have names but no aliases, are tagged too).
 - **Matching** on the text normalised with `normalize_for_search` (DATA_MODEL §10): an alias with `case_sensitive: true` matches exactly, otherwise case-folded; a match must not be preceded or followed by a letter or digit; overlapping matches are resolved **longest first** (`Дія.Бізнес` wins over `Дія` at the same place); a match covered by an occurrence of one of the alias's `exclude_patterns` (literal phrases, case-folded) is dropped.
 - **Output** per subject with at least one match: `matched_aliases` (distinct alias texts, sorted), `match_count`, `snippet` (up to 120 characters before and after the first match, whitespace collapsed). The reconciler adds them as suggested links (DATA_MODEL §15.8).
-- Inflected forms are aliases with `kind: inflection` that a person adds; there is no automatic stemming (pymorphy3 suggestions are Phase 3).
+- Inflected forms are aliases with `kind: inflection` that a person adds; there is no automatic stemming (pymorphy3 suggestions are deferred, §14).
 - The reconciler runs the tagger for every document candidate whose text is new or changed; the built-in collector `tagger` (§8.6) runs it over stored texts, e.g. after aliases were edited.
 
 ### 7.7 Event patterns (`codebook/event_patterns.yaml`)
@@ -407,7 +415,7 @@ patterns:
 
 - **Sentences** are split on the stored text (`document_text.text`) at line breaks and after `.`, `!`, `?` or `…` followed by whitespace (dots inside names such as `Дія.City` do not split). Each sentence is normalised with `normalize_for_search` and case-folded for matching, so offsets always refer to the stored text.
 - **Semantics:** a stem matches a word that starts with it; a phrase matches the sequence of words; `all_of` requires every part in the same sentence. Patterns apply to documents of their `lang` (documents without a language: all patterns).
-- A sentence with at least one alias match (§7.6) and one pattern match yields one `create_event` proposal per (subject, event type), recorded with `collector = tagger` and the run that raised it (also inside C1–C4 runs): event `date` = the document's `published` (canonical string) with `date_basis = inferred` and `date_text` = the document's `published_text`; evidence = the document's current text version (`document_id`, `text_hash`, its `raw_snapshot_id` and `retrieved_at`) with `char_start`/`char_end` of the sentence in the stored text and `quote` = the stored sentence (≤ 1 000 characters); `pattern_id`, `matched_alias` (DATA_MODEL §16.1). Documents without `published` give proposals without a date.
+- A sentence with at least one alias match (§7.6) and one pattern match yields one `create_event` proposal per (subject, event type), recorded with `collector = tagger` and the run that raised it (also inside C1–C4 runs): event `date` = the document's `published` (canonical string) with `date_basis = inferred` and `date_text` = the document's `published_text`; evidence = the document's current text version (`document_id`, `text_hash`, its `raw_snapshot_id` and `retrieved_at`) with `char_start`/`char_end` of the sentence in the stored text and `quote` = the stored sentence (≤ 1 000 characters; a longer sentence is cut, and trailing whitespace after the cut is removed, §15.2); `pattern_id`, `matched_alias` (DATA_MODEL §16.1). Documents without `published` give proposals without a date.
 - The share of accepted proposals per `pattern_id` is reported (API `GET /api/proposals/summary`), so the list can be improved on evidence (CODEBOOK §4).
 
 ### 7.8 Duplicate detection (`duplicates.py`)
@@ -691,9 +699,59 @@ Reconciler (every row of the decision table, record-level verification, the text
 | `pypdf` | text of PDFs (C4 files, uploads) | pure Python, BSD; extracted the Cyrillic text of `ministry_news/storage_pdf_draft_resolution.pdf` correctly [local, 2026-10-30]; preferred to pdfminer.six (more dependencies) and PyMuPDF (AGPL) |
 | `tzdata` | the IANA time-zone database for `zoneinfo` (Europe/Kyiv, §7.5) | a fallback that `zoneinfo` uses only when the system has no time-zone data, so a container image without the OS `tzdata` package still parses Kyiv times |
 
-Not added: trafilatura and lxml (heavy, version-dependent output; §7.4 is enough and reproducible), python-docx (DOCX via `zipfile` and ElementTree), python-multipart (uploads are raw request bodies, API §7.7), APScheduler (schedules are Phase 4), pymorphy3 (Phase 3), defusedxml (XML-bomb protection was dropped with D-15; sitemaps and Atom are parsed with ElementTree). openpyxl, already a dependency, reads XLSX imports.
+Not added: trafilatura and lxml (heavy, version-dependent output; §7.4 is enough and reproducible), python-docx (DOCX via `zipfile` and ElementTree), python-multipart (uploads are raw request bodies, API §7.7), APScheduler (schedules are Phase 4), pymorphy3 (deferred, §14), defusedxml (XML-bomb protection was dropped with D-15; sitemaps and Atom are parsed with ElementTree). openpyxl, already a dependency, reads XLSX imports.
 
 ## 14. Deferred
 
-- **Phase 3:** C2a `digitalstate_catalog` and C3b `diia_guide` (cross-check sources while D-12 is open; their fixtures stay in `fixtures/digitalstate_catalog/` and `fixtures/diia_guide/`, and the D-12 default "cross-check sources, observations only" applies when they are built); C6 legal acts (after the server check of zakon.rada.gov.ua; until then the S6 alternative applies, SOURCES S6); C7 Telegram and data.gov.ua; Wayback reconstruction of the catalogues at the cut-off dates, documents recovered from the archive in bulk and an automatic Wayback fallback inside collectors (era-specific parsers need real captures); the UNITED24 report harvester, Diia.Education courses and sitemap inventories of project sites; ai.thedigital.gov.ua (scope decision, SOURCES §5 item 5); pymorphy3 inflection suggestions for aliases; merging organisations and components, and proposals for organisations, participations and relations from page statements (D3); evidence capture in the document view; collector dry runs and resumable runs, if long backfills turn out to need them.
+- **Built in Phase 3** (DATA_MODEL §19–§24): evidence capture in the document view; the tagger's quote rule (§15.2); optionally, and last, C7a `telegram` (§15.1).
+- **Still deferred after Phase 3** (proposed; each needs a reason to be picked up):
+  - **C3b `diia_guide` and C2a `digitalstate_catalog`**, the cross-check collectors of decision D-12: their output would be observations only (the D-12 default), which no Phase 3 analysis uses, and SOURCES C-1 already records the name comparison of C2a's entries. The fixtures stay in `fixtures/diia_guide/` and `fixtures/digitalstate_catalog/`. When they are built: an observe-only declaration (match, bind and observe; no write, proposal or link), matching by URL only, for C2a through the entry's own website link rather than every outbound link, re-matched on every run (a binding whose match no longer holds is cleared) with the matching URL in the observation's `details`, and observation details shown in the Sources tables;
+  - **C7b `ckan`** (the ministry's datasets on data.gov.ua, SOURCES S7b): about 30 metadata-only documents (title, description, keywords; licence unknown) give the document analysis little; the fixtures stay in `fixtures/ckan/`;
+  - **C6 legal acts:** the rada subdomains do not resolve (data lead, 2026-10-30), so the S6 alternative stays: the ministry's legislation documents (C4) are the legal-act corpus and act links stay references; C6 is reconsidered after the DNS and robots.txt check from the target server (SOURCES §5 item 1);
+  - **Wayback reconstruction** of the catalogues at the cut-off dates, documents recovered from the archive in bulk, and an automatic Wayback fallback inside collectors: era-specific parsers need real captures, which `mdt fixtures capture wayback` records on the server first;
+  - **proposals for organisations, participations and relations from page statements** (footers, "at the initiative of" phrases): patterns would have to be designed and calibrated on real pages; in Phase 3 a person records them from passages in the document view (`docs/UI.md` §9.2);
+  - **pymorphy3 inflection suggestions** for aliases: a new dependency with a dictionary whose licence has to be checked first; inflected forms stay manual aliases (`kind: inflection`), and the pattern precision of the review inbox shows where they are missing;
+  - **in the analysis:** moving evidence to a new text version by hand ("re-anchoring") and reading earlier text versions in the document view (evidence stays valid on the version it quotes, DATA_MODEL §20.4); alias marks computed by the tagger for the reading pane (the links' matched aliases are highlighted in the browser instead); merging organisations and components (duplicates are rare and fixed by moving their references, DATA_MODEL §22.1); a derived portfolio exit and "left the portfolio" counts (the timeline draws the ministry's participation periods); "possible" period counts for imprecise dates; launches and modifications per year or quarter; page numbers for PDF texts; a REFI-QDA (QDPX) export (`codings.csv` and the texts serve every QDA program until one is chosen);
+  - card pages and the CNAP register of the Diia guide (`/asc/download/json/`), the UNITED24 report harvester, Diia.Education courses, sitemap inventories of project sites, ai.thedigital.gov.ua (scope decision, SOURCES §5 item 5);
+  - binding observations to records by hand;
+  - collector dry runs and resumable runs, if long backfills turn out to need them.
 - **Phase 4:** schedules, backups of `data/raw`, pruning of old `fetch_log` rows (collected values stay traceable through their field-level snapshot references), releases with the included runs in the manifest.
+
+## 15. Phase 3 additions
+
+The rules of §2–§13 and DATA_MODEL §15 apply unchanged; this section adds what Phase 3 needs.
+
+### 15.1 C7a `telegram` (SOURCES S7a; optional)
+
+Built last, after the E2E scenarios (q)–(u) of `docs/UI.md` §9.8 pass and once the data lead confirms that the channel's posts belong in the screening corpus (`PLAN.md` §14): every post becomes an unscreened document, which adds to the screening work, and SOURCES does not establish who runs the channel. It has a module `mdt.collectors.telegram`, the `sources.yaml` entry of §15.3 and the tests of §15.4, and runs from the Runs page and `mdt collect` like the Phase 2 collectors.
+- **Access:** the public web preview `https://t.me/s/<channel>` (option `channel`, default `mintsyfra`) and its pages `?before=<id>`; robots.txt answers 404 (allow all). No licence statement: `license = unknown` (the `sources.yaml` default). The listing host is `t.me`.
+- **Modes:** `incremental` (default) starts at the newest page and follows `<link rel="prev">` until a page whose posts all have observations (at least one page); `full` follows it until a page has no `rel=prev` link, returns no post, or holds no post older than the previous page's oldest one (the oldest captured page, `?before=30`, still links to `?before=9`) — about 430 pages for a backfill.
+- **Parser** (`preview_page`): posts are `div.tgme_widget_message[data-post="<channel>/<id>"]` (posts of other channels are skipped); the time is the `datetime` of `a.tgme_widget_message_date time` (UTC with offset); the text is `div.tgme_widget_message_text` extracted by §7.4 (line breaks kept, links as their text); `.tgme_widget_message_forwarded_from` marks a forwarded post. View counts, `data-view` and media download tokens are never read (DATA_MODEL §15.6).
+- **Candidates:** one document per post of the channel's own with text: key `post:<id>`, `external_id` = `<id>`, `url` = `https://t.me/<channel>/<id>`, `doc_type = announcement`, `title` = the first non-empty line of the text, cut to 200 characters with "…" (an excerpt, never a summary), `publisher` = `t.me/<channel>`, no `publisher_org_id`, `language` by §7.5, `published` = the Europe/Kyiv date of the `datetime` (precision `day`, basis `stated_in_source`), `published_text` = the attribute as given, `published_at_utc`, the text, `extraction_method = selector`, `license = unknown`; `details`: `has_media`. A **forwarded post** is someone else's text, so it is only sighted (`details.forwarded_from` = the origin as the forward header shows it) and gives no document; a post without text is sighted with `details.no_text = true`.
+- **Matching:** rule `document`. **Creates** documents (unverified, unscreened); **proposes** `update_field` for locked fields and text versions (DATA_MODEL §15.6) and `possible_duplicate` (§7.8); the framework's tagger adds suggested links and `create_event` proposals (§7.6, §7.7). No `possibly_discontinued`.
+- **Complete listing:** a `full` run whose walk ended by one of its end conditions with every page parsed; `incremental` never sets it.
+- `stats.extra`: `pages`, `posts`, `posts_forwarded`, `posts_without_text`.
+- **Fixtures** (`fixtures/telegram/`): `mintsyfra_preview_latest.html` (posts 8558, 8568, 8569; `rel=prev` to `?before=8558`; forwarded posts; emoji in the texts), `mintsyfra_preview_before_8558.html`, `mintsyfra_preview_oldest_before_30.html` (posts 9–29 of 2019-09-27, `rel=prev` to `?before=9`). Volatility: a derived variant with changed view counts, `data-view` values and download tokens gives identical candidates. Posts with emoji also serve the offset tests of evidence capture (DATA_MODEL §20.1).
+- **Target server:** the general host re-check only.
+
+### 15.2 The tagger's quotes
+
+`suggest_events` (`tagger.py`, §7.7) cuts a sentence longer than 1 000 characters to its first 1 000 and then removes trailing whitespace, and sets `char_end = char_start + len(quote)`, so every proposal's quote equals `text[char_start:char_end]` and the evidence created by accepting it passes the anchor check (DATA_MODEL §7, §15.9, §20.6).
+
+### 15.3 `sources.yaml` entry
+
+```yaml
+  telegram:
+    label: "Ministry Telegram channel (web preview)"
+    source: S7a
+    enabled: true
+    licence: {code: unknown}
+    options: {channel: mintsyfra, check_url: "https://t.me/s/mintsyfra"}
+```
+
+`check_url` names what `mdt sources check` fetches (§11). The entry is added together with the collector.
+
+### 15.4 Tests
+
+- **Tagger:** a sentence longer than 1 000 characters whose 1 000th character is a space gives a quote without trailing whitespace that equals `text[char_start:char_end]`.
+- **C7a** (with the collector): parser tests (`tests/collectors/test_telegram_parse.py`) on the fixtures, field by field against values read from them; forwarded posts give no candidate; the volatility variant; an `IdempotencyCase` in `tests/collectors/test_idempotency.py`: after a second run on the same responses no new record, revision, proposal or `document_text` row.
