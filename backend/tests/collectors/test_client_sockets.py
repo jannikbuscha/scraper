@@ -11,16 +11,25 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import httpx2
 import pytest
 
+from mdt.collectors import client as client_module
+from mdt.collectors.client import RunCancelled
 from mdt.collectors.fetchlog import MemorySink
 from mdt.collectors.throttle import SystemClock
 from tests.collectors.conftest import make_client, make_config
 
 
 class Handler(BaseHTTPRequestHandler):
-    """Routes: /stream (chunked, 64 KiB pieces), /slow (stalls), /page, /robots.txt (404)."""
+    """Routes: /stream (chunked, 64 KiB pieces), /slow (stalls), /trickle-headers (status
+    line and headers one byte per 0.25 s, like a tarpit), /page, /robots.txt (404)."""
 
     def log_message(self, format: str, *args: object) -> None:
         return
+
+    def handle_one_request(self) -> None:
+        try:
+            super().handle_one_request()
+        except OSError:  # the client gave up (a size limit, a cut-off trickle)
+            self.close_connection = True
 
     def do_GET(self) -> None:
         if self.path == "/stream":
@@ -39,6 +48,16 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(b"12345")
             self.wfile.flush()
             time.sleep(2.0)
+        elif self.path == "/trickle-headers":
+            head = b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 2\r\n\r\nok"
+            try:
+                for byte in head:  # every read returns within the read timeout
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
+                    time.sleep(0.25)
+            except OSError:
+                pass
+            self.close_connection = True
         elif self.path == "/page":
             body = b"<html>local page</html>"
             self.send_response(200)
@@ -82,3 +101,46 @@ def test_a_stalled_read_times_out_as_a_network_error(server: str) -> None:
     result = client.get(f"{server}/slow")
     assert result.outcome == "network_error"
     assert "Timeout" in (result.error or "")
+
+
+def test_trickled_headers_are_cut_off_at_the_request_limit(
+    server: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(client_module, "REQUEST_TOTAL_S", 1.0)
+    config = make_config(timeout_read_s=1.0, retries=0, min_interval_s=0)
+    client = make_client(httpx2.HTTPTransport(), config=config, listing_host=None)
+    client.clock = SystemClock()
+    started = time.monotonic()
+    result = client.get(f"{server}/trickle-headers")
+    assert time.monotonic() - started < 5.0  # the headers alone would take about 16 s
+    assert result.outcome == "network_error"
+    assert "took longer than 1 s" in (result.error or "")
+    assert client.get(f"{server}/page").ok  # the client stays usable
+
+
+def test_trickled_headers_are_cut_off_at_the_manual_fetch_budget(server: str) -> None:
+    config = make_config(timeout_read_s=1.0, min_interval_s=0)
+    client = make_client(httpx2.HTTPTransport(), config=config, listing_host=None)
+    client.clock = SystemClock()
+    client.deadline = time.monotonic() + 1.5  # what budget_s=1.5 sets
+    started = time.monotonic()
+    result = client.get(f"{server}/trickle-headers")
+    assert time.monotonic() - started < 5.0
+    assert result.outcome == "network_error" and result.out_of_budget
+    assert result.reason == "throttled"  # API: 502 fetch_failed {reason: "throttled"}
+
+
+def test_a_cancel_interrupts_trickled_headers(server: str) -> None:
+    cancel = threading.Event()
+    config = make_config(timeout_read_s=1.0, min_interval_s=0)
+    client = make_client(httpx2.HTTPTransport(), config=config, listing_host=None, cancel=cancel)
+    client.clock = SystemClock()
+    timer = threading.Timer(0.8, cancel.set)
+    timer.start()
+    started = time.monotonic()
+    try:
+        with pytest.raises(RunCancelled):
+            client.get(f"{server}/trickle-headers")
+    finally:
+        timer.cancel()
+    assert time.monotonic() - started < 4.0

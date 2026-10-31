@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gzip
 import json
 import sqlite3
 from collections.abc import Iterator
@@ -13,7 +14,7 @@ import pytest
 from typer.testing import CliRunner
 
 from mdt import cli
-from mdt.collectors import registry
+from mdt.collectors import fixtures, registry
 from mdt.collectors.base import RunContext
 from mdt.collectors.throttle import SystemClock
 from mdt.config import get_settings
@@ -126,11 +127,21 @@ def test_collect_runs_a_collector_in_the_foreground(environment: Path) -> None:
         (("collect", "stub_disabled"), "is disabled"),
         (("collect", "stub", "--recall-sample", "3"), "params.recall_sample: not supported"),
         (("collect", "stub", "--mode", "weekly"), "mode: must be one of"),
+        # Exit 2 means a partial run, so invalid parameters and usage errors exit 1 too
+        # (docs/COLLECTORS.md §6.2, §6.4, §11).
+        (("collect", "stub", "--limit", "0"), "error: params.limit: must be at least 1"),
+        (("collect", "stub", "--limit", "-3"), "error: params.limit: must be at least 1"),
+        (("collect", "stub", "--limit", "x"), "not a valid int"),
+        (("collect", "stub", "--recall-seed", "x"), "not a valid int"),
+        (("collect", "stub", "--recall-sample", "-1"), "error: params.recall_sample"),
+        (("collect", "stub", "--bogus"), "No such option"),
+        (("collect", "stub", "--limit"), "requires an argument"),
+        (("collect",), "Missing argument"),
     ],
 )
 def test_collect_refusals(environment: Path, args: tuple[str, ...], message: str) -> None:
     result = invoke(*args)
-    assert result.exit_code == 1
+    assert result.exit_code == 1, result.output
     assert message in result.output
 
 
@@ -221,6 +232,51 @@ def test_fixtures_capture_writes_body_and_meta(
     assert refused.exit_code == 1 and "contains an e-mail address" in refused.output
     assert invoke("fixtures", "capture", "stub", "--only", "nope", "--out", str(out)).exit_code == 1
     assert invoke("fixtures", "capture", "stub_builtin").exit_code == 1  # no fixtures list
+
+
+CDX_ECHO = (
+    b'[["urlkey","timestamp","original"],'
+    b'["org,example)/","20200101000000","https://example.org/?ua=MDT-Portfolio-Research/0.1"]]'
+)
+
+
+@pytest.mark.parametrize(
+    ("body", "problem"),
+    [
+        (CDX_ECHO, "User-Agent product token"),
+        (b'[["original"],["mailto:someone@mdt-portfolio.internal"]]', "e-mail address"),
+        (b'[["original"],["https://example.org/?t=__uzdbm_2"]]', "bot-manager token"),
+        (b"[" + b'"x",' * 400_000 + b'"x"]', "more than 1 MiB"),
+    ],
+    ids=["product-token", "e-mail", "bot-token", "size"],
+)
+def test_a_gzip_body_is_checked_decompressed(body: bytes, problem: str) -> None:
+    compressed = gzip.compress(body, mtime=0)
+    assert len(compressed) < fixtures.MAX_FIXTURE_BYTES
+    assert problem in (fixtures.refusal(body, TEST_EMAIL) or "")
+    assert problem in (fixtures.refusal(compressed, TEST_EMAIL) or "")
+    two = gzip.compress(b"[]", mtime=0) + compressed  # every gzip member is checked
+    assert problem in (fixtures.refusal(two, TEST_EMAIL) or "")
+
+
+def test_a_clean_gzip_body_and_the_contact_address_in_one(
+    environment: Path, site: Site, tmp_path: Path
+) -> None:
+    clean = gzip.compress(b'[["urlkey"],["org,example)/"]]', mtime=0)
+    assert fixtures.refusal(clean, TEST_EMAIL) is None
+    assert fixtures.refusal(clean[:-12], TEST_EMAIL) == "the gzip body is truncated"
+    corrupt = fixtures.GZIP_MAGIC + b"broken"
+    assert fixtures.refusal(corrupt, TEST_EMAIL) == "the gzip body cannot be decompressed"
+    echo = gzip.compress(f'[["note"],["{TEST_EMAIL}"]]'.encode(), mtime=0)
+    assert fixtures.refusal(echo, TEST_EMAIL) == "the body contains the contact address"
+    # Through the command: gzip without Content-Encoding, as the CDX server answers.
+    site.routes["https://example.org/page"] = httpx2.Response(
+        200, headers={"Content-Type": "text/plain"}, content=echo
+    )
+    out = tmp_path / "captured"
+    refused = invoke("fixtures", "capture", "stub", "--out", str(out))
+    assert refused.exit_code == 1 and "contains the contact address" in refused.output
+    assert not out.exists() or not any(out.iterdir())
 
 
 def test_sources_check_reports_hosts(environment: Path, site: Site) -> None:

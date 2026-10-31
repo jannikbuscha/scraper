@@ -16,6 +16,7 @@ import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import quote
 
 from pydantic import AfterValidator, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -65,10 +66,37 @@ def _upper_log_level(value: str) -> str:
     return level
 
 
+def _ascii_url(url: str) -> str:
+    """``url`` as it can go into an HTTP header (ASCII only): the host IDNA-encoded
+    (``мінцифри.укр`` → ``xn--…``), any other non-ASCII character percent-encoded as UTF-8."""
+    if url.isascii():
+        return url
+    scheme, separator, remainder = url.partition("://")
+    end = min((i for i in (remainder.find(c) for c in "/?#") if i != -1), default=len(remainder))
+    netloc, rest = remainder[:end], remainder[end:]
+    userinfo, at, hostport = netloc.rpartition("@")
+    host, colon, port = hostport.partition(":")
+    host = host.encode("idna").decode("ascii")  # UnicodeError for an invalid name
+
+    def encoded(text: str) -> str:
+        return "".join(char if char.isascii() else quote(char, safe="") for char in text)
+
+    return f"{scheme}{separator}{encoded(userinfo)}{at}{host}{colon}{port}{encoded(rest)}"
+
+
 def _check_project_url(value: str) -> str:
     url = value.strip()
-    if url and not _PROJECT_URL_RE.fullmatch(url):
-        raise ValueError("PROJECT_URL must be an http(s) URL without spaces, parentheses or ';'")
+    if not url:
+        return url
+    problem = "PROJECT_URL must be an http(s) URL without spaces, parentheses or ';'"
+    if not _PROJECT_URL_RE.fullmatch(url):
+        raise ValueError(problem)
+    try:
+        url = _ascii_url(url)
+    except UnicodeError as exc:
+        raise ValueError(f"{problem} and with a valid host name") from exc
+    if not _PROJECT_URL_RE.fullmatch(url):
+        raise ValueError(problem)
     return url
 
 

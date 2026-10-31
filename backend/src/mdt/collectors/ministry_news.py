@@ -48,8 +48,10 @@ from mdt.collectors.ministry_news_pages import (
     FETCHED,
     FILE,
     LINK,
+    MINISTRY_KEY,
     MINISTRY_URL,
     NEWS_URL,
+    microsite_key,
     parse_article,
     parse_document_page,
     parse_documents_listing,
@@ -72,6 +74,8 @@ PARTS = ("news", "documents", "ministry", "microsites")
 KINDS_MAPPING = "ministry_document_kinds"
 #: Observation detail of a content document: the keys of its attachments.
 ATTACHMENTS = "attachments"
+#: Observation detail of the ``/ministry`` page: the keys of its embedded document items.
+ITEMS = "items"
 
 DOCUMENTS = TypeDeclaration(
     creates=True,
@@ -145,6 +149,13 @@ class _Run:
     def sight(self, item: Candidate) -> None:
         """A sighting of an item that was not (or not successfully) fetched."""
         self.ctx.observe(item.entity_type, item.key, url=item.url, label=item.label)
+
+    def sight_attachments(self, observation: Observation | None) -> None:
+        """The attachment keys stored with a content document stay seen when its page is
+        not read (unchanged, or the request failed): DATA_MODEL §15.7."""
+        for key in (observation.details.get(ATTACHMENTS) if observation else None) or ():
+            if self.first(key):
+                self.ctx.observe("document", key)
 
     def mapping(self) -> LabelMapping:
         """The kinds mapping (loaded for the documents and ministry parts)."""
@@ -273,16 +284,14 @@ class MinistryNews:
                 run.reconcile(item)
         elif current and not run.refetch:
             run.sight(item)
-            assert observation is not None
-            for key in observation.details.get(ATTACHMENTS) or ():
-                if run.first(key):
-                    run.ctx.observe("document", key)
+            run.sight_attachments(observation)
         else:
-            self._content(run, item)
+            self._content(run, item, observation)
 
-    def _content(self, run: _Run, item: Candidate) -> None:
+    def _content(self, run: _Run, item: Candidate, observation: Observation | None) -> None:
         """A content document's page and its attachments. The listing values are recorded
-        only when the page and every attachment were read, so a failure is retried."""
+        only when the page and every attachment were read, so a failure is retried; when
+        the page fails, the attachments known from earlier runs stay seen."""
         assert item.url is not None
         page = fetch_parsed(
             run.ctx,
@@ -291,6 +300,7 @@ class MinistryNews:
         )
         if page is None or not page[1].candidates:
             run.reconcile(listing_only(item))
+            run.sight_attachments(observation)
             return
         document, *attachments = page[1].candidates
         read = [
@@ -330,14 +340,19 @@ class MinistryNews:
     # /ministry and microsites ----------------------------------------------------------
 
     def _ministry(self, run: _Run) -> None:
+        """``/ministry``: the page and its embedded document items. The page's observation
+        records the items' keys, so that when the page cannot be read, the page and its
+        items (with the attachments of content items) stay seen (DATA_MODEL §15.7)."""
         page = fetch_parsed(
             run.ctx,
             MINISTRY_URL,
             lambda snapshot: parse_ministry_page(snapshot, run.mapping(), run.values),
         )
         if page is None or not page[1].candidates:
+            self._sight_ministry(run)
             return
         document, *items = page[1].candidates
+        document.details[ITEMS] = [item.key for item in items]
         if run.first(document.key):
             run.reconcile(document)
         for item in items:
@@ -345,12 +360,30 @@ class MinistryNews:
                 return
             self._item(run, item)
 
+    def _sight_ministry(self, run: _Run) -> None:
+        observation = run.ctx.observation(MINISTRY_KEY)
+        if observation is None:
+            return
+        if run.first(MINISTRY_KEY):
+            run.ctx.observe("document", MINISTRY_KEY, url=observation.url)
+        for key in observation.details.get(ITEMS) or ():
+            if run.stopped():
+                return
+            if run.first(key):
+                run.ctx.observe("document", key)
+                run.sight_attachments(run.ctx.observation(key))
+
     def _microsites(self, run: _Run) -> None:
+        """The microsites; one that cannot be read is sighted under its key (the requested
+        host), so a complete run does not mark it missing."""
         for url in MICROSITES:
             if run.stopped():
                 return
             page = fetch_parsed(run.ctx, url, parse_microsite)
             if page is None:
+                key = microsite_key(url)
+                if run.first(key):
+                    run.ctx.observe("document", key, url=url)
                 continue
             for candidate in page[1].candidates:
                 if run.first(candidate.key):

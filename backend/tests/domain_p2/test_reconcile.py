@@ -11,10 +11,11 @@ from sqlalchemy import select
 
 from mdt.collectors.base import Outcome
 from mdt.db.models import Proposal, Revision, SourceObservation
-from mdt.db.session import read_transaction
+from mdt.db.session import read_transaction, write_transaction
 from mdt.domain.actor import Actor
+from mdt.domain.clock import utc_now
 from mdt.domain.merge import merge
-from mdt.domain.observations import record_sighting
+from mdt.domain.observations import bind_observation, record_sighting
 from mdt.domain.reconcile import archive_key, reconcile_candidate, urls_to_add
 from mdt.domain.revisions import apply_change, soft_delete
 from tests.domain_p2.conftest import P2, StubScope, candidate
@@ -430,6 +431,61 @@ def test_the_external_id_rule_finds_the_record_of_a_renamed_key(p2: P2) -> None:
     assert outcome == Outcome("updated", project_id, ())
     observation = p2.observation("stub", "entry:alpha-renamed")
     assert observation is not None and observation["subject_id"] == project_id
+
+
+def _page_document(p2: P2, scope: StubScope, external_id: str) -> str:
+    """A project page of the stub collector whose key carries ``external_id`` (as C1's
+    ``page:<project.id>`` shares the UUID with the entry ``entry:<slug>``)."""
+    url = "https://example.org/pages/alpha"
+    item = candidate(
+        "document",
+        f"page:{external_id}",
+        p2.snapshot(scope.run_id, url),
+        url=url,
+        external_id=external_id,
+        fields={"title": "Example page", "url": url},
+    )
+    [outcome] = run(p2, scope, item)
+    assert outcome.action == "created" and outcome.record_id is not None
+    return outcome.record_id
+
+
+def test_the_external_id_rule_never_matches_a_key_of_another_type(p2: P2) -> None:
+    first = p2.scope()
+    _page_document(p2, first, "example-uuid")
+    later = p2.scope()
+    # No project has the URL: the bound page with the same external_id is no match.
+    [outcome] = run(p2, later, project_candidate(p2, later, external_id="example-uuid"))
+    assert outcome.action == "proposed"
+    [proposal] = [row for row in p2.proposals() if row["kind"] == "create_entity"]
+    assert proposal["payload"]["candidates"] == []
+    observation = p2.observation("stub", "entry:alpha")
+    assert observation is not None and observation["subject_id"] is None
+    # With a project that has the URL, the next rule (url_fields) binds the key to it.
+    project_id = alpha(p2)
+    again = p2.scope()
+    [outcome] = run(p2, again, project_candidate(p2, again, external_id="example-uuid"))
+    assert (outcome.action, outcome.record_id) == ("unchanged", project_id)
+
+
+def test_a_key_bound_to_a_record_of_another_type_is_a_write_error(p2: P2) -> None:
+    first = p2.scope()
+    document_id = _page_document(p2, first, "example-uuid")
+    run(p2, first, project_candidate(p2, first))  # unmatched: proposed, unbound
+    observation = p2.observation("stub", "entry:alpha")
+    assert observation is not None
+    with p2.session() as session, write_transaction(session):  # a damaged binding
+        bind_observation(session, observation["id"], document_id, "auto", utc_now())
+    before = p2.revisions()
+    later = p2.scope()
+    item = project_candidate(p2, later, fields={"description_uk": "Example"})
+    [outcome] = run(p2, later, item)
+    assert outcome == Outcome("observed")
+    [error] = [m for m in later.messages if m[1] == "write_error"]
+    assert error[0] == "error" and document_id in error[2]
+    assert p2.revisions() == before
+    observation = p2.observation("stub", "entry:alpha")
+    assert observation is not None and observation["last_seen_run"] == later.run_id
 
 
 def test_a_merged_subject_is_followed_to_its_survivor(p2: P2) -> None:

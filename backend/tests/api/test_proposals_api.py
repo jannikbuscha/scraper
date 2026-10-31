@@ -8,6 +8,7 @@ from typing import Any
 
 import pytest
 
+from mdt.db.models import Proposal
 from mdt.domain.reconcile import reconcile_candidate
 from tests.api.helpers import ApiClient, error_of, project_data
 from tests.conftest import Db
@@ -89,6 +90,71 @@ def test_listing_and_reading_proposals(p2: P2, client: ApiClient) -> None:
     assert (observation["key"], observation["bound_by"]) == ("entry:api-example", "auto")
     filtered = client.ok(client.get("/api/entities/project", {"f.open_proposals": "range:1.."}))
     assert [entry["id"] for entry in filtered["items"]] == [item["id"]]
+
+
+def test_the_summary_reports_the_precision_of_each_event_pattern(p2: P2, client: ApiClient) -> None:
+    """The precision of an event pattern is reported by the summary that the review inbox
+    shows (docs/CODEBOOK.md §4, docs/COLLECTORS.md §7.7, docs/API.md §7.4): accepted and
+    edited-and-accepted among the decided ``create_event`` proposals, null without a
+    decision. The proposals come from the real event patterns of the codebook."""
+    # Names without a word of any pattern ("Example Beta" would also match "beta").
+    names = ["Example Aster", "Example Birch", "Example Cedar", "Example Dune", "Example Elm"]
+    ids = {name: client.create("project", project_data(name_en=name))["id"] for name in names}
+    sentences = [f"{name} went live today." for name in names[:4]]
+    sentences.append("Example Elm was renamed.")
+    url = "https://example.org/news/api-example"
+    scope = p2.scope(collector="ministry_news")
+    snapshot = p2.snapshot(scope.run_id, url, source_id="ministry_news")
+    fields = {
+        "title": "Example news",
+        "url": url,
+        "language": "en",
+        "published": "2026-01-02",
+        "published_basis": "stated_in_source",
+    }
+    with p2.session() as session:
+        outcome = reconcile_candidate(
+            session,
+            scope,
+            candidate(
+                "document",
+                "news:api-example",
+                snapshot,
+                url=url,
+                fields=fields,
+                text="\n".join(sentences),
+                extraction_method="html",
+            ),
+        )
+    assert outcome.action == "created", scope.messages
+    rows = p2.proposals(Proposal.kind == "create_event")
+    proposals = {row["subject_id"]: row["id"] for row in rows}
+    assert len(rows) == len(names) and set(proposals) == set(ids.values())
+    accepted, modified, rejected = (proposals[ids[name]] for name in names[:3])
+    client.ok(client.post(f"/api/proposals/{accepted}/accept", {}))
+    edited = {"values": {"description_en": "Edited example"}}
+    decision = client.ok(client.post(f"/api/proposals/{modified}/accept", edited))
+    assert decision["proposal"]["state"] == "accepted_modified"
+    client.ok(client.post(f"/api/proposals/{rejected}/reject", {"note": "Not a launch"}))
+    summary = client.ok(client.get("/api/proposals/summary"))
+    assert summary["patterns"] == [
+        {
+            "pattern_id": "launch_en_launched",
+            "open": 1,
+            "accepted": 1,
+            "accepted_modified": 1,
+            "rejected": 1,
+            "precision": pytest.approx(2 / 3),
+        },
+        {
+            "pattern_id": "rebrand_en_renamed",
+            "open": 1,
+            "accepted": 0,
+            "accepted_modified": 0,
+            "rejected": 0,
+            "precision": None,
+        },
+    ]
 
 
 def test_accepting_and_rejecting(p2: P2, client: ApiClient) -> None:

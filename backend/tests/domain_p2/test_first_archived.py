@@ -11,11 +11,11 @@ import pytest
 from sqlalchemy import select
 
 from mdt.collectors.base import Capture, Outcome
-from mdt.db.models import Event, Evidence
+from mdt.db.models import Derived, Event, Evidence
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
 from mdt.domain.reconcile import record_first_archived
-from mdt.domain.revisions import soft_delete
+from mdt.domain.revisions import apply_change, soft_delete
 from tests.domain_p2.conftest import P2, StubScope
 from tests.helpers import create_event, create_project, load
 
@@ -159,3 +159,90 @@ def test_a_malformed_timestamp_is_a_collector_bug(p2: P2, sigma: str) -> None:
     scope = p2.scope(collector="wayback")
     with pytest.raises(ValueError, match="14-digit"):
         record(p2, scope, sigma, capture(p2, scope, "2012"), exact=True)
+
+
+# --------------------------------------------------------------------------------------
+# A person's correction of a C5 event is never undone (DoD 5)
+# --------------------------------------------------------------------------------------
+
+
+def existed_by(p2: P2, subject_id: str) -> str | None:
+    with p2.session() as session, read_transaction(session):
+        return session.scalar(select(Derived.existed_by).where(Derived.entity_id == subject_id))
+
+
+def first_event(p2: P2, sigma: str, timestamp: str = "20180510120000") -> str:
+    """Run 1: C5 creates the event of the capture at ``timestamp`` for ``sigma``."""
+    scope = p2.scope(collector="wayback")
+    created = record(p2, scope, sigma, capture(p2, scope, timestamp), exact=True)
+    assert created.action == "created" and created.record_id is not None
+    return created.record_id
+
+
+CORRECTIONS = {
+    "re-dated": {"date": "2019-06-01"},  # the earliest capture showed a placeholder
+    "year-precision": {"date": "2018"},  # date_end 2018-12-31, after the capture
+    "retyped": {"event_type": "launch", "date_basis": "stated_in_source"},
+}
+
+
+@pytest.mark.parametrize("correction", sorted(CORRECTIONS))
+def test_a_corrected_c5_event_is_not_created_again(p2: P2, sigma: str, correction: str) -> None:
+    event_id = first_event(p2, sigma)
+    with p2.session() as session:
+        apply_change(session, "event", event_id, CORRECTIONS[correction], Actor.ui())
+    corrected = existed_by(p2, sigma)
+    revisions = p2.revisions()
+    later = p2.scope(collector="wayback")
+    outcome = record(p2, later, sigma, capture(p2, later, "20180510120000"), exact=True)
+    assert outcome == Outcome("unchanged", sigma)
+    assert p2.revisions() == revisions and p2.proposals() == []
+    assert [event.id for event in events(p2, sigma)] == [event_id]
+    assert existed_by(p2, sigma) == corrected
+
+
+def test_a_corrected_then_deleted_c5_event_is_not_created_again(p2: P2, sigma: str) -> None:
+    event_id = first_event(p2, sigma)
+    with p2.session() as session:
+        apply_change(session, "event", event_id, {"date": "2019-06-01"}, Actor.ui())
+        soft_delete(session, "event", event_id, Actor.ui())
+    later = p2.scope(collector="wayback")
+    outcome = record(p2, later, sigma, capture(p2, later, "20180510120000"), exact=True)
+    assert outcome == Outcome("unchanged", sigma)
+    assert [event.id for event in events(p2, sigma)] == [event_id]
+    assert existed_by(p2, sigma) is None
+
+
+def test_a_c5_event_moved_to_another_subject_is_not_created_again(p2: P2, sigma: str) -> None:
+    event_id = first_event(p2, sigma)
+    with p2.session() as session:
+        other = create_project(session, name_en="Example other").entity_id
+        apply_change(session, "event", event_id, {"subject_id": other}, Actor.ui())
+    later = p2.scope(collector="wayback")
+    outcome = record(p2, later, sigma, capture(p2, later, "20180510120000"), exact=True)
+    assert outcome == Outcome("unchanged", sigma)
+    assert events(p2, sigma) == []
+    assert [event.id for event in events(p2, other)] == [event_id]
+
+
+@pytest.mark.parametrize("correction", ["re-dated", "deleted"])
+def test_after_a_correction_an_earlier_capture_is_only_proposed(
+    p2: P2, sigma: str, correction: str
+) -> None:
+    event_id = first_event(p2, sigma)
+    with p2.session() as session:
+        if correction == "deleted":
+            soft_delete(session, "event", event_id, Actor.ui())
+        else:
+            apply_change(session, "event", event_id, CORRECTIONS[correction], Actor.ui())
+    corrected = existed_by(p2, sigma)
+    later = p2.scope(collector="wayback")
+    earlier = capture(p2, later, "20170101120000")
+    outcome = record(p2, later, sigma, earlier, exact=True)
+    assert outcome.action == "proposed"
+    assert [event.id for event in events(p2, sigma)] == [event_id]
+    assert existed_by(p2, sigma) == corrected
+    [proposal] = p2.proposals()
+    assert (proposal["kind"], proposal["subject_id"]) == ("create_event", sigma)
+    assert proposal["payload"]["event"]["date"] == "2017-01-01"
+    assert proposal["payload"]["evidence"]["archive_url"] == earlier.archive_url

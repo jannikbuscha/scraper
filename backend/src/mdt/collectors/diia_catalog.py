@@ -246,8 +246,9 @@ def parse_subcategory_page(snapshot: Snapshot) -> Subcategory:
 
 def _empty_subcategory(soup: BeautifulSoup) -> bool:
     """A subcategory without services: its service section is there, but the link boxes of
-    the "Від А до Я" accordion hold no link (two such pages on 2026-10-30, live check). A
-    page whose boxes hold links that are not read as services has changed its markup."""
+    the "Від А до Я" accordion hold no link (two such pages on 2026-10-30,
+    docs/SOURCES.md S3). A page whose boxes hold links that are not read as services has
+    changed its markup."""
     boxes = soup.select("section.service-acc_section .service-acc_item-link-box")
     return bool(boxes) and not any(box.find("a", href=True) for box in boxes)
 
@@ -260,7 +261,8 @@ def _empty_subcategory(soup: BeautifulSoup) -> bool:
 def redirect_target(snapshot: Snapshot) -> str | None:
     """The target of a page that only redirects with ``<meta http-equiv="refresh">`` and
     has no service title, or None. ``/services/RD4U`` (listed in the catalogue) answered so
-    on 2026-10-30 with HTTP 200, pointing to the subcategory of the Register of Damage."""
+    on 2026-10-30 with HTTP 200, pointing to the subcategory of the Register of Damage
+    (docs/SOURCES.md S3)."""
     page = read_page(snapshot)
     if page.soup.select_one("h1.service-type_title") is not None:
         return None

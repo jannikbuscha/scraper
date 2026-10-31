@@ -30,18 +30,18 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Final, Literal
 from urllib.parse import urlsplit
 
-from sqlalchemy import Table, or_, select
+from sqlalchemy import Table, func, or_, select
 from sqlalchemy.orm import Session
 
 from mdt.collectors.base import MATCH_RULES, MAX_QUOTE_CHARS, Candidate, Capture, Outcome
 from mdt.collectors.duplicates import DuplicatePair
 from mdt.collectors.parsing.dates import kyiv_date_of_wayback_timestamp
-from mdt.db.models import Document, Event, Proposal, SourceObservation
+from mdt.db.models import Document, Event, Proposal, Revision, SourceObservation
 from mdt.db.session import write_transaction
 from mdt.domain import document_versions as docs
 from mdt.domain.actor import Actor
 from mdt.domain.clock import utc_now
-from mdt.domain.errors import DomainError, Problems
+from mdt.domain.errors import DomainError, InvalidStateError, Problems
 from mdt.domain.ids import new_batch_id
 from mdt.domain.normalize import INVALID, is_empty, normalize_value, values_equal
 from mdt.domain.observations import (
@@ -61,7 +61,7 @@ from mdt.domain.proposals import (
     supersede_where,
 )
 from mdt.domain.records import Row, field_meta_of, load_links, stored_values, table_of
-from mdt.domain.registry import ENTITY_TYPES, EVENT, EVIDENCE, EntityTypeSpec
+from mdt.domain.registry import ENTITY_TYPES, EVENT, EVIDENCE, EntityTypeSpec, type_of_id
 from mdt.domain.run_effects import RunEffects
 from mdt.domain.urls import UrlError, canonical_url
 from mdt.domain.writes import WriteUnit, create_record, normalize_changes, update_record
@@ -315,6 +315,14 @@ class _Match:
 def _match(ctx: _Context, seen: SeenObservation) -> _Match:
     """The binding of the key, else the first declared rule that finds records."""
     if seen.subject_id is not None:
+        if type_of_id(seen.subject_id) != ctx.spec.name:
+            # Bindings are made only to records of the key's own type (§15.3, §16.4); a
+            # binding to another type is a damaged row, reported as a write error.
+            raise InvalidStateError(
+                "bound",
+                f"the key is bound to {seen.subject_id}, which is not a "
+                f"{ctx.spec.label.lower()}; nothing was written",
+            )
         resolved = resolve_subject(ctx.session, seen.subject_id)
         if resolved is None or resolved[1]["deleted_at"] is not None:
             return _Match("blocked", resolved[0] if resolved else seen.subject_id)
@@ -343,11 +351,14 @@ def _rule_steps(ctx: _Context, rule: str, seen: SeenObservation) -> Iterator[lis
     """The records each step of a match rule finds, live and deleted (§15.3)."""
     candidate, session = ctx.candidate, ctx.session
     if rule == "external_id" and candidate.external_id:
+        # Only keys of the candidate's own type: C1 gives a project entry and its project
+        # page (C3: a service and its page) the same external_id.
         yield [
             str(subject_id)
             for subject_id in session.execute(
                 select(SourceObservation.subject_id).where(
                     SourceObservation.collector == ctx.scope.collector,
+                    SourceObservation.entity_type == candidate.entity_type,
                     SourceObservation.external_id == candidate.external_id,
                     SourceObservation.subject_id.is_not(None),
                     SourceObservation.id != seen.id,
@@ -393,11 +404,11 @@ def _url_field_matches(ctx: _Context, url: str) -> list[str]:
 def _classify(ctx: _Context, ids: Sequence[str], rule: str) -> _Match | None:
     """A unique live match binds; several live matches are ambiguous; only deleted
     matches block; nothing found lets the next rule try. Merged records count as their
-    survivor."""
+    survivor; records of another type than the candidate's never match."""
     resolved: dict[str, Row] = {}
     for record_id in ids:
         found = resolve_subject(ctx.session, record_id)
-        if found is not None:
+        if found is not None and type_of_id(found[0]) == ctx.spec.name:
             resolved[found[0]] = found[1]
     if not resolved:
         return None
@@ -971,6 +982,50 @@ def _archive_values(
     return event, evidence
 
 
+@dataclass(frozen=True)
+class _ArchiveHistory:
+    """The ``first_archived`` events a collector created for a subject: the capture each
+    was created from (its ``date_text`` as created) and whether anything changed or deleted
+    one of them since (a person's correction, verification or deletion)."""
+
+    captures: frozenset[str]
+    corrected: bool
+
+
+def _archive_history(session: Session, subject_id: str, collector: str) -> _ArchiveHistory:
+    """Read from the creating revisions, so an event a person later re-dated, moved to
+    another subject, retyped or deleted still counts as recorded (§15.12)."""
+    revisions = Revision.__table__
+    events = Event.__table__
+    assert isinstance(revisions, Table) and isinstance(events, Table)
+    rows = session.execute(
+        select(revisions.c.snapshot, events.c.version, events.c.deleted_at)
+        .join(events, events.c.id == revisions.c.entity_id)
+        .where(
+            revisions.c.entity_type == EVENT.name,
+            revisions.c.version == 1,
+            revisions.c.author == f"collector:{collector}",
+            func.json_extract(revisions.c.snapshot, "$.fields.subject_id") == subject_id,
+        )
+    ).all()
+    captures: set[str] = set()
+    corrected = False
+    for snapshot, version, deleted_at in rows:
+        created = (snapshot or {}).get("fields") or {}
+        if created.get("event_type") != FIRST_ARCHIVED:
+            continue
+        if created.get("date_text"):
+            captures.add(str(created["date_text"]))
+        corrected = corrected or version > 1 or deleted_at is not None
+    return _ArchiveHistory(frozenset(captures), corrected)
+
+
+def _capture_text(event: Mapping[str, Any]) -> str:
+    """The ``date_text`` of a capture's event as it is stored (normalised, §1.2)."""
+    normalized = normalize_value(EVENT.field("date_text"), event["date_text"], Problems())
+    return str(event["date_text"] if normalized is INVALID else normalized)
+
+
 def _archive_bound_exists(session: Session, subject_id: str, day: str, collector: str) -> bool:
     """A live ``first_archived`` event of the subject (from anyone), or a deleted one this
     collector created, that ends on or before ``day`` makes a capture redundant."""
@@ -994,7 +1049,9 @@ def record_first_archived(
 ) -> Outcome:
     """Record the earliest Wayback capture of one of the subject's URLs (DATA_MODEL
     §15.12): a ``first_archived`` event with evidence for an exact match, else a
-    ``create_event`` proposal; nothing when an existing bound makes it redundant."""
+    ``create_event`` proposal; nothing when the capture is already recorded or an existing
+    bound makes it redundant. Once a person changed or deleted an event this collector
+    created for the subject, a new capture is only proposed."""
     day = kyiv_date_of_wayback_timestamp(capture.timestamp)
     if day is None:
         raise ValueError(f"not a 14-digit Wayback timestamp: {capture.timestamp!r}")
@@ -1040,10 +1097,13 @@ def _first_archived(
         )
         return Outcome("blocked", subject_id)
     record_id = resolved[0]
-    if _archive_bound_exists(session, record_id, day, scope.collector):
-        return Outcome("unchanged", record_id)
     event, evidence = _archive_values(capture, record_id, day)
-    if not exact:
+    history = _archive_history(session, record_id, scope.collector)
+    if _capture_text(event) in history.captures or _archive_bound_exists(
+        session, record_id, day, scope.collector
+    ):
+        return Outcome("unchanged", record_id)
+    if not exact or history.corrected:
         draft = ProposalDraft(
             kind="create_event",
             entity_type="event",

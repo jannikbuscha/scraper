@@ -8,14 +8,18 @@ per-host throttle state is process-wide. In order, every request:
    its host is unavailable (``fetch_log.outcome = refused``);
 2. is checked against the robots.txt of its origin, fetched once per origin and run (§4.2);
    a disallowed URL is not requested (``robots_disallowed``);
-3. waits until the host's interval has passed since its previous request ended (§4.3),
-   interruptibly;
+3. waits until the host's interval has passed since its previous request ended and until
+   any ``Retry-After`` of the host has run out (§4.3), interruptibly;
 4. goes out with our User-Agent and no browser imitation (§4.4), conditional when an
    earlier live snapshot carries validators (§4.8), and streams its body with the size
-   limit (§4.4);
-5. follows redirects itself, checking every hop as in 1-3 (§4.5);
+   limit (§4.4); a watchdog holds the whole exchange, headers included, to the time limit
+   and to a cancel request;
+5. follows redirects itself, checking every hop as in 1-3 and never following a redirect
+   to a challenge host (§4.5, §4.7);
 6. is retried after 429, 502, 503, 504 and network errors with ``Retry-After`` or backoff
-   (§4.6); a wait longer than ``max_wait_s`` throttles the host for the run;
+   (§4.6), never after a challenge page or an undecodable body; a ``Retry-After`` holds for
+   the host and every client of the process, and a wait longer than ``max_wait_s``
+   throttles the host for the run;
 7. is checked for challenge pages and repeated 403/429 answers (§4.7);
 8. is recorded: one ``fetch_log`` row per attempt and every final response body stored as a
    raw snapshot before the collector sees it (§4.9).
@@ -26,13 +30,17 @@ its clock are in :mod:`mdt.collectors.throttle`.
 
 from __future__ import annotations
 
+import contextlib
 import email.utils
 import random
 import re
+import socket
 import threading
+import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Any, Literal, get_args
+from urllib.parse import urlsplit
 
 import httpx2
 from sqlalchemy.orm import Session
@@ -45,7 +53,13 @@ from mdt.collectors.replay import REPLAY_EXTENSION, ReplayMiss, ReplayTransport
 from mdt.collectors.robots import PRODUCT_TOKEN, RobotsPolicy, policy_from_response
 from mdt.collectors.sources import MANUAL, CollectorConfig, load_sources
 from mdt.collectors.store import SnapshotMeta, SnapshotRecord, SnapshotStore
-from mdt.collectors.throttle import PROCESS_THROTTLE, Clock, HostThrottle, SystemClock
+from mdt.collectors.throttle import (
+    PROCESS_THROTTLE,
+    Clock,
+    HostDeferred,
+    HostThrottle,
+    SystemClock,
+)
 from mdt.collectors.urls import FetchUrl, UrlError, parse_fetch_url, resolve_location
 from mdt.config import Settings, contact_email_problem
 from mdt.domain.clock import utc_now
@@ -63,6 +77,14 @@ MANUAL_FETCH_BUDGET_S = 60.0
 _SIGNATURE_BYTES = 65_536
 _MAX_ERROR_CHARS = 500
 _BUDGET_TEXT = "time budget of the manual fetch exhausted"
+_DEFERRED_TEXT = "host throttled: it asked for a longer wait (Retry-After)"
+#: Reasons of an unavailable robots policy that mean "throttled", not "robots.txt
+#: unavailable": no ``robots_unavailable`` message, URLs refused as ``throttled``.
+_THROTTLED_REASONS = frozenset({_BUDGET_TEXT, _DEFERRED_TEXT})
+#: Failures without a usable response that retrying cannot change (§4.6: not network errors).
+_PERMANENT_ERRORS = (httpx2.DecodingError, httpx2.LocalProtocolError, httpx2.UnsupportedProtocol)
+#: How often the watchdog of an exchange looks at the cancel flag (seconds).
+_WATCH_POLL_S = 0.2
 
 FetchOutcome = Literal[
     "ok",
@@ -131,10 +153,13 @@ class FetchResult:
 
     @property
     def reason(self) -> str:
-        """The ``fetch_failed`` reason of a failed manual fetch (docs/API.md §7.8)."""
+        """The ``fetch_failed`` reason of a failed manual fetch (docs/API.md §7.8); a fetch
+        out of time is ``throttled`` whatever its last outcome."""
+        if self.out_of_budget:
+            return "throttled"
         if self.outcome in ("robots_disallowed", "too_large", "network_error", "blocked"):
             return self.outcome
-        if self.throttled or self.out_of_budget or self.refusal == "throttled":
+        if self.throttled or self.refusal == "throttled":
             return "throttled"
         if self.refusal in ("blocked", "excluded"):
             return "blocked"
@@ -157,17 +182,38 @@ def user_agent(contact_email: str | None, project_url: str = "") -> str:
 
 _TITLE_RE = re.compile(r"<title[^>]*>\s*Just a moment\.\.\.\s*</title>", re.IGNORECASE)
 _MANAGED_RE = re.compile(r"cType\s*:\s*['\"]managed['\"]")
+_RADWARE_TITLE_RE = re.compile(r"<title[^>]*>[^<]*(?:Radware|ShieldSquare)[^<]*</title>", re.I)
+#: The challenge host of the Radware (ShieldSquare) bot manager on www.kmu.gov.ua: its
+#: pages configure ``validate.perfdrive.com`` as the captcha host (docs/SOURCES.md S4b).
+CHALLENGE_DOMAINS = ("perfdrive.com",)
+
+
+def challenge_host(url: str) -> str | None:
+    """The host of ``url`` if it is a bot manager's challenge host (or a subdomain)."""
+    host = (urlsplit(url).hostname or "").rstrip(".").lower()
+    for domain in CHALLENGE_DOMAINS:
+        if host == domain or host.endswith(f".{domain}"):
+            return host
+    return None
 
 
 def block_signature(
     status: int | None, headers: Mapping[str, str], body: bytes | None
 ) -> str | None:
     """The challenge or block signature a response matches, if any (§4.7): Cloudflare
-    ("Just a moment..." title, ``cType: 'managed'``, ``cf-mitigated: challenge``) and
-    Akamai (HTTP 403 with an "Access Denied" page)."""
+    ("Just a moment..." title, ``cType: 'managed'``, ``cf-mitigated: challenge``), Akamai
+    (HTTP 403 with an "Access Denied" page) and Radware/ShieldSquare (a redirect to its
+    challenge host ``*.perfdrive.com``, or a page titled with the vendor's name). A body that
+    only mentions the challenge host (every page of the site configures it) is no
+    challenge."""
     lowered = {name.lower(): value for name, value in headers.items()}
     if lowered.get("cf-mitigated", "").strip().lower() == "challenge":
         return "cloudflare: cf-mitigated: challenge"
+    location = lowered.get("location", "")
+    if status is not None and 300 <= status < 400 and location:
+        host = challenge_host(location)
+        if host is not None:
+            return f"radware: redirect to {host}"
     text = (body or b"")[:_SIGNATURE_BYTES].decode("utf-8", errors="replace")
     if _TITLE_RE.search(text):
         return "cloudflare: Just a moment..."
@@ -175,6 +221,8 @@ def block_signature(
         return "cloudflare: managed challenge"
     if status == 403 and "Access Denied" in text:
         return "akamai: Access Denied"
+    if _RADWARE_TITLE_RE.search(text):
+        return "radware: challenge page"
     return None
 
 
@@ -208,6 +256,77 @@ class _TooLarge(Exception):
 
 class _Budget(Exception):
     """A wait does not fit the remaining time budget of a manual fetch."""
+
+
+class _Undecodable(Exception):
+    """A response whose body cannot be decoded (e.g. labelled ``gzip`` but not gzip): the
+    server answered, so this is an ``http_error`` with its status, never retried."""
+
+    def __init__(self, sent: _Sent, error: str) -> None:
+        super().__init__(error)
+        self.sent = sent
+        self.error = error
+
+
+class _Watchdog:
+    """Guards one HTTP exchange, status line and headers included (§4.4, §4.6, §6.3): when
+    its time limit passes or a cancel is requested, it shuts down the client's sockets, so
+    a server that trickles bytes (each read within the read timeout) cannot hold the
+    request open. The exchange then fails, and :meth:`check` turns that failure into a
+    timeout or a cancellation."""
+
+    def __init__(
+        self,
+        seconds: float,
+        cancel: threading.Event | None,
+        sockets: Callable[[], list[socket.socket]],
+    ) -> None:
+        self.seconds = seconds
+        self.cancel = cancel
+        self.sockets = sockets
+        self.fired: Literal["expired", "cancelled"] | None = None
+        self._done = threading.Event()
+        self._lock = threading.Lock()
+        self._thread = threading.Thread(target=self._watch, name="mdt-fetch-watchdog", daemon=True)
+
+    def __enter__(self) -> _Watchdog:
+        self._thread.start()
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        with self._lock:
+            self._done.set()
+        self._thread.join()
+
+    def _watch(self) -> None:
+        end = time.monotonic() + self.seconds
+        while True:
+            remaining = end - time.monotonic()
+            if self._done.wait(max(0.0, min(_WATCH_POLL_S, remaining))):
+                return
+            if self.cancel is not None and self.cancel.is_set():
+                self._fire("cancelled")
+                return
+            if time.monotonic() >= end:
+                self._fire("expired")
+                return
+
+    def _fire(self, reason: Literal["expired", "cancelled"]) -> None:
+        with self._lock:
+            if self._done.is_set():
+                return
+            self.fired = reason
+            for sock in self.sockets():
+                # The plain socket call, also for TLS sockets (no SSL state changes).
+                with contextlib.suppress(OSError):
+                    socket.socket.shutdown(sock, socket.SHUT_RDWR)
+
+    def check(self) -> None:
+        """Raise the reason the exchange was interrupted, if it was."""
+        if self.fired == "cancelled":
+            raise RunCancelled()
+        if self.fired == "expired":
+            raise httpx2.ReadTimeout(f"the request took longer than {self.seconds:g} s")
 
 
 @dataclass
@@ -281,6 +400,8 @@ class PoliteHttpClient:
         self._throttled: dict[str, str] = {}
         self._unavailable_reported: set[str] = set()
         self._streaks: dict[str, int] = {}
+        self._sockets: list[socket.socket] = []
+        self._sockets_lock = threading.Lock()
         # transport None: the network, honouring the environment's proxy settings.
         self._http = httpx2.Client(
             transport=transport,
@@ -374,7 +495,13 @@ class PoliteHttpClient:
                 return self._finish_refusal(target, current, stop, hops, started)
             validators = self._validators(base) if base is not None and not hops else {}
             final = self._attempts(method, current, accept, "content", validators)
-            if final.outcome is None and final.sent is not None and self._is_redirect(final.sent):
+            if (
+                final.outcome is None
+                and final.sent is not None
+                and self._is_redirect(final.sent)
+                # a redirect to a bot manager's challenge host blocks this host (§4.7)
+                and block_signature(final.sent.status, final.sent.headers, None) is None
+            ):
                 next_url = resolve_location(current.url, final.sent.headers["location"])
                 if len(hops) >= self.settings.max_redirects:
                     return self._too_many_redirects(method, target, current, final, hops, started)
@@ -395,7 +522,8 @@ class PoliteHttpClient:
             if policy.state == "blocked":
                 refusal = "blocked"
             elif policy.state == "unavailable":
-                refusal = "throttled" if policy.reason == _BUDGET_TEXT else "robots_unavailable"
+                throttled = policy.reason in _THROTTLED_REASONS
+                refusal = "throttled" if throttled else "robots_unavailable"
             elif target.host in self._throttled:
                 refusal = "throttled"
             elif not policy.allows(target.url):
@@ -456,8 +584,19 @@ class PoliteHttpClient:
                     self.clock,
                     self._wait,
                     self._check_cancelled,
+                    max_wait=self.settings.max_wait_s,
                 ):
                     sent = self._send(method, target, accept, validators)
+            except HostDeferred as exc:  # an earlier Retry-After of the host, not waited
+                return _Final(
+                    "refused",
+                    attempt=attempt,
+                    at=at,
+                    error=f"host throttled: it asked for a wait of {exc.seconds:.0f} s",
+                    retry_after_s=exc.seconds,
+                    refusal="throttled",
+                    throttled=True,
+                )
             except ReplayMiss:
                 return _Final(
                     "refused",
@@ -473,6 +612,13 @@ class PoliteHttpClient:
             except _TooLarge as exc:
                 self.sink.count("requests")
                 return _Final("too_large", attempt=attempt, at=at, error=_short(str(exc)))
+            except _Undecodable as exc:
+                self.sink.count("requests")
+                return _Final("http_error", exc.sent, attempt, at, error=exc.error)
+            except _PERMANENT_ERRORS as exc:
+                self.sink.count("requests")
+                error = _short(f"{type(exc).__name__}: {exc}".rstrip(": "))
+                return _Final("http_error", attempt=attempt, at=at, error=error)
             except httpx2.RequestError as exc:
                 self.sink.count("requests")
                 error = _short(f"{type(exc).__name__}: {exc}".rstrip(": "))
@@ -491,11 +637,25 @@ class PoliteHttpClient:
                     self._record(method, target, purpose, failed, "network_error")
                     self._wait(wait)
                     continue
-                return _Final("network_error", attempt=attempt, at=at, error=error)
+                # A manual fetch cut off by its budget is out of time ("throttled").
+                return _Final(
+                    "network_error",
+                    attempt=attempt,
+                    at=at,
+                    error=error,
+                    out_of_budget=not self._fits(0),
+                )
             self.sink.count("requests")
             self.sink.count("bytes", len(sent.body or b""))
             retry_after = parse_retry_after(sent.headers.get("retry-after"), self.clock.time())
-            if sent.status in retry_statuses and attempt <= self.settings.retries:
+            # A Retry-After on 429 or 5xx holds for the host and every client of the process,
+            # also after the last attempt (RFC 9110 §10.2.3).
+            deferred = retry_after if sent.status == 429 or sent.status >= 500 else None
+            if deferred is not None:
+                self.throttle.defer(target.host, deferred, self.clock)
+            # A challenge page is final whatever its status: no retries (§4.2, §4.7).
+            challenge = block_signature(sent.status, sent.headers, sent.body) is not None
+            if sent.status in retry_statuses and attempt <= self.settings.retries and not challenge:
                 wait = retry_after if retry_after is not None else self._backoff(attempt)
                 if wait > self.settings.max_wait_s:
                     return _Final(None, sent, attempt, at, retry_after_s=wait, throttled=True)
@@ -512,12 +672,15 @@ class PoliteHttpClient:
                 )
                 self._wait(wait)
                 continue
-            return _Final(None, sent, attempt, at, retry_after_s=retry_after)
+            too_long = deferred is not None and deferred > self.settings.max_wait_s
+            return _Final(None, sent, attempt, at, retry_after_s=retry_after, throttled=too_long)
 
     def _send(
         self, method: str, target: FetchUrl, accept: str, validators: Mapping[str, str]
     ) -> _Sent:
-        """One HTTP exchange with the size and total time limits."""
+        """One HTTP exchange with the size and total time limits (300 s per request, the
+        remaining budget of a manual fetch). The limit and a cancel request also cover the
+        status line and headers: a watchdog interrupts the exchange (§4.4, §4.6, §6.3)."""
         started = self.clock.monotonic()
         limit = REQUEST_TOTAL_S
         if self.deadline is not None:
@@ -528,7 +691,19 @@ class PoliteHttpClient:
             "Accept-Encoding": ACCEPT_ENCODING,
             **validators,
         }
-        request = self._http.build_request(method, target.url, headers=headers)
+        request = self._http.build_request(
+            method, target.url, headers=headers, extensions={"trace": self._trace}
+        )
+        with _Watchdog(limit, self.cancel, self._open_sockets) as watchdog:
+            try:
+                return self._exchange(method, request, started, limit)
+            except httpx2.RequestError:
+                watchdog.check()
+                raise
+
+    def _exchange(
+        self, method: str, request: httpx2.Request, started: float, limit: float
+    ) -> _Sent:
         response = self._http.send(request, stream=True)
         try:
             status = response.status_code
@@ -541,18 +716,41 @@ class PoliteHttpClient:
                     raise _TooLarge(int(declared))
                 chunks: list[bytes] = []
                 total = 0
-                for chunk in response.iter_bytes():
-                    total += len(chunk)
-                    if total > self.settings.max_bytes:
-                        raise _TooLarge(total)
-                    if self.clock.monotonic() - started > limit:
-                        raise httpx2.ReadTimeout(f"the request took longer than {limit:g} s")
-                    chunks.append(chunk)
+                try:
+                    for chunk in response.iter_bytes():
+                        total += len(chunk)
+                        if total > self.settings.max_bytes:
+                            raise _TooLarge(total)
+                        if self.clock.monotonic() - started > limit:
+                            raise httpx2.ReadTimeout(f"the request took longer than {limit:g} s")
+                        chunks.append(chunk)
+                except httpx2.DecodingError as exc:
+                    duration = int((self.clock.monotonic() - started) * 1000)
+                    sent = _Sent(status, response_headers, None, replay, duration)
+                    raise _Undecodable(sent, _short(f"{type(exc).__name__}: {exc}")) from exc
                 body = b"".join(chunks)
             duration = int((self.clock.monotonic() - started) * 1000)
             return _Sent(status, response_headers, body, replay, duration)
         finally:
             response.close()
+
+    def _trace(self, event: str, info: Mapping[str, Any]) -> None:
+        """httpcore's ``trace`` extension: remember the socket of every connection the
+        client opens, so that the watchdog of an exchange can interrupt it."""
+        if not event.endswith(
+            (".connect_tcp.complete", ".connect_unix_socket.complete", ".start_tls.complete")
+        ):
+            return
+        extra = getattr(info.get("return_value"), "get_extra_info", None)
+        sock = extra("socket") if callable(extra) else None
+        if isinstance(sock, socket.socket):
+            with self._sockets_lock:
+                self._sockets = [known for known in self._sockets if known.fileno() != -1]
+                self._sockets.append(sock)
+
+    def _open_sockets(self) -> list[socket.socket]:
+        with self._sockets_lock:
+            return [sock for sock in self._sockets if sock.fileno() != -1]
 
     def _finish(
         self,
@@ -573,13 +771,19 @@ class PoliteHttpClient:
             "redirects": tuple(hops),
             "duration_ms": duration,
         }
-        if final.outcome is not None:  # no response: too_large, network_error, refused
+        if final.outcome is not None:  # no usable response: too_large, network_error,
+            # refused, http_error (an undecodable body)
             entry = self._record(method, current, "content", final, final.outcome)
             self._content_failure(entry, None)
+            if final.throttled:
+                self._throttle(current.host, f"a wait of {final.retry_after_s:.0f} s", current.url)
             return FetchResult(
                 outcome=final.outcome,
+                status=final.sent.status if final.sent else None,
                 error=final.error,
+                retry_after_s=final.retry_after_s,
                 refusal=final.refusal,
+                throttled=final.throttled,
                 out_of_budget=final.out_of_budget,
                 **common,
             )
@@ -743,7 +947,7 @@ class PoliteHttpClient:
         policy = self._fetch_robots(target)
         self._robots[target.origin] = policy
         host = target.host
-        if policy.state == "unavailable" and policy.reason != _BUDGET_TEXT:
+        if policy.state == "unavailable" and policy.reason not in _THROTTLED_REASONS:
             if host not in self._unavailable_reported:
                 self._unavailable_reported.add(host)
                 self.sink.message(
@@ -776,12 +980,18 @@ class PoliteHttpClient:
             if final.out_of_budget:  # a manual fetch ran out of time: throttled
                 self._record("GET", current, "robots", final, final.outcome or "http_error")
                 return RobotsPolicy("unavailable", _BUDGET_TEXT)
+            if final.outcome is not None and final.throttled:  # an earlier Retry-After
+                self._record("GET", current, "robots", final, final.outcome)
+                reason = f"a wait of {final.retry_after_s:.0f} s"
+                self._throttle(target.host, reason, target.robots_url)
+                return RobotsPolicy("unavailable", _DEFERRED_TEXT)
             if final.outcome is not None:
                 self._record("GET", current, "robots", final, final.outcome)
                 return policy_from_response(None, None)
             sent = final.sent
             assert sent is not None
-            if self._is_redirect(sent) and len(hops) < ROBOTS_MAX_REDIRECTS:
+            challenge = block_signature(sent.status, sent.headers, None) is not None
+            if not challenge and self._is_redirect(sent) and len(hops) < ROBOTS_MAX_REDIRECTS:
                 next_url = resolve_location(current.url, sent.headers["location"])
                 self._record("GET", current, "robots", final, "redirect")
                 hops.append(f"{sent.status} {next_url}")

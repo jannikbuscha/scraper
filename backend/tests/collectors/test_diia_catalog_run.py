@@ -24,7 +24,7 @@ from mdt.db.models import Project, RawSnapshot, RunMessage, SourceObservation
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
 from mdt.domain.merge import merge
-from mdt.domain.revisions import soft_delete
+from mdt.domain.revisions import apply_change, soft_delete
 from tests.collectors.acceptance import Acceptance, acceptance, acceptance_template
 from tests.collectors.conftest import FIXTURES, FakeClock
 from tests.helpers import fields_of, load
@@ -357,6 +357,39 @@ def test_a_deleted_diia_project_fails_the_run_before_any_request(acceptance: Acc
     assert "seed key 'diia'" in row["error"]
     assert row["stats"]["requests"] == 0
     assert acceptance.state().records["service"] == 0
+
+
+def test_a_service_blocked_by_a_deleted_service_stays_blocked_in_every_run(
+    acceptance: Acceptance,
+) -> None:
+    # The service key and its page share the slug as external_id; after run 1 the page's
+    # document is bound while the service key is blocked (DATA_MODEL §15.3: the rule
+    # external_id matches keys of the candidate's own type only).
+    url = "https://diia.gov.ua/services/reyestraciya-fop"
+    with acceptance.db.session() as session:
+        changes = {"project_id": diia_project(acceptance), "name_en": "Example", "urls": [url]}
+        service_id = apply_change(session, "service", None, changes, Actor.ui()).entity_id
+        soft_delete(session, "service", service_id, Actor.ui(), note="Example deletion")
+    first = acceptance.run(COLLECTOR, COLLECTOR)
+    assert (acceptance.run_row(first)["status"], acceptance.run_row(first)["error"]) == (
+        "partial",
+        None,
+    )
+    assert "reyestraciya-fop" not in bound(acceptance, "service")
+    assert "reyestraciya-fop" in bound(acceptance, "page")
+    before = acceptance.state()
+    for _ in range(2):
+        run_id = acceptance.run(COLLECTOR, COLLECTOR)
+        row = acceptance.run_row(run_id)
+        assert (row["status"], row["error"], row["complete_listing"]) == ("partial", None, True)
+        assert acceptance.state() == before
+        [deleted] = [
+            message
+            for message in messages(acceptance, run_id, "subject_deleted")
+            if message["details"]["key"] == "service:reyestraciya-fop"
+        ]
+        assert service_id in deleted["message"]
+    assert "reyestraciya-fop" not in bound(acceptance, "service")
 
 
 def test_a_challenge_on_the_listing_host_fails_the_run(acceptance: Acceptance) -> None:

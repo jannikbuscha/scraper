@@ -211,6 +211,11 @@ def _listing_candidate(item: Mapping[str, Any], snapshot: Snapshot, index: int) 
     )
 
 
+def page_key(project_id: str) -> str:
+    """The key of a project page document: ``page:<project.id>``."""
+    return f"page:{project_id}"
+
+
 def parse_project_page(snapshot: Snapshot, values: SiteValues) -> ParseResult:
     """A project page (loader entry with ``project``): a partial project candidate (the
     project UUID, ``ministry_categories`` and the proposed official URLs, all from this
@@ -273,7 +278,7 @@ def parse_project_page(snapshot: Snapshot, values: SiteValues) -> ParseResult:
         fields["license"] = licence
     document = Candidate(
         entity_type="document",
-        key=f"page:{project_id}",
+        key=page_key(project_id),
         evidence=evidence,
         label=title,
         url=url,
@@ -364,6 +369,7 @@ class MinistryProjects:
         page = fetch_parsed(ctx, entry.url, lambda snapshot: parse_project_page(snapshot, values))
         if page is None:
             ctx.reconcile(entry)
+            self._sight_page(ctx, entry)
             return
         snapshot, parsed = page
         partial, document = parsed.candidates
@@ -377,9 +383,22 @@ class MinistryProjects:
                 snapshot_id=snapshot.raw_snapshot_id,
             )
             ctx.reconcile(entry)
+            self._sight_page(ctx, entry)
             return
         ctx.reconcile(with_project_page(entry, partial))
         ctx.reconcile(document)
+
+    def _sight_page(self, ctx: RunContext, entry: Candidate) -> None:
+        """A listed content entry whose page was not read in this run: the key of its
+        project page (the project UUID is known from an earlier run, the ``external_id`` of
+        the entry's observation) stays seen (DATA_MODEL §15.7: keys come from listings, so
+        a failed detail page cannot hide a key)."""
+        observation = ctx.observation(entry.key)
+        if observation is None or not observation.external_id:
+            return
+        key = page_key(observation.external_id)
+        if ctx.observation(key) is not None:
+            ctx.observe("document", key, url=entry.url, label=entry.label)
 
 
 def _first_per_key(candidates: Sequence[Candidate]) -> list[Candidate]:

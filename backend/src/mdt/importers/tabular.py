@@ -281,7 +281,10 @@ def _update(
                 {"field": name, "current": current[name], "new": value, "reason": reason}
             )
     if "in_paper_scope" in changes and "scope_note" not in changes and "scope_note" in provided:
-        changes["scope_note"] = provided["scope_note"]  # the scope rule needs the reason along
+        # The scope rule needs the reason in the same change. The imported note equals the
+        # current one or is a conflict, which is never written (§17.1): the current note
+        # goes along, as in the seed and a merge.
+        changes["scope_note"] = current["scope_note"]
     result.id = row["id"]
     if not changes:
         result.action = "unchanged"

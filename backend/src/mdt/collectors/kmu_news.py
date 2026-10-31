@@ -270,21 +270,28 @@ class _Run:
             return
         known = entry.key in self.known
         observation = None if known else self.ctx.observation(entry.key)
-        if (known or observation is not None) and not self.refetch:
+        judged_before = known or observation is not None
+        if judged_before and not self.refetch:
             self.sight(entry, observation)
             return
         self.handled.add(entry.key)
         self.fetched += 1
-        self._judge(entry, {"discovery": discovery, "lastmod": entry.lastmod, **(extra or {})})
+        details = {"discovery": discovery, "lastmod": entry.lastmod, **(extra or {})}
+        if not self._judge(entry, details) and judged_before:
+            # A refetch that failed: the entry is still listed, so its key stays seen
+            # with its earlier judgement (DATA_MODEL §15.7).
+            self.sight(entry, observation)
 
-    def _judge(self, entry: Entry, details: dict[str, Any]) -> None:
-        """Fetch a page; reconcile it when relevant, else observe it as discarded."""
+    def _judge(self, entry: Entry, details: dict[str, Any]) -> bool:
+        """Fetch a page; reconcile it when relevant, else observe it as discarded. False if
+        the page could not be read (the run message is written; the next run tries
+        again)."""
         ctx = self.ctx
         licence = ctx.client.config.licence.code
         parse = partial(parse_news_page, focal_org_id=self.focal_org_id, default_licence=licence)
         parsed = _fetch(ctx, entry.url, parse)
         if parsed is None or not parsed.candidates:
-            return  # the run message is written; the next run tries again
+            return False
         candidate = parsed.candidates[0]
         snapshot_id = candidate.evidence.raw_snapshot_id
         for code, text in parsed.warnings:
@@ -297,7 +304,7 @@ class _Run:
             self.judged[entry.key] = "relevant"
             candidate.details.update(details, relevance=reason, discarded=None)
             ctx.reconcile(candidate)
-            return
+            return True
         self.judged[entry.key] = "discarded"
         ctx.count("discarded")
         ctx.observe(
@@ -315,6 +322,7 @@ class _Run:
             url=entry.url,
             snapshot_id=snapshot_id,
         )
+        return True
 
 
 class KmuNews:

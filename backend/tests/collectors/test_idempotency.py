@@ -22,7 +22,11 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import pytest
+from sqlalchemy import select
 
+from mdt.db.models import Project
+from mdt.domain.actor import Actor
+from mdt.domain.revisions import apply_change
 from tests.collectors import wayback_helpers
 from tests.collectors.acceptance import Acceptance, acceptance, acceptance_template
 
@@ -41,15 +45,34 @@ class IdempotencyCase:
     setup: Callable[[Acceptance], None] | None = None
     #: The first run must create at least these records (type → count).
     creates_at_least: Mapping[str, int] = field(default_factory=dict)
+    #: Distinguishes cases of the same collector and mode in the pytest ID.
+    variant: str = ""
 
     @property
     def id(self) -> str:
         """The pytest ID of the case."""
-        return f"{self.collector}-{self.mode}"
+        return "-".join(part for part in (self.collector, self.mode, self.variant) if part)
+
+
+def _unmatched_brave1(acceptance: Acceptance) -> None:
+    """Clear the ministry URL of the seed project ``brave1``, so that its listing entry is
+    unmatched: run 1 proposes it (``create_entity``) and creates its project page, whose
+    key shares the entry's external_id (DATA_MODEL §15.3)."""
+    with acceptance.db.session() as session:
+        project_id = session.scalar(select(Project.id).where(Project.slug == "brave1"))
+        assert project_id is not None
+        apply_change(session, "project", project_id, {"ministry_urls": []}, Actor.ui())
 
 
 CASES: list[IdempotencyCase] = [
     IdempotencyCase("ministry_projects", "ministry_projects", creates_at_least={"document": 4}),
+    IdempotencyCase(
+        "ministry_projects",
+        "ministry_projects",
+        setup=_unmatched_brave1,
+        creates_at_least={"document": 4},
+        variant="unmatched-entry",
+    ),
     IdempotencyCase("ministry_news", "ministry_news", creates_at_least={"document": 50}),
     IdempotencyCase(
         "ministry_news", "ministry_news", mode="full", creates_at_least={"document": 50}

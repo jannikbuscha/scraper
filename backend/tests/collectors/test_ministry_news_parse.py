@@ -35,6 +35,7 @@ from mdt.collectors.ministry_news import (
 )
 from mdt.collectors.ministry_news_pages import (
     document_item,
+    microsite_key,
     parse_article,
     parse_document_page,
     parse_documents_listing,
@@ -873,6 +874,105 @@ def test_a_full_run_of_every_part_completes_the_listing(settings: Settings) -> N
     limited = fake_run(settings, pages, mode="full", params={"limit": 1})
     limited.run()
     assert len(limited.reconciled) == 1 and not limited.complete
+
+
+def _ministry_page(*items: dict[str, Any]) -> Snapshot:
+    return synthetic_page(
+        f"{SITE}/ministry",
+        "pages.view",
+        {
+            "page": {
+                "id": "id-ministry",
+                "title": "Example page",
+                "slug": "ministry",
+                "blocks": [{"type": "relatedDocuments", "attrs": {"documents": list(items)}}],
+            }
+        },
+    )
+
+
+def test_the_keys_of_a_failed_ministry_page_stay_seen(settings: Settings) -> None:
+    # DATA_MODEL §15.7: a failed page cannot hide a key; the page's observation records
+    # the keys of its embedded items.
+    url, file = storage_file(b"Example file text.")
+    pages: dict[str, Snapshot | int] = {
+        f"{SITE}/ministry": _ministry_page(_file_item(url)),
+        url: file,
+    }
+    options = {"parts": ["ministry"]}
+    first = fake_run(settings, pages, options=options, mode="full")
+    first.run()
+    md5_key = f"file:{storage_md5(url)}"
+    assert first.keys() == ["page:ministry", md5_key]
+    assert first.stored["page:ministry"].details["items"] == [md5_key]
+    failed = {**pages, f"{SITE}/ministry": 500}
+    second = fake_run(settings, failed, options=options, mode="full", stored=first.stored)
+    second.run()
+    assert second.reconciled == []
+    assert second.sightings == ["page:ministry", md5_key]
+    # Without an earlier observation nothing is invented.
+    fresh = fake_run(settings, failed, options=options, mode="full")
+    fresh.run()
+    assert fresh.sightings == [] and fresh.reconciled == []
+
+
+def test_the_attachments_of_a_content_item_whose_page_fails_stay_seen(settings: Settings) -> None:
+    url, file = storage_file(b"Example attachment text.")
+    content = {
+        "type": "content",
+        "slug": "ministry/example",
+        "title": "Example notice",
+        "kind": {"slug": "project"},
+        "publishedAt": {"iso8601": "2025-01-01T10:00:00+02:00"},
+    }
+    link = {
+        "type": "text",
+        "text": "Example draft",
+        "marks": [{"type": "link", "attrs": {"href": url}}],
+    }
+    page = synthetic_page(
+        f"{SITE}/documents/ministry/example",
+        "documents.view",
+        {
+            "document": {
+                "id": "id-example",
+                **{key: content[key] for key in ("slug", "title", "kind", "publishedAt")},
+                "blocks": [{"type": "paragraph", "content": [link]}],
+            }
+        },
+    )
+    pages: dict[str, Snapshot | int] = {
+        f"{SITE}/documents": documents_page(1, [content], 1),
+        f"{SITE}/documents/ministry/example": page,
+        url: file,
+    }
+    options = {"parts": ["documents"]}
+    first = fake_run(settings, pages, options=options, mode="full")
+    first.run()
+    md5_key = f"file:{storage_md5(url)}"
+    assert first.stored["doc:ministry/example"].details["attachments"] == [md5_key]
+    failed = {**pages, f"{SITE}/documents/ministry/example": 500}
+    second = fake_run(
+        settings,
+        failed,
+        options=options,
+        mode="full",
+        params={"refetch": True},
+        stored=first.stored,
+    )
+    second.run()
+    assert second.keys() == ["doc:ministry/example"]  # from its listing values
+    assert second.reconciled[0].details == {"type": "content"}
+    assert second.sightings == [md5_key]
+
+
+def test_a_failed_microsite_is_sighted_under_its_key(settings: Settings) -> None:
+    pages: dict[str, Snapshot | int] = dict.fromkeys(MICROSITES, 500)
+    run = fake_run(settings, pages, options={"parts": ["microsites"]}, mode="full")
+    run.run()
+    assert run.reconciled == []
+    assert run.sightings == [microsite_key(url) for url in MICROSITES]
+    assert run.sightings[0] == "microsite:2years.thedigital.gov.ua"
 
 
 def test_listing_only_drops_the_compared_details() -> None:

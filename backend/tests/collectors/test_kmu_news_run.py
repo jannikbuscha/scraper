@@ -343,6 +343,18 @@ def test_an_entry_that_leaves_the_sitemaps_is_missing_after_a_complete_run(
     assert f"uk:{REGULATION}" in documents(acceptance)  # documents stay
 
 
+def test_a_known_entry_whose_refetch_fails_stays_seen(acceptance: Acceptance) -> None:
+    # DATA_MODEL §15.7: the entry is still listed, so a failed page cannot hide its key.
+    run_kmu(acceptance, PatchedReplay(NPA_AS_POST_3))
+    failing = {**NPA_AS_POST_3, news(KOMANDA): body(500, b"<html>Example error</html>")}
+    second = run_kmu(acceptance, PatchedReplay(failing), {"refetch": True})
+    row = acceptance.run_row(second)
+    assert row["complete_listing"] and row["stats"]["observations_missing"] == 0
+    observation = acceptance.observations("kmu_news")[f"uk:{KOMANDA}"]
+    assert (observation["present"], observation["last_seen_run"]) == (True, second)
+    assert f"uk:{KOMANDA}" in documents(acceptance)
+
+
 def test_a_block_after_the_complete_listing_makes_the_run_partial(acceptance: Acceptance) -> None:
     answers = {**NPA_AS_POST_3, news(YEAR_REVIEW): body(403, CHALLENGE)}
     run_id = run_kmu(acceptance, PatchedReplay(answers))
@@ -356,6 +368,39 @@ def test_a_blocked_sitemap_fails_the_run(acceptance: Acceptance) -> None:
     run_id = run_kmu(acceptance, PatchedReplay({f"{SITE}/sitemap.xml": body(403, CHALLENGE)}))
     row = acceptance.run_row(run_id)
     assert (row["status"], row["error"]) == ("failed", "www.kmu.gov.ua: blocked")
+
+
+#: Synthetic: the challenge URL shape of the Radware bot manager (SOURCES S4b).
+RADWARE = "https://validate.perfdrive.com/example/captcha?ssa=example&ssc=example"
+
+
+def captcha(request: httpx2.Request) -> httpx2.Response:
+    return httpx2.Response(302, headers={"Location": RADWARE})
+
+
+def test_a_radware_challenge_on_the_sitemap_fails_the_run(acceptance: Acceptance) -> None:
+    run_id = run_kmu(acceptance, PatchedReplay({f"{SITE}/sitemap.xml": captcha}))
+    row = acceptance.run_row(run_id)
+    assert (row["status"], row["error"]) == ("failed", "www.kmu.gov.ua: blocked")
+    assert len(messages(acceptance, run_id, "blocked")) == 1
+    with acceptance.db.session() as session, read_transaction(session):
+        hosts = set(session.scalars(select(FetchLog.host).where(FetchLog.run_id == run_id)))
+    assert hosts == {"www.kmu.gov.ua"}  # the challenge host is never requested
+
+
+def test_a_radware_challenge_after_the_listing_blocks_the_rest(acceptance: Acceptance) -> None:
+    answers = {**NPA_AS_POST_3, **{news(slug): captcha for slug in (YEAR_REVIEW, REGULATION)}}
+    run_id = run_kmu(acceptance, PatchedReplay(answers))
+    row = acceptance.run_row(run_id)
+    assert (row["status"], row["error"], row["complete_listing"]) == ("partial", None, True)
+    assert len(messages(acceptance, run_id, "blocked")) == 1
+    assert requested(acceptance, run_id, "blocked") == [news(YEAR_REVIEW)]
+    # The first candidate was blocked; no later page was requested (each one is refused).
+    refused = set(requested(acceptance, run_id, "refused"))
+    later = [url for url in requested(acceptance, run_id) if "/news/" in url][1:]
+    assert later and all(url in refused for url in later)
+    assert documents(acceptance) == {}
+    assert messages(acceptance, run_id, "parse_error") == []
 
 
 def test_limit_stops_after_that_many_pages(acceptance: Acceptance) -> None:

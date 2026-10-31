@@ -47,6 +47,8 @@ from mdt.documents.extract import Extraction, ExtractionError, extract_text
 NEWS_URL = f"{SITE}/news"
 DOCUMENTS_URL = f"{SITE}/documents"
 MINISTRY_URL = f"{SITE}/ministry"
+#: The key of the ``/ministry`` page document (``page:<slug>``, the slug of its URL).
+MINISTRY_KEY = "page:" + urlsplit(MINISTRY_URL).path.strip("/")
 STORAGE_HOST = "storage.thedigital.gov.ua"
 #: A storage file: ``/files/<x>/<yx>/<32 hex = MD5 of the content>.<ext>``.
 STORAGE_FILE = re.compile(r"^/files/(?:[^/]+/)*([0-9a-f]{32})\.[A-Za-z0-9]+$")
@@ -449,6 +451,11 @@ def _related_documents(node: Any) -> list[Any]:
     return _related_documents(node.get("content"))
 
 
+def microsite_key(url: str) -> str:
+    """The key of a year-in-review microsite: ``microsite:<requested host>``."""
+    return f"microsite:{(urlsplit(url).hostname or '').lower()}"
+
+
 def parse_microsite(snapshot: Snapshot) -> ParseResult:
     """A year-in-review microsite: one document (key ``microsite:<requested host>``,
     ``doc_type = report``, ``url`` and ``publisher`` from the final URL, text by
@@ -460,7 +467,6 @@ def parse_microsite(snapshot: Snapshot) -> ParseResult:
     if page.title is None:
         raise ParseError("the page has no title")
     url = snapshot.final_url or snapshot.url or ""
-    host = (urlsplit(snapshot.url or url).hostname or "").lower()
     fields: dict[str, Any] = {
         "doc_type": "report",
         "title": page.title,
@@ -471,7 +477,7 @@ def parse_microsite(snapshot: Snapshot) -> ParseResult:
     }
     candidate = Candidate(
         entity_type="document",
-        key=f"microsite:{host}",
+        key=microsite_key(snapshot.url or url),
         evidence=evidence_of(snapshot),
         label=page.title,
         url=url,

@@ -14,6 +14,7 @@ from typing import Any
 import httpx2
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import text
 
 from mdt.app import create_app
 from tests.api.conftest import api_settings
@@ -37,22 +38,27 @@ def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(httpx2.HTTPTransport, "handle_request", refuse)
 
 
-def _replay_dir(root: Path) -> Path:
-    directory = root / "replay"
-    directory.mkdir()
-    (directory / "annual.html").write_bytes(HTML)
+def _write_fixture(directory: Path, name: str, url: str, body: bytes = HTML) -> None:
+    """A replay fixture (HTTP 200) for ``url``."""
+    (directory / f"{name}.html").write_bytes(body)
     meta = {
-        "fixture": "annual",
-        "body": "annual.html",
-        "url": PAGE,
-        "final_url": PAGE,
+        "fixture": name,
+        "body": f"{name}.html",
+        "url": url,
+        "final_url": url,
         "redirects": [],
         "status": 200,
         "retrieved_at": FIXTURE_TIME,
         "content_type": "text/html; charset=utf-8",
         "headers": {"content-type": "text/html; charset=utf-8"},
     }
-    (directory / "annual.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+    (directory / f"{name}.meta.json").write_text(json.dumps(meta), encoding="utf-8")
+
+
+def _replay_dir(root: Path) -> Path:
+    directory = root / "replay"
+    directory.mkdir()
+    _write_fixture(directory, "annual", PAGE)
     return directory
 
 
@@ -160,6 +166,53 @@ def test_a_url_without_fixture_is_a_failed_fetch(client: ApiClient) -> None:
     assert response.status_code == 502
     error = error_of(response)
     assert error["code"] == "fetch_failed" and set(error["details"]) == {"reason", "status"}
+    assert error["details"] == {"reason": "http_error", "status": None}
+
+
+#: URLs that break the URL rule (DATA_MODEL §1.2), or a capture URL without an http(s) original.
+INVALID_URLS = [
+    "ftp://example.org/reports/annual",
+    "https://user:secret@example.org/reports/annual",
+    "https://example.org/reports/annual report",
+    "not a url",
+    "https://web.archive.org/web/20200102030405/example.org/reports/annual",
+]
+
+
+@pytest.mark.parametrize("url", INVALID_URLS)
+def test_an_invalid_url_is_refused_before_anything_is_fetched(
+    client: ApiClient, api_db: Db, url: str
+) -> None:
+    """docs/API.md §7.8 and docs/COLLECTORS.md §10.3: ``400 validation_error`` on ``url``,
+    not ``502 fetch_failed``; no request is made and no snapshot is stored."""
+    response = client.post("/api/documents/fetch", {"url": url})
+    assert response.status_code == 400
+    error = error_of(response)
+    assert error["code"] == "validation_error" and set(error["details"]) == {"url"}
+    with api_db.engine.connect() as connection:
+        assert connection.execute(text("SELECT count(*) FROM raw_snapshot")).scalar() == 0
+        assert connection.execute(text("SELECT count(*) FROM fetch_log")).scalar() == 0
+
+
+def test_an_invalid_url_is_refused_before_the_contact_address_is_needed(api_db: Db) -> None:
+    """The URL is checked first, also outside replay mode without ``CONTACT_EMAIL``."""
+    with TestClient(create_app(api_settings(api_db.root)), base_url=BASE_URL) as test_client:
+        response = ApiClient(test_client).post("/api/documents/fetch", {"url": INVALID_URLS[0]})
+    assert response.status_code == 400
+    assert error_of(response)["code"] == "validation_error"
+
+
+def test_a_trap_path_is_a_failed_fetch(client: ApiClient, tmp_path: Path) -> None:
+    """A valid URL that the polite client refuses (``/cdn-cgi/…``, docs/COLLECTORS.md §4.1)
+    is a failed fetch with the reason ``http_error``, not an invalid URL, even though the
+    replay directory could answer it."""
+    url = "https://example.org/cdn-cgi/l/email-protection"
+    _write_fixture(tmp_path / "replay", "trap", url)
+    response = client.post("/api/documents/fetch", {"url": url})
+    assert response.status_code == 502
+    error = error_of(response)
+    assert error["code"] == "fetch_failed"
+    assert error["details"] == {"reason": "http_error", "status": None}
 
 
 def test_fetching_without_a_contact_address_outside_replay_mode(api_db: Db) -> None:

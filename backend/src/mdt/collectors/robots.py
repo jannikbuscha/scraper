@@ -2,6 +2,12 @@
 match, ``*`` and ``$``, Allow wins ties), after a preprocessing that makes the files seen in
 Phase 0b behave as their owners meant (docs/SOURCES.md §2).
 
+The group is chosen here, not by protego (RFC 9309 §2.2.1): a group applies when one of its
+``User-agent`` values, reduced to its product token (the leading letters, ``_`` and ``-``, as
+Google's reference parser does, so ``MDT-Portfolio-Research/0.1`` counts), equals our token
+case-insensitively; otherwise the ``*`` groups apply; several applying groups are merged.
+protego then parses only the chosen rules.
+
 This module is pure: :mod:`mdt.collectors.client` fetches robots.txt and turns the response
 into a :class:`RobotsPolicy` with :func:`policy_from_response`.
 """
@@ -23,6 +29,7 @@ PolicyState = Literal["rules", "allow_all", "blocked", "unavailable"]
 _ROBOTS_FIELDS = frozenset({"user-agent", "allow", "disallow", "crawl-delay", "sitemap"})
 _FIELD_LINE = re.compile(r"^\s*([A-Za-z][A-Za-z0-9_-]*)\s*:")
 _HTML_MARKERS = ("<html", "<!doctype html", "<head", "<body")
+_AGENT_TOKEN = re.compile(r"[A-Za-z_-]+")
 
 
 @dataclass(frozen=True)
@@ -102,10 +109,49 @@ def preprocess(body: bytes) -> str | None:
     return "\n".join(kept) + "\n"
 
 
+def agent_token(value: str) -> str:
+    """The product token of a ``User-agent`` value, lower-cased: ``*``, or its leading run
+    of letters, ``_`` and ``-`` (``MDT-Portfolio-Research/1.0`` → ``mdt-portfolio-research``)."""
+    value = value.strip()
+    if value.startswith("*"):
+        return "*"
+    match = _AGENT_TOKEN.match(value)
+    return match.group(0).lower() if match else ""
+
+
+def select_group(text: str, token: str = PRODUCT_TOKEN) -> str:
+    """The rule lines of the preprocessed ``text`` that apply to ``token``, under one
+    ``User-agent`` line: every group naming the token (case-insensitive), else every ``*``
+    group (RFC 9309 §2.2.1); empty when no group applies (allow all). Consecutive
+    ``User-agent`` lines form one group; ``Sitemap`` lines belong to no group."""
+    groups: list[tuple[set[str], list[str]]] = []
+    agents_open = False
+    for line in text.splitlines():
+        field_name = _field_of(line)
+        if field_name is None or field_name == "sitemap":
+            continue
+        if field_name == "user-agent":
+            if not agents_open:
+                groups.append((set(), []))
+                agents_open = True
+            groups[-1][0].add(agent_token(line.split("#", 1)[0].split(":", 1)[1]))
+            continue
+        agents_open = False
+        if groups:
+            groups[-1][1].append(line)
+    for wanted in (token.lower(), "*"):
+        chosen = [lines for agents, lines in groups if wanted in agents]
+        if chosen:
+            rules = [line for lines in chosen for line in lines]
+            return "\n".join([f"User-agent: {token}", *rules]) + "\n"
+    return ""
+
+
 def parse(body: bytes) -> Protego | None:
-    """The parsed rules of a 2xx robots.txt body, or None for "allow all"."""
+    """The parsed rules of a 2xx robots.txt body that apply to us, or None for "allow
+    all"."""
     text = preprocess(body)
-    return None if text is None else Protego.parse(text)
+    return None if text is None else Protego.parse(select_group(text))
 
 
 def policy_from_response(

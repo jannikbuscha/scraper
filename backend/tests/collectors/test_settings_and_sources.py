@@ -6,12 +6,17 @@ import re
 from pathlib import Path
 from typing import Any
 
+import httpx2
 import pytest
 import yaml
 from pydantic import ValidationError
 
+from mdt.collectors.client import PoliteHttpClient, user_agent
+from mdt.collectors.fetchlog import MemorySink
 from mdt.collectors.sources import SourcesError, load_sources, parse_sources
+from mdt.collectors.throttle import HostThrottle
 from mdt.config import REPO_ROOT, Settings, contact_email_problem
+from tests.collectors.conftest import FakeClock, make_config
 
 #: A syntactically valid address in a non-reserved, non-public domain (RFC 6762 style
 #: private-use label): it passes the CONTACT_EMAIL rule but reaches nobody.
@@ -75,11 +80,50 @@ def test_project_url_accepts_http_urls(value: str) -> None:
 
 
 @pytest.mark.parametrize(
-    "value", ["ftp://example.org", "example.org", "https://example.org/a b", "https://x.org/(a)"]
+    "value",
+    [
+        "ftp://example.org",
+        "example.org",
+        "https://example.org/a b",
+        "https://x.org/(a)",
+        "https://мінцифри..укр/paper",  # an empty label: no valid IDNA host
+        "https://exa\u0080mple.org/",
+    ],
 )
 def test_project_url_refuses_values_that_break_the_user_agent(value: str) -> None:
     with pytest.raises(ValidationError):
         settings(project_url=value)
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        ("https://мінцифри.укр/paper", "https://xn--h1aakeqxm0k.xn--j1amh/paper"),
+        ("https://example.org/стаття", "https://example.org/%D1%81%D1%82%D0%B0%D1%82%D1%82%D1%8F"),
+        ("https://example.org:8443/a?q=т", "https://example.org:8443/a?q=%D1%82"),
+    ],
+)
+def test_a_non_ascii_project_url_is_stored_in_its_ascii_form(value: str, expected: str) -> None:
+    current = settings(project_url=value)
+    assert current.project_url == expected and current.project_url.isascii()
+    # The User-Agent built from it can be sent: a request goes out (MockTransport).
+    sent: list[str] = []
+
+    def handler(request: httpx2.Request) -> httpx2.Response:
+        sent.append(request.headers["user-agent"])
+        return httpx2.Response(404 if request.url.path == "/robots.txt" else 200, text="ok")
+
+    with PoliteHttpClient(
+        make_config(),
+        MemorySink(),
+        user_agent=user_agent(VALID_EMAIL, current.project_url),
+        transport=httpx2.MockTransport(handler),
+        source_id="example",
+        clock=FakeClock(),
+        throttle=HostThrottle(),
+    ) as client:
+        assert client.get("https://a.example.org/page").ok
+    assert sent and all(f"+{expected};" in agent for agent in sent)
 
 
 @pytest.mark.parametrize(

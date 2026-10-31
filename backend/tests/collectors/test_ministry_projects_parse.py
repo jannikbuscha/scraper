@@ -5,6 +5,7 @@ transport."""
 
 from __future__ import annotations
 
+import json
 import unicodedata
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -27,16 +28,18 @@ from mdt.collectors.parsing.tiptap import OutboundLink, tiptap_to_text
 from mdt.collectors.parsing.turbostream import find_route, loader_data
 from mdt.collectors.thedigital import SiteValues, joined_text
 from mdt.config import Settings
-from mdt.db.models import FetchLog, Project, RunMessage
+from mdt.db.models import FetchLog, Project, RunMessage, SourceObservation
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
-from mdt.domain.revisions import apply_change
+from mdt.domain.proposal_actions import accept_proposal, reject_proposal
+from mdt.domain.revisions import apply_change, soft_delete
 from tests.collectors.acceptance import (
     Acceptance,
     acceptance,
     acceptance_settings,
     acceptance_template,
 )
+from tests.collectors.conftest import FIXTURES
 from tests.collectors.thedigital_helpers import (
     RAW_ID,
     fixture_snapshot,
@@ -450,6 +453,190 @@ def test_an_entry_without_a_matching_project_becomes_a_create_entity_proposal(
     assert fields["ministry_categories"] == ["technologies"]
     assert proposal["first_run_id"] == run_id
     assert acceptance.observations(C1)["entry:brave1"]["subject_id"] is None
+
+
+def _unmatch(acceptance: Acceptance, slug: str) -> str:
+    """Clear the project's ministry URL (channel ``ui``), so that its listing entry stands
+    for a project the database does not have; returns the project's ID."""
+    project_id = _project(acceptance, slug).id
+    with acceptance.db.session() as session:
+        apply_change(session, "project", project_id, {"ministry_urls": []}, Actor.ui())
+    return project_id
+
+
+def _bound_by(acceptance: Acceptance, key: str) -> str | None:
+    with acceptance.db.session() as session, read_transaction(session):
+        return session.scalar(
+            select(SourceObservation.bound_by).where(
+                SourceObservation.collector == C1, SourceObservation.key == key
+            )
+        )
+
+
+def _assert_run_completed(acceptance: Acceptance, run_id: str) -> None:
+    """The run reconciled every entry: it did not fail, and its listing is complete (the
+    10 pages without a fixture make it ``partial``)."""
+    row = acceptance.run_row(run_id)
+    assert (row["status"], row["error"], row["complete_listing"]) == ("partial", None, True)
+    assert row["stats"]["items_seen"] == 24  # 20 entries and 4 project pages
+
+
+@pytest.mark.parametrize("decision", ["open", "rejected"])
+def test_an_unmatched_entry_keeps_its_proposal_and_later_runs_write_nothing(
+    acceptance: Acceptance, decision: str
+) -> None:
+    # The entry and its project page share the project UUID as external_id; the page's
+    # document is bound after run 1 while the entry stays unbound (DATA_MODEL §15.3: the
+    # rule external_id matches keys of the candidate's own type only).
+    _unmatch(acceptance, "brave1")
+    first = acceptance.run(C1, C1)
+    _assert_run_completed(acceptance, first)
+    [proposal] = acceptance.proposals(kind="create_entity")
+    assert proposal["payload"]["candidates"] == []
+    entry = acceptance.observations(C1)["entry:brave1"]
+    assert entry["subject_id"] is None and entry["external_id"]
+    page = acceptance.observations(C1)[f"page:{entry['external_id']}"]
+    assert page["external_id"] == entry["external_id"] and page["subject_id"].startswith("doc_")
+    if decision == "rejected":
+        with acceptance.db.session() as session:
+            reject_proposal(session, proposal["id"], "Example: not a project of the paper.")
+    before = acceptance.state()
+
+    for _ in range(2):
+        run_id = acceptance.run(C1, C1)
+        _assert_run_completed(acceptance, run_id)
+        stats = acceptance.run_row(run_id)["stats"]
+        assert (stats["entities_created"], stats["entities_updated"], stats["revisions"]) == (
+            0,
+            0,
+            0,
+        )
+        assert acceptance.state() == before  # no record, revision or proposal change
+        entry = acceptance.observations(C1)["entry:brave1"]
+        assert (entry["subject_id"], entry["last_seen_run"]) == (None, run_id)
+    [after] = acceptance.proposals(kind="create_entity")
+    assert (after["id"], after["state"]) == (proposal["id"], decision)
+
+
+@pytest.mark.parametrize("decision", ["accepted", "linked"])
+def test_after_the_proposal_is_accepted_the_entry_updates_its_project(
+    acceptance: Acceptance, decision: str
+) -> None:
+    brave1 = _unmatch(acceptance, "brave1")
+    acceptance.run(C1, C1)
+    [proposal] = acceptance.proposals(kind="create_entity")
+    with acceptance.db.session() as session:
+        if decision == "accepted":
+            result = accept_proposal(
+                session,
+                proposal["id"],
+                values={"in_paper_scope": False, "scope_note": "Example scope note"},
+            )
+        else:
+            result = accept_proposal(session, proposal["id"], match_id=brave1)
+    assert result.result_id is not None
+    assert acceptance.observations(C1)["entry:brave1"]["subject_id"] == result.result_id
+
+    second = acceptance.run(C1, C1)
+    _assert_run_completed(acceptance, second)
+    assert acceptance.observations(C1)["entry:brave1"]["subject_id"] == result.result_id
+    before = acceptance.state()
+    third = acceptance.run(C1, C1)
+    _assert_run_completed(acceptance, third)
+    assert acceptance.state() == before
+
+
+def test_an_entry_of_a_deleted_project_stays_blocked_in_every_run(
+    acceptance: Acceptance,
+) -> None:
+    project_id = _project(acceptance, "european-integration").id
+    with acceptance.db.session() as session:
+        soft_delete(session, "project", project_id, Actor.ui(), note="Example deletion")
+    first = acceptance.run(C1, C1)
+    _assert_run_completed(acceptance, first)
+    before = acceptance.state()
+    for _ in range(2):
+        run_id = acceptance.run(C1, C1)
+        _assert_run_completed(acceptance, run_id)
+        assert acceptance.state() == before
+        deleted = [
+            details
+            for details in _message_details(acceptance, run_id, "subject_deleted")
+            if details.get("key") == "entry:yevrointegraciya"
+        ]
+        assert len(deleted) == 1
+    entry = acceptance.observations(C1)["entry:yevrointegraciya"]
+    assert entry["subject_id"] is None
+    assert acceptance.proposals(kind="create_entity") == []
+
+
+def _renamed_copy(target: Path, old: str, new: str) -> Path:
+    """A copy of the C1 fixtures in which the site renamed the entry slug ``old`` to
+    ``new`` (rubric included): the listing and the detail page carry the new slug, and the
+    detail page is served under its new URL."""
+    source = FIXTURES / C1
+    target.mkdir()
+    for meta_path in sorted(source.glob("*.meta.json")):
+        meta = json.loads(meta_path.read_text("utf-8"))
+        body = (source / meta["body"]).read_bytes()
+        if meta["fixture"] in ("projects_page1", "project_brave1_technologies"):
+            renamed = body.replace(f'\\"{old}\\"'.encode(), f'\\"{new}\\"'.encode())
+            assert renamed != body
+            body = renamed
+        if meta["fixture"] == "project_brave1_technologies":
+            url = f"https://thedigital.gov.ua/projects/{new}"
+            meta = {**meta, "url": url, "final_url": url}
+        (target / meta["body"]).write_bytes(body)
+        (target / meta_path.name).write_text(json.dumps(meta), "utf-8")
+    return target
+
+
+def test_a_renamed_entry_is_followed_by_its_uuid(acceptance: Acceptance, tmp_path: Path) -> None:
+    acceptance.run(C1, C1)
+    brave1 = _project(acceptance, "brave1")
+    assert acceptance.observations(C1)["entry:brave1"]["subject_id"] == brave1.id
+    directory = _renamed_copy(
+        tmp_path / "renamed", "technologies/brave1", "technologies/brave1-example-renamed"
+    )
+    # Two complete runs without the old key would propose a lost project as discontinued.
+    for _ in range(3):
+        run_id = acceptance.run(C1, str(directory))
+        _assert_run_completed(acceptance, run_id)
+    observations = acceptance.observations(C1)
+    renamed = observations["entry:brave1-example-renamed"]
+    assert renamed["subject_id"] == brave1.id
+    assert _bound_by(acceptance, "entry:brave1-example-renamed") == "auto"
+    assert renamed["external_id"] == observations["entry:brave1"]["external_id"]
+    assert observations["entry:brave1"]["present"] is False
+    assert acceptance.proposals(kind="create_entity") == []
+    assert acceptance.proposals(kind="possibly_discontinued") == []
+    # The project's seed-locked ministry URLs gain the new URL only through a proposal.
+    [urls] = acceptance.proposals(kind="update_field", field="ministry_urls")
+    assert urls["subject_id"] == brave1.id
+    assert urls["proposed_value"] == [
+        "https://thedigital.gov.ua/projects/technologies/brave1-example-renamed"
+    ]
+
+
+def test_a_failed_project_page_keeps_its_page_key_seen(
+    acceptance: Acceptance, tmp_path: Path
+) -> None:
+    # DATA_MODEL §15.7: keys come from listings, so a failed detail page cannot hide a key.
+    acceptance.run(C1, C1)
+    entry = acceptance.observations(C1)["entry:brave1"]
+    page_key = f"page:{entry['external_id']}"
+    directory = tmp_path / "no-brave1-page"
+    directory.mkdir()
+    for meta_path in sorted((FIXTURES / C1).glob("*.meta.json")):
+        meta = json.loads(meta_path.read_text("utf-8"))
+        if meta["fixture"] != "project_brave1_technologies":
+            (directory / meta_path.name).write_bytes(meta_path.read_bytes())
+            (directory / meta["body"]).write_bytes((FIXTURES / C1 / meta["body"]).read_bytes())
+    second = acceptance.run(C1, str(directory))
+    row = acceptance.run_row(second)
+    assert row["complete_listing"] and row["stats"]["observations_missing"] == 0
+    page = acceptance.observations(C1)[page_key]
+    assert (page["present"], page["last_seen_run"]) == (True, second)
 
 
 def test_a_run_with_a_limit_reads_only_the_first_entries(acceptance: Acceptance) -> None:

@@ -127,6 +127,49 @@ def test_serve_refuses_to_start_without_a_database(
     assert not (environment / "app.db").exists()
 
 
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("runs",),
+        ("runs", "show", "run_01JBX3RXNNNNG0000000000000"),
+        ("collect", "tagger"),
+        ("check",),
+        ("check", "--deep"),
+        ("recompute",),
+        ("reindex",),
+        ("seed",),
+        ("import", "IMPORT_FILE", "--type", "project", "--dry-run"),
+    ],
+    ids=lambda args: "-".join(args),
+)
+def test_commands_refuse_a_missing_database_without_creating_it(
+    environment: Path, tmp_path: Path, args: tuple[str, ...]
+) -> None:
+    upload = tmp_path / "projects.csv"
+    upload.write_text("slug,name_en\nexample-a,Example\n", encoding="utf-8")
+    result = invoke(*(str(upload) if arg == "IMPORT_FILE" else arg for arg in args))
+    assert result.exit_code == 1
+    assert "error: database" in result.output and "does not exist" in result.output
+    assert "run `mdt db upgrade` and `mdt seed` first" in result.output
+    assert "Traceback" not in result.output and "SQL" not in result.output
+    assert not (environment / "app.db").exists()
+    assert not list((environment / "raw").rglob("*.gz"))  # no orphan upload either
+    # So `mdt serve` still gives the full advice afterwards.
+    served = invoke("serve")
+    assert served.exit_code == 1 and "`mdt seed` first" in served.output
+
+
+def test_a_database_without_schema_names_both_commands(environment: Path) -> None:
+    environment.mkdir(parents=True, exist_ok=True)
+    (environment / "app.db").touch()
+    result = invoke("runs")
+    assert result.exit_code == 1
+    assert "schema is at no revision" in result.output
+    assert "run `mdt db upgrade` and `mdt seed`" in result.output
+    assert invoke("db", "upgrade").exit_code == 0
+    assert invoke("runs").exit_code == 0
+
+
 def test_health_check_lines_are_dropped_from_the_access_log() -> None:
     health = cli.HealthCheckFilter()
 

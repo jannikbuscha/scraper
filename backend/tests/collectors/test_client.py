@@ -18,6 +18,7 @@ from mdt.collectors.client import (
     user_agent,
 )
 from mdt.collectors.fetchlog import MemorySink
+from mdt.collectors.throttle import HostThrottle
 from tests.collectors.conftest import (
     TEST_UA,
     FakeClock,
@@ -576,3 +577,233 @@ def test_fetch_result_reasons() -> None:
     assert reason(outcome="refused", refusal="no_fixture") == "http_error"
     assert reason(outcome="http_error") == "http_error"
     assert FetchResult(url="x", outcome="not_modified").ok
+
+
+# --------------------------------------------------------------------------------------
+# Retry-After holds for the host (§4.3, §4.6)
+# --------------------------------------------------------------------------------------
+
+
+class Timed(Site):
+    """A site that records the fake time of every request."""
+
+    def __init__(self, routes: dict[str, object], clock: FakeClock) -> None:
+        super().__init__(routes, clock=clock)
+        self.times: list[tuple[str, float]] = []
+
+    def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        assert self.clock is not None
+        self.times.append((str(request.url), self.clock.now))
+        return super().__call__(request)
+
+
+def test_a_retry_after_on_the_last_attempt_delays_the_next_request_to_the_host(
+    clock: FakeClock,
+) -> None:
+    busy = httpx2.Response(503, headers={"Retry-After": "120"}, text="busy")
+    site = Timed({"https://a.example.org/x": busy, "https://a.example.org/y": "y"}, clock)
+    client = make_client(site, clock=clock, listing_host=None)
+    assert client.get("https://a.example.org/x").outcome == "http_error"
+    last_x = max(at for url, at in site.times if url.endswith("/x"))
+    assert client.get("https://a.example.org/y").ok
+    [(_, at_y)] = [(url, at) for url, at in site.times if url.endswith("/y")]
+    assert at_y - last_x >= 120.0
+    # Another host is not affected.
+    site.routes["https://b.example.org/z"] = "z"
+    before = clock.now
+    assert client.get("https://b.example.org/z").ok
+    assert clock.now - before < 5.0
+
+
+@pytest.mark.parametrize("retries", [0, 2])
+def test_a_retry_after_above_max_wait_on_the_last_attempt_throttles_the_host(
+    clock: FakeClock, retries: int
+) -> None:
+    final = httpx2.Response(503, headers={"Retry-After": "3600"}, text="busy")
+    answers: list[object] = [503] * retries + [final]
+    site = Site({"https://a.example.org/x": answers, "https://a.example.org/y": "y"})
+    sink = MemorySink()
+    client = make_client(
+        site, sink=sink, clock=clock, listing_host=None, config=make_config(retries=retries)
+    )
+    result = client.get("https://a.example.org/x")
+    assert result.outcome == "http_error" and result.throttled and result.reason == "throttled"
+    assert 3600.0 not in clock.sleeps
+    assert "throttled" in [code for _, code, _ in sink.messages]
+    assert client.get("https://a.example.org/y").refusal == "throttled"
+    assert "https://a.example.org/y" not in site.urls()
+
+
+def test_every_client_of_the_process_honours_a_retry_after(clock: FakeClock) -> None:
+    throttle = HostThrottle()
+    busy = httpx2.Response(429, headers={"Retry-After": "90"}, text="slow down")
+    site = Timed({"https://a.example.org/x": busy, "https://a.example.org/m": "m"}, clock)
+    run = make_client(site, clock=clock, listing_host=None, config=make_config(retries=0))
+    run.throttle = throttle
+    manual = make_client(site, clock=clock, listing_host=None)
+    manual.throttle = throttle
+    assert run.get("https://a.example.org/x").status == 429
+    answered = clock.now
+    assert manual.get("https://a.example.org/m").ok
+    [(_, at_m)] = [(url, at) for url, at in site.times if url.endswith("/m")]
+    assert at_m - answered >= 90.0 - 1e-6
+    # A wait above max_wait_s is not started by the other client either: throttled.
+    site.routes["https://a.example.org/x"] = httpx2.Response(503, headers={"Retry-After": "3600"})
+    site.routes["https://a.example.org/n"] = "n"
+    run.get("https://a.example.org/x")
+    other = make_client(site, clock=clock, listing_host=None)
+    other.throttle = throttle
+    result = other.get("https://a.example.org/n")
+    assert result.outcome == "refused" and result.refusal == "throttled"
+    assert result.reason == "throttled" and "https://a.example.org/n" not in site.urls()
+
+
+# --------------------------------------------------------------------------------------
+# Challenges with a retryable status, Radware, undecodable bodies (§4.6, §4.7)
+# --------------------------------------------------------------------------------------
+
+CHALLENGE = b"<html><head><title>Just a moment...</title></head><body></body></html>"
+
+
+def test_a_challenge_on_robots_with_status_503_blocks_without_retry(clock: FakeClock) -> None:
+    page = httpx2.Response(503, content=CHALLENGE)
+    site = Site({"https://a.example.org/robots.txt": page})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, clock=clock, listing_host=None)
+    assert client.get("https://a.example.org/page").refusal == "blocked"
+    assert site.urls() == ["https://a.example.org/robots.txt"]
+    assert clock.sleeps == []
+    assert [entry.outcome for entry in sink.fetches if entry.purpose == "robots"] == ["blocked"]
+
+
+@pytest.mark.parametrize(
+    ("headers", "body"),
+    [({}, CHALLENGE), ({"cf-mitigated": "challenge"}, b"")],
+    ids=["just-a-moment", "cf-mitigated"],
+)
+def test_a_challenge_with_status_503_is_requested_once(
+    clock: FakeClock, headers: dict[str, str], body: bytes
+) -> None:
+    site = Site({"https://a.example.org/x": httpx2.Response(503, headers=headers, content=body)})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, clock=clock, listing_host=None)
+    result = client.get("https://a.example.org/x")
+    assert result.outcome == "blocked"
+    assert site.urls().count("https://a.example.org/x") == 1
+    assert client.get("https://a.example.org/y").refusal == "blocked"
+
+
+RADWARE_CAPTCHA = "https://validate.perfdrive.com/example/captcha?ssa=example&ssc=example"
+
+
+def test_radware_signatures() -> None:
+    redirect = {"location": RADWARE_CAPTCHA}
+    assert "perfdrive.com" in (block_signature(302, redirect, None) or "")
+    page = b"<html><head><title>Radware Bot Manager Captcha</title></head></html>"
+    assert "radware" in (block_signature(200, {}, page) or "")
+    # Every normal page of the site configures the challenge host in a script: no block.
+    normal = b'<script>ssConf("cu", "validate.perfdrive.com, ssc");</script><title>News</title>'
+    assert block_signature(200, {}, normal) is None
+    assert block_signature(302, {"location": "https://www.example.org/news/x"}, None) is None
+
+
+def test_a_redirect_to_the_radware_captcha_blocks_the_host_without_following() -> None:
+    captcha = httpx2.Response(302, headers={"Location": RADWARE_CAPTCHA})
+    site = Site({"https://www.example.org/news/a": captcha, "https://www.example.org/news/b": "b"})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, listing_host=None)
+    result = client.get("https://www.example.org/news/a")
+    assert result.outcome == "blocked" and result.status == 302
+    assert "perfdrive.com" in (result.signature or "")
+    assert not any("perfdrive.com" in url for url in site.urls())  # robots.txt included
+    assert client.get("https://www.example.org/news/b").refusal == "blocked"
+    [blocked] = [message for message in sink.messages if message[1] == "blocked"]
+    assert "www.example.org" in blocked[2]
+
+
+def test_a_radware_challenge_on_the_listing_host_fails_the_run() -> None:
+    captcha = httpx2.Response(302, headers={"Location": RADWARE_CAPTCHA})
+    site = Site({"https://www.example.org/sitemap.xml": captcha})
+    client = make_client(site)
+    with pytest.raises(ListingHostUnavailable, match=r"www\.example\.org: blocked"):
+        client.get("https://www.example.org/sitemap.xml")
+    assert not any("perfdrive.com" in url for url in site.urls())
+
+
+def test_a_robots_redirect_to_the_radware_captcha_blocks_the_host() -> None:
+    captcha = httpx2.Response(302, headers={"Location": RADWARE_CAPTCHA})
+    site = Site({"https://www.example.org/robots.txt": captcha})
+    client = make_client(site, listing_host=None)
+    assert client.get("https://www.example.org/news/a").refusal == "blocked"
+    assert site.urls() == ["https://www.example.org/robots.txt"]
+
+
+def test_an_undecodable_body_is_an_http_error_without_retry(clock: FakeClock) -> None:
+    def broken(request: httpx2.Request) -> httpx2.Response:
+        body = iter([b"not gzip at all"])  # decoded only when the client reads it
+        return httpx2.Response(200, headers={"Content-Encoding": "gzip"}, content=body)
+
+    site = Site({"https://a.example.org/x": broken})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, clock=clock, listing_host=None)
+    result = client.get("https://a.example.org/x")
+    assert (result.outcome, result.status) == ("http_error", 200)
+    assert "DecodingError" in (result.error or "")
+    assert site.urls().count("https://a.example.org/x") == 1
+    rows = [entry for entry in sink.fetches if entry.purpose == "content"]
+    assert [(entry.outcome, entry.status) for entry in rows] == [("http_error", 200)]
+    assert [code for _, code, _ in sink.messages] == ["http_error"]
+
+
+# --------------------------------------------------------------------------------------
+# Dot segments (§4.1, §4.2): the URL checked is the URL sent
+# --------------------------------------------------------------------------------------
+
+
+def test_dot_segments_cannot_bypass_robots_or_the_trap_rule() -> None:
+    rules = httpx2.Response(200, text="User-agent: *\nDisallow: /private\n")
+    hop = httpx2.Response(302, headers={"Location": "https://a.example.org/public/../private/y"})
+    site = Site({"https://a.example.org/robots.txt": rules, "https://a.example.org/go": hop})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, listing_host=None)
+    for url in (
+        "https://a.example.org/public/../private/x",
+        "https://a.example.org/public/%2e%2e/private/x",
+        "https://a.example.org/go",
+    ):
+        assert client.get(url).outcome == "robots_disallowed"
+    assert client.get("https://a.example.org/x/../cdn-cgi/l/email-protection").refusal == "trap"
+    assert not any("private" in url or "cdn-cgi" in url for url in site.urls())
+    logged = [entry.url for entry in sink.fetches]
+    assert "https://a.example.org/private/x" in logged
+    assert "https://a.example.org/private/y" in logged
+    assert "https://a.example.org/cdn-cgi/l/email-protection" in logged
+    assert not any("/../" in url for url in logged)
+
+
+def test_a_dotted_url_is_requested_and_recorded_without_dot_segments() -> None:
+    site = Site({"https://a.example.org/b/page": "page"})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, listing_host=None)
+    result = client.get("https://a.example.org/a/./../b/page")
+    assert result.ok and result.url == result.final_url == "https://a.example.org/b/page"
+    assert [str(request.url.raw_path, "ascii") for request in site.requests][-1] == "/b/page"
+    assert sink.fetches[-1].url == "https://a.example.org/b/page"
+
+
+@pytest.mark.parametrize(
+    "error", [httpx2.LocalProtocolError, httpx2.UnsupportedProtocol, httpx2.DecodingError]
+)
+def test_errors_that_a_retry_cannot_change_are_not_retried(
+    clock: FakeClock, error: type[httpx2.RequestError]
+) -> None:
+    def failing(request: httpx2.Request) -> httpx2.Response:
+        raise error("example failure", request=request)
+
+    site = Site({"https://a.example.org/x": failing})
+    sink = MemorySink()
+    client = make_client(site, sink=sink, clock=clock, listing_host=None)
+    result = client.get("https://a.example.org/x")
+    assert result.outcome == "http_error" and error.__name__ in (result.error or "")
+    assert site.urls().count("https://a.example.org/x") == 1
+    assert [code for _, code, _ in sink.messages] == ["http_error"]

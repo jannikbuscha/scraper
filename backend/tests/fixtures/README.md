@@ -41,7 +41,7 @@ Each fixture is a body file `<name>.<ext>` (HTML, XML, JSON, text or PDF) plus `
 | `capture` | how and by which Phase 0b explorer the response was fetched |
 | `synthetic` | only in synthetic fixtures: `true` (see "Synthetic fixtures" below) |
 
-`backend/tests/test_fixtures.py` checks the format: every body has a meta file with these keys, the stored SHA-256 matches, `trimmed` is a boolean, untrimmed bodies equal the original capture, no body is larger than 1 MiB, no meta file carries a User-Agent field or a `mailto:` address, no body echoes the fetcher's User-Agent or contains the kmu.gov.ua bot-manager token, and, where `CONTACT_EMAIL` is configured locally (not in CI), no fixture contains that address. It also enforces the rules of the synthetic fixtures below.
+`backend/tests/test_fixtures.py` checks the format: every body has a meta file with these keys, the stored SHA-256 matches, `trimmed` is a boolean, untrimmed bodies equal the original capture, no body is larger than 1 MiB, no meta file carries a User-Agent field or a `mailto:` address, no body echoes the fetcher's User-Agent or contains the kmu.gov.ua bot-manager token, and, where `CONTACT_EMAIL` is configured locally (not in CI), no fixture contains that address; gzip bodies (`.gz`) are checked decompressed, the size limit included. It also enforces the rules of the synthetic fixtures below.
 
 ## How the fixtures were captured
 
@@ -71,7 +71,9 @@ The real C5 fixtures come from `mdt fixtures capture wayback` on the target serv
 
 ## Adding or refreshing fixtures
 
-Phase 2 adds `mdt fixtures capture <source>` (`PLAN.md` §5.7), which fetches a fixed URL list through the polite client and writes the same body and meta format. Until then, add a fixture by hand only from a capture with known URL, time and SHA-256, keep the format above, and run `uv run pytest -q tests/test_fixtures.py` in `backend/`. Captures still missing are listed in `docs/SOURCES.md` (Phase 0b results, "from the target server").
+`mdt fixtures capture <collector>` (`docs/COLLECTORS.md` §11) fetches the URL list of the collector's `fixtures` entry in `sources.yaml` (in Phase 2 only `wayback` has one) through the polite client (robots.txt, throttling, the User-Agent with `CONTACT_EMAIL`, which must be set) and writes the body and meta format above, with `capture` = "mdt fixtures capture <collector> (app <version>), <UTC time>", to `backend/tests/fixtures/<collector>/` in a source checkout, else to `DATA_DIR/fixtures/<collector>/` (`--out` chooses another directory). It writes whole bodies, so a list names only openly licensed pages or technical responses without creative content (robots.txt, CDX JSON, sitemaps); it refuses bodies above 1 MiB and bodies that contain the contact address, the User-Agent product token, any e-mail address or the kmu.gov.ua bot-manager token (a gzip body is checked decompressed), and it keeps existing files unless `--force`. **On the target server:** `docker compose run --rm app mdt fixtures capture wayback` writes to `./data/fixtures/wayback/` on the host; copy that folder to `backend/tests/fixtures/wayback/` in a checkout, run `uv run pytest -q tests/test_fixtures.py` and the C5 parser tests in `backend/`, update the fixture list below, and commit (a push needs the data lead's approval).
+
+Excerpts (pages that are not openly licensed or that carry client tokens) are made by hand, only from a capture with known URL, time and SHA-256, in the format above; then run `uv run pytest -q tests/test_fixtures.py` in `backend/`. Captures still missing are listed in `docs/SOURCES.md` (Phase 0b results, "from the target server", and §5).
 
 ## Fixture list
 

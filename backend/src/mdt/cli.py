@@ -21,6 +21,8 @@ import httpx2
 import typer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+from typer._click.exceptions import UsageError  # the Click copy Typer runs on
+from typer.core import TyperCommand
 
 from mdt.collectors.errors import CollectorUnavailableError, RunInProgressError
 from mdt.collectors.fixtures import capture_fixtures, default_out_dir
@@ -41,7 +43,7 @@ from mdt.collectors.store import SnapshotStore
 from mdt.config import BACKEND_DIR, Settings, contact_email_problem, get_settings
 from mdt.db.ddl import RAW_SNAPSHOT_TRIGGER_NAMES, existing_raw_snapshot_triggers
 from mdt.db.engine import create_db_engine
-from mdt.db.migrate import upgrade_database
+from mdt.db.migrate import database_problem, upgrade_database
 from mdt.db.models import Project, RunMessage
 from mdt.db.selfcheck import SelfCheckError, check_sqlite
 from mdt.db.session import create_session_factory, read_transaction, write_transaction
@@ -83,6 +85,16 @@ def _setup(settings: Settings) -> None:
     settings.ensure_data_dirs()
 
 
+def _require_database(settings: Settings) -> None:
+    """Commands that read or write data need the database at the current schema; otherwise
+    an ``error:`` line and exit 1 before anything opens the database file (which would
+    create an empty one), as ``mdt serve`` does."""
+    problem = database_problem(settings.sqlalchemy_url)
+    if problem is not None:
+        typer.echo(f"error: {problem}", err=True)
+        raise typer.Exit(1)
+
+
 @contextmanager
 def _session(settings: Settings) -> Iterator[Session]:
     """A session on the configured database; codebook and seed file errors end the
@@ -119,6 +131,7 @@ def seed(
     """Load vocabularies and seed data (idempotent; never overwrites human edits)."""
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session:
         report = run_seed(session, settings, dry_run=dry_run)
     for line in report.lines():
@@ -132,6 +145,7 @@ def recompute() -> None:
     """Recompute all derived values."""
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session, write_transaction(session):
         written = derived.recompute_all(session, utc_now(), settings)
     typer.echo(f"derived rows updated: {written}")
@@ -146,6 +160,7 @@ def check(
     """Report integrity problems (changes nothing); exits non-zero if any are found."""
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session:
         report = run_check(session, settings)
         problems = report.problems + _acquisition_problems(session, settings, deep=deep)
@@ -185,6 +200,7 @@ def reindex() -> None:
     """Rebuild both full-text search tables (in batches; the app stays usable)."""
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session:
         count = fts.reindex_all(session)
     typer.echo(f"records indexed: {count}")
@@ -285,13 +301,31 @@ def _refused(message: str) -> typer.Exit:
     return typer.Exit(1)
 
 
-@app.command()
+class _RefusedUsage(UsageError):
+    """A usage error of ``mdt collect``: exit 1, because 2 means a partial run."""
+
+    exit_code = 1
+
+
+class _UsageErrorExitsOne(TyperCommand):
+    """``mdt collect`` exits 2 only for a ``partial`` run (docs/COLLECTORS.md §6.2, §11), so
+    its usage errors (a missing name, an unknown option, a value that is no number) exit 1
+    like every other refused start, instead of Click's 2."""
+
+    def parse_args(self, ctx: Any, args: list[str]) -> list[str]:
+        try:
+            return super().parse_args(ctx, args)
+        except UsageError as exc:
+            raise _RefusedUsage(exc.format_message(), exc.ctx) from exc
+
+
+@app.command(cls=_UsageErrorExitsOne)
 def collect(
     name: str = typer.Argument(..., help="Collector name (a key of sources.yaml)."),
     mode: str = typer.Option("incremental", "--mode", help="incremental or full."),
-    limit: int | None = typer.Option(None, "--limit", min=1, help="Stop after N items."),
+    limit: int | None = typer.Option(None, "--limit", help="Stop after N items (N >= 1)."),
     refetch: bool = typer.Option(False, "--refetch", help="Fetch known articles again."),
-    recall_sample: int | None = typer.Option(None, "--recall-sample", min=0),
+    recall_sample: int | None = typer.Option(None, "--recall-sample", help="N >= 0 (kmu_news)."),
     recall_seed: int | None = typer.Option(None, "--recall-seed"),
     document: list[str] | None = typer.Option(
         None, "--document", help="Document ID for the tagger (repeatable)."
@@ -299,11 +333,13 @@ def collect(
 ) -> None:
     """Run a collector (or the tagger) in the foreground; Ctrl-C cancels it.
 
-    Exits 0 (succeeded), 2 (partial) or 1 (failed, cancelled or refused).
+    Exits 0 (succeeded), 2 (partial) or 1 (failed, cancelled or refused, invalid
+    parameters included).
     """
     settings = get_settings()
     _setup(settings)
     _sources(settings)
+    _require_database(settings)
     params: dict[str, Any] = {}
     for key, value in (
         ("limit", limit),
@@ -414,6 +450,7 @@ def runs(
         return
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session:
         items, total = list_runs(
             session,
@@ -442,6 +479,7 @@ def runs_show(run_id: str = typer.Argument(..., help="The run's ID.")) -> None:
     """Show one run with its stats and messages."""
     settings = get_settings()
     _setup(settings)
+    _require_database(settings)
     with _session(settings) as session:
         try:
             run = run_detail(session, settings, run_id)
@@ -532,7 +570,12 @@ def sources_check(
 
 
 def _official_urls(settings: Settings) -> list[str]:
-    """The ``official_urls`` of the live projects (read only; none without a database)."""
+    """The ``official_urls`` of the live projects (read only; none without a database,
+    which is not created either)."""
+    problem = database_problem(settings.sqlalchemy_url)
+    if problem is not None:
+        log.warning("the official URLs of the projects are not checked: %s", problem)
+        return []
     try:
         with _session(settings) as session, read_transaction(session):
             rows = session.scalars(
@@ -599,6 +642,7 @@ def import_file(
     if not file.is_file() or file.stat().st_size == 0:
         typer.echo(f"error: {file} is not a non-empty file", err=True)
         raise typer.Exit(1)
+    _require_database(settings)
     with _session(settings) as session:
         try:
             with file.open("rb") as handle:

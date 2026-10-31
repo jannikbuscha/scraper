@@ -5,8 +5,10 @@
 Nothing is recorded in the database. Bodies are written whole, so a list may name only
 openly licensed pages or technical responses (robots.txt, CDX JSON, sitemaps); a body above
 1 MiB, or one that contains the contact address, the User-Agent product token, any e-mail
-address or the kmu.gov.ua bot-manager token, is refused ("capture an excerpt by hand").
-The meta file never carries the User-Agent or the contact address.
+address or the kmu.gov.ua bot-manager token, is refused ("capture an excerpt by hand"). A
+gzip body (a CDX answer without ``Content-Encoding``, written as ``.gz``) is checked
+decompressed, the size limit included. The meta file never carries the User-Agent or the
+contact address.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import zlib
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +34,7 @@ from mdt.config import REPO_ROOT, Settings
 from mdt.domain.clock import utc_now
 
 MAX_FIXTURE_BYTES = 1 << 20
+GZIP_MAGIC = b"\x1f\x8b"
 _EMAIL_RE = re.compile(rb"[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}")
 _BOT_TOKEN = b"__uzdbm"
 _EXTENSIONS = {
@@ -79,8 +83,36 @@ def extension_for(content_type: str | None, body: bytes) -> str:
     return extension
 
 
+def gunzip_bounded(body: bytes, limit: int) -> bytes:
+    """The decompressed content of a gzip body (every member), at most ``limit + 1`` bytes
+    of it, which is enough to tell that it exceeds ``limit``. Raises ``ValueError`` for a
+    corrupt or truncated body."""
+    output = b""
+    data = body
+    while data:
+        decompressor = zlib.decompressobj(wbits=31)
+        try:
+            output += decompressor.decompress(data, limit + 1 - len(output))
+        except zlib.error as exc:
+            raise ValueError("the gzip body cannot be decompressed") from exc
+        if len(output) > limit:
+            return output
+        if not decompressor.eof:
+            raise ValueError("the gzip body is truncated")
+        data = decompressor.unused_data
+    return output
+
+
 def refusal(body: bytes, contact_email: str | None) -> str | None:
-    """Why a body cannot be written whole, or None."""
+    """Why a body cannot be written whole, or None. A gzip body is checked decompressed:
+    its compressed bytes would hide every match."""
+    if body.startswith(GZIP_MAGIC):
+        try:
+            body = gunzip_bounded(body, MAX_FIXTURE_BYTES)
+        except ValueError as exc:
+            return str(exc)
+        if len(body) > MAX_FIXTURE_BYTES:
+            return "the decompressed body has more than 1 MiB"
     if len(body) > MAX_FIXTURE_BYTES:
         return f"the body has {len(body)} bytes, more than 1 MiB"
     lowered = body.lower()

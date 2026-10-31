@@ -15,13 +15,10 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.telemetry import TelemetryConfig
-from sqlalchemy import Engine, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.exc import OperationalError
+from sqlalchemy import Engine
 
 from mdt import __version__
 from mdt.api import (
@@ -46,7 +43,7 @@ from mdt.collectors.runs import RunLauncher, recover_stale_runs
 from mdt.collectors.sources import SourcesError, load_sources
 from mdt.config import Settings, get_settings
 from mdt.db.engine import create_db_engine
-from mdt.db.migrate import head_revision
+from mdt.db.migrate import database_problem
 from mdt.db.selfcheck import SelfCheckError, check_sqlite
 from mdt.db.session import create_session_factory
 from mdt.domain.vocab import CodebookError, load_parameters
@@ -66,29 +63,9 @@ class StartupError(RuntimeError):
 
 
 def _check_database(settings: Settings, engine: Engine) -> None:
-    url = make_url(settings.sqlalchemy_url)
-    database = url.database
-    if (
-        url.get_backend_name() == "sqlite"
-        and database
-        and database != ":memory:"
-        and not database.startswith("file:")
-        and not Path(database).is_file()
-    ):
-        raise StartupError(
-            f"database {database} does not exist; run `mdt db upgrade` and `mdt seed` first"
-        )
-    try:
-        with engine.connect() as connection:
-            current = connection.execute(text("SELECT version_num FROM alembic_version")).scalar()
-    except OperationalError:
-        current = None
-    head = head_revision()
-    if current != head:
-        raise StartupError(
-            f"the database schema is at {current or 'no revision'}, this version needs "
-            f"{head}; run `mdt db upgrade`"
-        )
+    problem = database_problem(settings.sqlalchemy_url, engine)
+    if problem is not None:
+        raise StartupError(problem)
 
 
 def preflight(settings: Settings, engine: Engine | None = None) -> None:

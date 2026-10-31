@@ -443,6 +443,80 @@ def test_a_scope_change_takes_the_imported_note_along(db: Db) -> None:
     assert _project(db, project.entity_id)["in_paper_scope"] == 1
 
 
+def _person_kept_note(db: Db, project_id: str, kind: str) -> None:
+    """A person's scope note on ``project_id``: set by hand, field-verified, or restored."""
+    with db.session() as session:
+        if kind == "restored":
+            before = int(_project(db, project_id)["version"])
+            apply_change(session, "project", project_id, {"scope_note": "Interim"}, Actor.ui())
+            restore_version(
+                session, "project", project_id, before, Actor.restore(), fields=["scope_note"]
+            )
+            return
+        apply_change(
+            session, "project", project_id, {"scope_note": "Example note set by hand"}, Actor.ui()
+        )
+        if kind == "verified":
+            evidence = apply_change(
+                session,
+                "evidence",
+                None,
+                {
+                    "subject_id": project_id,
+                    "target": "field:scope_note",
+                    "url": "https://example.org/source",
+                    "quote": "Example note set by hand",
+                },
+                Actor.ui(),
+            )
+            set_field_verification(
+                session,
+                "project",
+                project_id,
+                "scope_note",
+                "verified",
+                Actor.ui(),
+                evidence_id=evidence.entity_id,
+            )
+
+
+@pytest.mark.parametrize("kind", ["manual", "verified", "restored"])
+def test_a_scope_change_never_takes_a_conflicting_note_along(db: Db, kind: str) -> None:
+    # The project and its scope come from an import; only the scope note is the person's.
+    mapping = {"slug": "slug", "name": "name_en", "scope_flag": "in_paper_scope"}
+    mapping["scope"] = "scope_note"
+    first = _upload(
+        db, _csv("slug,name,scope_flag,scope", "example-r,Example,false,Import note A"), "a.csv"
+    )
+    project_id = _run(db, first, entity_type="project", mapping=mapping, key_field="slug")
+    project_id = project_id.plan.rows[0].id or ""
+    _person_kept_note(db, project_id, kind)
+    kept = _project(db, project_id)
+    second = _upload(db, _csv("slug,scope_flag,scope", "example-r,true,Import note B"), "b.csv")
+    request: dict[str, Any] = {
+        "entity_type": "project",
+        "mapping": {"slug": "slug", "scope_flag": "in_paper_scope", "scope": "scope_note"},
+        "key_field": "slug",
+    }
+    planned = _dry(db, second, **request).rows[0]
+    result = _run(db, second, **request)
+    for row in (planned, result.plan.rows[0]):
+        assert row.action == "update", row.errors
+        assert row.changes == {"in_paper_scope": [False, True]}
+        assert row.conflicts == [
+            {
+                "field": "scope_note",
+                "current": kept["scope_note"],
+                "new": "Import note B",
+                "reason": kind,
+            }
+        ]
+    after = _project(db, project_id)
+    assert after["in_paper_scope"] == 1
+    assert after["scope_note"] == kept["scope_note"]  # what the dry run and result report
+    assert after["field_meta"]["scope_note"] == kept["field_meta"]["scope_note"]
+
+
 def test_a_fatal_error_is_recorded_and_earlier_rows_stay(
     db: Db, monkeypatch: pytest.MonkeyPatch
 ) -> None:

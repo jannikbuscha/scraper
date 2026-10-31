@@ -108,3 +108,45 @@ def test_406_from_the_fixture_is_unavailable_and_a_challenge_blocks() -> None:
         challenge=True,
     )
     assert challenged.state == "blocked" and "challenge" in challenged.reason
+
+
+def _rules(text: str) -> RobotsPolicy:
+    return policy_from_response(200, text.encode())
+
+
+def test_a_group_naming_our_token_with_a_version_applies_to_us() -> None:
+    # Operators copy the token from the access log, version included (RFC 9309 §2.2.1:
+    # the product token is matched case-insensitively; the version is not part of it).
+    versioned = _rules(
+        "User-agent: *\nAllow: /\nCrawl-delay: 2\n\n"
+        "User-agent: MDT-Portfolio-Research/0.1\nDisallow: /\nCrawl-delay: 30\n"
+    )
+    assert not versioned.allows("https://h.example.org/page")
+    assert versioned.crawl_delay() == 30.0
+    lower = _rules("User-agent: mdt-portfolio-research\nDisallow: /private\n")
+    assert not lower.allows("https://h.example.org/private/x")
+    assert lower.allows("https://h.example.org/public")
+    alone = _rules("User-agent: MDT-Portfolio-Research/1.0\nDisallow: /\n")  # no * group
+    assert not alone.allows("https://h.example.org/page")
+
+
+@pytest.mark.parametrize("agent", ["mdt", "MDT-Portfolio", "md", "m", "research"])
+def test_a_group_for_a_part_of_our_token_does_not_apply_to_us(agent: str) -> None:
+    permissive = _rules(
+        f"User-agent: *\nDisallow: /\nCrawl-delay: 10\n\nUser-agent: {agent}\nAllow: /\n"
+    )
+    assert not permissive.allows("https://h.example.org/page")
+    assert permissive.crawl_delay() == 10.0  # the * group's
+    strict = _rules(f"User-agent: {agent}\nDisallow: /private\n")
+    assert strict.allows("https://h.example.org/private/x")  # no group applies: allow all
+
+
+def test_groups_naming_our_token_are_merged() -> None:
+    merged = _rules(
+        "User-agent: Example-Bot\nUser-agent: MDT-Portfolio-Research\nDisallow: /a\n\n"
+        "User-agent: *\nDisallow: /\n\n"
+        "User-agent: mdt-portfolio-research/2\nDisallow: /b\n"
+    )
+    assert not merged.allows("https://h.example.org/a/x")
+    assert not merged.allows("https://h.example.org/b/x")
+    assert merged.allows("https://h.example.org/c")  # the * group does not apply

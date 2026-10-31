@@ -28,7 +28,7 @@ from mdt.collectors.wayback import UNAVAILABLE, prefix_query, url_query
 from mdt.db.models import Event, Evidence, FetchLog, RawSnapshot
 from mdt.db.session import read_transaction
 from mdt.domain.actor import Actor
-from mdt.domain.revisions import soft_delete
+from mdt.domain.revisions import apply_change, soft_delete
 from tests.collectors.acceptance import Acceptance, acceptance, acceptance_template
 from tests.collectors.conftest import FIXTURES, FakeClock, fixture_path
 from tests.collectors.wayback_helpers import TEST_PREFIX, create_subjects, use_test_sources
@@ -298,6 +298,34 @@ def test_a_deleted_event_is_not_recreated(acceptance: Acceptance, subjects: dict
     (still,) = events(acceptance, subjects["example-gamma"])
     assert still["id"] == event["id"] and still["deleted_at"] is not None
     assert archive_proposals(acceptance, subjects["example-gamma"]) == []
+
+
+@pytest.mark.parametrize("then_delete", [False, True], ids=["re-dated", "re-dated-then-deleted"])
+def test_a_corrected_event_is_not_recreated(
+    acceptance: Acceptance, subjects: dict[str, str], tmp_path: Path, then_delete: bool
+) -> None:
+    run_wayback(acceptance, PatchedReplay(DIRECTORY))
+    subject = subjects["Example service One"]
+    (event,) = events(acceptance, subject)
+    assert event["date_start"] == "2019-04-05"
+    with acceptance.db.session() as session:
+        apply_change(session, "event", event["id"], {"date": "2020-06-01"}, Actor.ui())
+        if then_delete:
+            soft_delete(session, "event", event["id"], Actor.ui(), note="Example: a placeholder")
+    before = acceptance.state()
+    run_wayback(acceptance, PatchedReplay(DIRECTORY))
+    assert acceptance.state() == before  # the same capture writes nothing
+    (still,) = events(acceptance, subject)
+    assert (still["id"], still["date_start"]) == (event["id"], "2020-06-01")
+    # An earlier capture of the same URL is only proposed: the person's correction stands.
+    variant = tmp_path / "wayback_variant"
+    shutil.copytree(DIRECTORY, variant)
+    body = variant / "synthetic_cdx_extra_columns.json"
+    body.write_text(body.read_text("utf-8").replace("20190405060708", "20170102030405"), "utf-8")
+    run_wayback(acceptance, PatchedReplay(variant))
+    assert [row["id"] for row in events(acceptance, subject)] == [event["id"]]
+    [proposal] = archive_proposals(acceptance, subject)
+    assert proposal["payload"]["event"]["date"] == "2017-01-02"
 
 
 def test_a_url_the_stored_robots_txt_disallows_is_never_queried(

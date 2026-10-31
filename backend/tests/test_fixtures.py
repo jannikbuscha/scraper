@@ -178,12 +178,38 @@ def test_meta_has_no_user_agent_and_no_mailto(path: Path) -> None:
     assert "mailto:" not in text.lower(), f"{rel(path)}: contains a mailto: address"
 
 
+def plain_bytes(data: bytes) -> bytes:
+    """A body's content: decompressed when it is gzip (a CDX answer is stored as ``.gz``),
+    because the compressed bytes would hide every match."""
+    return gzip.decompress(data) if data.startswith(GZIP_MAGIC) else data
+
+
+def client_data_problems(data: bytes) -> list[str]:
+    """Why a body file may not be committed: too large, or it carries client data."""
+    plain = plain_bytes(data)
+    problems = []
+    if max(len(data), len(plain)) > MAX_BODY_BYTES:
+        problems.append(f"{len(data)} bytes, {len(plain)} decoded (limit {MAX_BODY_BYTES})")
+    if USER_AGENT_PRODUCT.lower() in plain.lower():
+        problems.append("echoes the fetcher's User-Agent")
+    if BOT_MANAGER_TOKEN in plain:
+        problems.append("contains the kmu.gov.ua bot-manager token")
+    return problems
+
+
 @pytest.mark.parametrize("path", BODY_PARAMS)
 def test_body_is_small_and_carries_no_client_data(path: Path) -> None:
-    data = path.read_bytes()
-    assert len(data) <= MAX_BODY_BYTES, f"{rel(path)}: {len(data)} bytes (limit {MAX_BODY_BYTES})"
-    assert USER_AGENT_PRODUCT not in data, f"{rel(path)}: echoes the fetcher's User-Agent"
-    assert BOT_MANAGER_TOKEN not in data, f"{rel(path)}: contains the kmu.gov.ua bot-manager token"
+    assert client_data_problems(path.read_bytes()) == [], rel(path)
+
+
+def test_the_client_data_check_looks_into_gzip_bodies() -> None:
+    echo = b'[["original"],["https://example.org/?ua=MDT-Portfolio-Research/0.1"]]'
+    token = b"<script>var __uzdbm_2 = 'example';</script>"
+    for body, problem in ((echo, "User-Agent"), (token, "bot-manager token")):
+        for data in (body, gzip.compress(body, mtime=0)):
+            assert any(problem in text for text in client_data_problems(data))
+    big = gzip.compress(b"x" * (MAX_BODY_BYTES + 1), mtime=0)
+    assert any("decoded" in text for text in client_data_problems(big))
 
 
 def is_synthetic(meta: dict[str, Any]) -> bool:
@@ -292,5 +318,5 @@ def test_no_fixture_contains_the_configured_contact_email() -> None:
         pytest.skip("no CONTACT_EMAIL configured (the format checks above still apply)")
     needle = email.lower().encode("utf-8")
     files = [path for path in FIXTURES.rglob("*") if path.is_file()]
-    hits = [rel(path) for path in files if needle in path.read_bytes().lower()]
+    hits = [rel(path) for path in files if needle in plain_bytes(path.read_bytes()).lower()]
     assert hits == []
