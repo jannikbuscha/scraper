@@ -9,7 +9,7 @@ import type { MouseEvent } from 'react';
 import type { Run } from '../../api/acquisition-types';
 import { AnchorLink } from '../AnchorLink';
 import { Timestamp } from '../Timestamp';
-import { formatCount, formatDuration, isReplay } from './run-labels';
+import { formatCount, formatDuration, isReplay, TABLE_BADGE_MIN_WIDTH } from './run-labels';
 import { RunStatusBadge } from './RunStatusBadge';
 import classes from './runs.module.css';
 
@@ -69,7 +69,7 @@ export function RunsTable({ runs, showCollector = true }: { runs: readonly Run[]
                 <Group gap={4} wrap="nowrap">
                   <RunStatusBadge status={run.status} />
                   {isReplay(run) && (
-                    <Badge size="xs" variant="outline" color="gray" title="Answered from stored fixtures">
+                    <Badge size="xs" variant="outline" color="gray" title="Answered from stored fixtures" miw={TABLE_BADGE_MIN_WIDTH}>
                       replay
                     </Badge>
                   )}
@@ -77,7 +77,7 @@ export function RunsTable({ runs, showCollector = true }: { runs: readonly Run[]
               </Table.Td>
               <Table.Td>{run.trigger}</Table.Td>
               <Table.Td>{run.mode}</Table.Td>
-              <Table.Td>
+              <Table.Td className={classes.nowrap}>
                 {showCollector ? (
                   <Timestamp value={run.started_at} />
                 ) : (

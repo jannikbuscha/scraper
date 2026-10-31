@@ -4,11 +4,12 @@ import { EmptyState, Loader, Stack } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import { useState } from 'react';
 
+import { useLookupIds } from '../../api/lookup';
 import { useEntityList } from '../../api/queries';
 import type { EntityType, Item, Meta } from '../../api/types';
 import { useUrlSearch } from '../../hooks/useUrlSearch';
 import { canonicalQuery } from '../../lib/query-string';
-import { FeedPagination } from '../changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../changes/FeedPagination';
 import { pagingParams } from '../changes/feed-query';
 import { recordTypePlural } from '../changes/record-labels';
 import { pageTarget } from '../changes/targets';
@@ -28,6 +29,8 @@ interface TrashRowsProps {
 
 function TrashRows({ type, items, onUndelete, onUnmerge }: TrashRowsProps) {
   const info = useDeleteInfo(items);
+  // The survivors of merged records, by label (the list carries only their IDs).
+  const survivors = useLookupIds(items.flatMap((item) => (item.merged_into ? [item.merged_into] : []))).byId;
   return (
     <TrashTable
       rows={items.map((item) => ({
@@ -42,6 +45,7 @@ function TrashRows({ type, items, onUndelete, onUnmerge }: TrashRowsProps) {
         merged: item.merged_into
           ? {
               survivorId: item.merged_into,
+              survivor: survivors.get(item.merged_into),
               onUnmerge: () => {
                 onUnmerge(item);
               },
@@ -93,7 +97,11 @@ export function TrashEntityList({ type, meta }: { type: EntityType; meta: Meta }
     content = (
       <>
         <div aria-busy={list.isPlaceholderData}>
-          <TrashRows type={type} items={list.data.items} onUndelete={setTarget} onUnmerge={setUnmerging} />
+          {list.data.items.length === 0 ? (
+            <FeedPastEnd total={list.data.total} search={search} setSearch={setSearch} />
+          ) : (
+            <TrashRows type={type} items={list.data.items} onUndelete={setTarget} onUnmerge={setUnmerging} />
+          )}
         </div>
         <FeedPagination total={list.data.total} search={search} setSearch={setSearch} />
       </>

@@ -42,6 +42,13 @@ export function withParam(search: SearchRecord, key: string, value: string | nul
 export const withListParam = (search: SearchRecord, key: string, values: readonly string[]): SearchRecord =>
   withParam(search, key, values.join(','));
 
+/** Sets (or removes) a page-state parameter, e.g. an expanded row; unlike a filter it keeps the page. */
+export function withStateParam(search: SearchRecord, key: string, value: string | null): SearchRecord {
+  const next = Object.fromEntries(Object.entries(search).filter(([name]) => name !== key));
+  if (value !== null && value !== '') next[key] = value;
+  return next;
+}
+
 /** A valid local day of the URL (`since`/`until`), else null. */
 export function dayParam(search: SearchRecord, key: 'since' | 'until'): string | null {
   const value = search[key];

@@ -6,6 +6,7 @@ import { Button, Table, Text, VisuallyHidden } from '@mantine/core';
 import { IconGitMerge, IconRestore } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
+import type { LookupItem } from '../../api/types';
 import { pluralize } from '../../lib/format';
 import { EntityLink } from '../EntityLink';
 import { Timestamp } from '../Timestamp';
@@ -21,8 +22,11 @@ interface TrashRowData {
   deletedAt: string | null;
   info: DeleteInfo | undefined;
   onUndelete: () => void;
-  /** A merged record: its survivor, and Unmerge instead of Undelete. */
-  merged?: { survivorId: string; onUnmerge: () => void } | undefined;
+  /**
+   * A merged record: its survivor, labelled from the lookup as in the deleted
+   * banner (the ID until the label has loaded), and Unmerge instead of Undelete.
+   */
+  merged?: { survivorId: string; survivor: LookupItem | undefined; onUnmerge: () => void } | undefined;
 }
 
 function DeletedTogether({ info }: { info: DeleteInfo | undefined }) {
@@ -60,7 +64,13 @@ export function TrashTable({ rows }: { rows: readonly TrashRowData[] }) {
                 {row.merged && (
                   <Text span size="sm" c="dimmed">
                     {' '}
-                    · Merged into <EntityLink id={row.merged.survivorId} />
+                    · Merged into{' '}
+                    <EntityLink
+                      id={row.merged.survivorId}
+                      label={row.merged.survivor?.label}
+                      type={row.merged.survivor?.type}
+                      deleted={row.merged.survivor?.deleted}
+                    />
                   </Text>
                 )}
               </Table.Td>

@@ -1,5 +1,7 @@
 // Messages of a run (docs/UI.md §8.3): time, level, code, message, URL,
-// snapshot and record. Messages are plain text.
+// snapshot and record. Messages are plain text. Times, levels, codes and
+// snapshot links stay on one line; messages and URLs wrap (a URL at any
+// character), so a long URL never pushes the other columns aside.
 import { Badge, Table, Text } from '@mantine/core';
 import { IconAlertCircle, IconAlertTriangle, IconInfoCircle } from '@tabler/icons-react';
 
@@ -9,7 +11,7 @@ import { EntityLink } from '../EntityLink';
 import { ExternalLink } from '../ExternalLink';
 import { SnapshotLink } from '../SnapshotLink';
 import { Timestamp } from '../Timestamp';
-import { MESSAGE_LEVEL_COLORS } from './run-labels';
+import { MESSAGE_LEVEL_COLORS, TABLE_BADGE_MIN_WIDTH } from './run-labels';
 import classes from './runs.module.css';
 
 function LevelIcon({ level }: { level: MessageLevel }) {
@@ -23,11 +25,13 @@ function LevelIcon({ level }: { level: MessageLevel }) {
       <IconInfoCircle {...props} />
     );
   return (
-    <Badge size="xs" variant="light" color={MESSAGE_LEVEL_COLORS[level]} leftSection={icon}>
+    <Badge size="xs" variant="light" color={MESSAGE_LEVEL_COLORS[level]} leftSection={icon} miw={TABLE_BADGE_MIN_WIDTH}>
       {level}
     </Badge>
   );
 }
+
+const nowrap = `${classes.cell} ${classes.nowrap}`;
 
 export function RunMessagesTable({ messages, refs }: { messages: readonly RunMessage[]; refs: Refs }) {
   if (messages.length === 0) {
@@ -56,18 +60,18 @@ export function RunMessagesTable({ messages, refs }: { messages: readonly RunMes
             const ref = message.subject_id ? refs[message.subject_id] : undefined;
             return (
               <Table.Tr key={message.id}>
-                <Table.Td className={classes.cell}>
+                <Table.Td className={nowrap}>
                   <Timestamp value={message.at} />
                 </Table.Td>
-                <Table.Td className={classes.cell}>
+                <Table.Td className={nowrap}>
                   <LevelIcon level={message.level} />
                 </Table.Td>
-                <Table.Td className={classes.cell}>
+                <Table.Td className={nowrap}>
                   <code>{message.code}</code>
                 </Table.Td>
                 <Table.Td className={`${classes.cell} ${classes.message}`}>{message.message}</Table.Td>
-                <Table.Td className={classes.cell}>{message.url && <ExternalLink url={message.url} />}</Table.Td>
-                <Table.Td className={classes.cell}>
+                <Table.Td className={classes.cell}>{message.url && <ExternalLink url={message.url} wrap />}</Table.Td>
+                <Table.Td className={nowrap}>
                   {message.raw_snapshot_id && <SnapshotLink id={message.raw_snapshot_id} />}
                 </Table.Td>
                 <Table.Td className={classes.cell}>

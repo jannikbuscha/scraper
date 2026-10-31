@@ -67,7 +67,7 @@ describe('Copy link', () => {
     await user.click(await screen.findByRole('button', { name: 'Copy link' }));
     const dialog = await screen.findByRole('dialog', { name: 'Copy the link' });
     expect(within(dialog).getByRole('textbox', { name: 'Link to this record' })).toHaveValue(URL_TO_COPY);
-    await user.click(within(dialog).getByRole('button', { name: /close/i }));
+    await user.click(within(dialog).getByRole('button', { name: 'Close dialog' }));
     await waitFor(() => {
       expect(screen.queryByRole('dialog', { name: 'Copy the link' })).toBeNull();
     });

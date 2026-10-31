@@ -157,3 +157,17 @@ describe('Recent changes', () => {
     expect(requestsTo(fetchMock, '/api/revisions/11')).toHaveLength(1);
   });
 });
+
+describe('Recent changes past the end (docs/UI.md §5)', () => {
+  it('says that a page is past the end instead of "No changes match the filters"', async () => {
+    mockApi((url) => {
+      if (url.pathname === '/api/meta') return exampleMeta;
+      if (url.pathname === '/api/revisions') return { items: [], total: 2, page: 4, page_size: 50 };
+      return undefined;
+    });
+    renderRoute(RecentChangesPage, { url: '/changes?channel=ui&page=4', path: '/changes' });
+    expect(await screen.findByText('This page is past the end of the list')).toBeInTheDocument();
+    expect(screen.queryByText('No changes match the filters')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+  });
+});

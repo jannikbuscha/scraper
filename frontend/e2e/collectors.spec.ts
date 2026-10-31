@@ -3,7 +3,8 @@
 // stored fixtures of backend/tests/fixtures/ministry_projects (replay; no
 // request leaves the machine). Values that are not in the fixtures are
 // synthetic. The scenarios build on each other in the listed order: (i)
-// imports the collector values that (j) works with.
+// imports the collector values that (j) works with, and (o) and (p) use the
+// runs and collected values of the earlier scenarios.
 import type { Locator, Page } from '@playwright/test';
 
 import { expect, test, uniqueSuffix, type Api, type Item } from './fixtures';
@@ -266,15 +267,110 @@ test('(n) merge two services, then unmerge them', async ({ page, api }) => {
 
   await page.goto('/trash?type=service');
   const row = page.getByRole('row').filter({ hasText: `Synthetic service B ${suffix}` });
-  await expect(row).toContainText('Merged into');
+  // The survivor by its label, as on the merged record's page.
+  await expect(row).toContainText(`Merged into Synthetic service A ${suffix}`);
   await row.getByRole('button', { name: `Unmerge Synthetic service B ${suffix}` }).click();
   const unmerge = page.getByRole('dialog', { name: 'Unmerge' });
+  await expect(unmerge.getByRole('button', { name: 'Close dialog', exact: true })).toBeVisible();
   await unmerge.getByRole('button', { name: 'Unmerge' }).click();
-  await unmerge.getByRole('button', { name: 'Close' }).click();
+  // The footer button; the header's close button is named "Close dialog".
+  await unmerge.getByRole('button', { name: 'Close', exact: true }).click();
 
   expect((await api.item('service', merged.id)).fields.name_en).toBe(`Synthetic service B ${suffix}`);
   const restored = await api.get<{ item: Item & { deleted_at: string | null } }>(`/api/entities/service/${merged.id}`);
   expect(restored.item.deleted_at).toBeNull();
   await page.goto(`/services/${survivor.id}`);
   await expect(page.getByText(`Synthetic description A ${suffix}`)).toBeVisible();
+});
+
+/** A synthetic URL of about 250 characters without a single break opportunity. */
+const LONG_URL = `https://example.org/${'synthetic'.repeat(26)}`;
+
+/** Answers the matching API requests as the server does, with LONG_URL put in by `patch`. */
+async function withLongUrl(page: Page, matches: (url: URL) => boolean, patch: (body: unknown) => void) {
+  await page.route(matches, async (route) => {
+    const response = await route.fetch();
+    const body: unknown = await response.json();
+    patch(body);
+    await route.fulfill({ response, json: body });
+  });
+}
+
+/** The DOM members the layout check reads (the E2E code is type-checked without the DOM library). */
+interface Measured {
+  readonly scrollWidth: number;
+  readonly clientWidth: number;
+  readonly ownerDocument: { readonly documentElement: { readonly clientWidth: number } };
+  getBoundingClientRect(): { readonly right: number };
+  getClientRects(): { readonly length: number };
+  querySelectorAll(selector: string): Iterable<Measured>;
+}
+
+/** How a table fits the viewport: the right edge of its last column, cut badges and broken times. */
+async function tableLayout(table: Locator) {
+  return table.evaluate((element: Measured) => ({
+    right: Math.max(...[...element.querySelectorAll('thead th')].map((th) => th.getBoundingClientRect().right)),
+    viewport: element.ownerDocument.documentElement.clientWidth,
+    cutBadges: [...element.querySelectorAll('.mantine-Badge-label')].filter((label) => label.scrollWidth > label.clientWidth + 1).length,
+    timesOnSeveralLines: [...element.querySelectorAll('time')].filter((time) => time.getClientRects().length > 1).length,
+  }));
+}
+
+async function expectReadable(table: Locator) {
+  await expect(table.getByRole('link', { name: LONG_URL })).toBeVisible();
+  const layout = await tableLayout(table);
+  // Every column is on screen, no badge is cut to a letter and no time is broken over lines.
+  expect(layout.right).toBeLessThanOrEqual(layout.viewport);
+  expect(layout.cutBadges).toBe(0);
+  expect(layout.timesOnSeveralLines).toBe(0);
+}
+
+test('(o) a long URL keeps the run, source and detail tables readable', async ({ page, api }) => {
+  const runs = await api.get<{ items: Run[] }>(`/api/runs?collector=${COLLECTOR}&page_size=1`);
+  const run = runs.items[0];
+  if (!run) throw new Error('no run of the collector');
+  // The first entry of each list gets the long URL; the rest of the answer is the server's.
+  const patchFirst = (body: unknown) => {
+    const first = (body as { items: { url: string | null }[] }).items[0];
+    if (first) first.url = LONG_URL;
+  };
+  await withLongUrl(page, (url) => url.pathname === `/api/runs/${run.id}/messages`, patchFirst);
+  await withLongUrl(page, (url) => url.pathname === `/api/runs/${run.id}/fetches`, patchFirst);
+  await withLongUrl(page, (url) => url.pathname === '/api/observations', patchFirst);
+  const usf = await api.project('usf');
+  await withLongUrl(page, (url) => url.pathname === `/api/entities/project/${usf.id}`, (body) => {
+    const first = (body as { item: { observations: { url: string | null }[] } }).item.observations[0];
+    if (first) first.url = LONG_URL;
+  });
+
+  await page.goto(`/runs/${run.id}`);
+  await expectReadable(page.getByRole('tabpanel', { name: /Messages/ }).getByRole('table'));
+  await page.getByRole('tab', { name: 'Fetch log' }).click();
+  await expectReadable(page.getByRole('tabpanel', { name: 'Fetch log' }).getByRole('table'));
+
+  await page.goto(`/sources/${COLLECTOR}`);
+  await expectReadable(page.getByRole('region', { name: 'Observations' }).getByRole('table'));
+
+  await page.goto(`/projects/${usf.id}`);
+  await expectReadable(page.getByRole('region', { name: 'Seen in sources' }).getByRole('table'));
+});
+
+test('(p) the provenance popover of a collected value works from the keyboard', async ({ page, api }) => {
+  const usf = await api.project('usf');
+  await page.goto(`/projects/${usf.id}`);
+  const badge = fieldRow(page, 'Description (Ukrainian)').getByRole('button', { name: /^Provenance: collector:/ });
+  await badge.focus();
+  await page.keyboard.press('Enter');
+  const popover = page.getByRole('dialog', { name: /^Provenance: collector:/ });
+  await expect(popover).toBeVisible();
+  // Focus moves into the (portaled) popover, and Tab goes through its links.
+  await expect(popover.getByRole('link', { name: COLLECTOR, exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(popover.getByRole('link', { name: /^run run_/ })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(popover.getByRole('link', { name: 'snapshot 1' })).toBeFocused();
+  // Escape closes it and returns to the badge.
+  await page.keyboard.press('Escape');
+  await expect(popover).toBeHidden();
+  await expect(badge).toBeFocused();
 });

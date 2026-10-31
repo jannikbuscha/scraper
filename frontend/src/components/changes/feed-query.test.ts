@@ -10,6 +10,7 @@ import {
   listParam,
   withListParam,
   withParam,
+  withStateParam,
 } from './feed-query';
 
 describe('Recent changes URL state', () => {
@@ -24,6 +25,14 @@ describe('Recent changes URL state', () => {
     });
     expect(withListParam(search, 'entity_type', [])).toEqual({ page_size: '100' });
     expect(withParam(search, 'batch_id', '')).toEqual({ entity_type: 'project,comment', page_size: '100' });
+  });
+
+  it('sets and removes a page-state parameter without leaving the page', () => {
+    const search = { kind: 'update_field', page: '2', page_size: '5' };
+    const expanded = withStateParam(search, 'proposal', 'prp_A');
+    expect(expanded).toEqual({ kind: 'update_field', page: '2', page_size: '5', proposal: 'prp_A' });
+    expect(withStateParam(expanded, 'proposal', null)).toEqual(search);
+    expect(withStateParam(expanded, 'proposal', '')).toEqual(search);
   });
 
   it('sends local days as inclusive timestamps and drops invalid days', () => {

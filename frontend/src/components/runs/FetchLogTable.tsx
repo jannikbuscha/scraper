@@ -1,13 +1,17 @@
 // The fetch log of a run (docs/UI.md §8.3): one row per request attempt and
-// per URL the client decided not to request (outcome `refused`).
+// per URL the client decided not to request (outcome `refused`). Short values
+// stay on one line; URLs (at any character) and errors wrap, so a long URL
+// never pushes the error off-screen.
 import { Badge, Table, Text } from '@mantine/core';
 
 import type { FetchLogEntry } from '../../api/acquisition-types';
 import { ExternalLink } from '../ExternalLink';
 import { SnapshotLink } from '../SnapshotLink';
 import { Timestamp } from '../Timestamp';
-import { FETCH_OUTCOME_COLORS, formatBytes, formatCount } from './run-labels';
+import { FETCH_OUTCOME_COLORS, formatBytes, formatCount, TABLE_BADGE_MIN_WIDTH } from './run-labels';
 import classes from './runs.module.css';
+
+const nowrap = `${classes.cell} ${classes.nowrap}`;
 
 export function FetchLogTable({ entries }: { entries: readonly FetchLogEntry[] }) {
   if (entries.length === 0) {
@@ -43,12 +47,12 @@ export function FetchLogTable({ entries }: { entries: readonly FetchLogEntry[] }
         <Table.Tbody>
           {entries.map((entry) => (
             <Table.Tr key={entry.id}>
-              <Table.Td className={classes.cell}>
+              <Table.Td className={nowrap}>
                 <Timestamp value={entry.at} />
               </Table.Td>
-              <Table.Td className={classes.cell}>{entry.method}</Table.Td>
+              <Table.Td className={nowrap}>{entry.method}</Table.Td>
               <Table.Td className={classes.cell}>
-                <ExternalLink url={entry.url} />
+                <ExternalLink url={entry.url} wrap />
                 {entry.purpose === 'robots' && (
                   <Text span size="xs" c="dimmed">
                     {' '}
@@ -56,22 +60,22 @@ export function FetchLogTable({ entries }: { entries: readonly FetchLogEntry[] }
                   </Text>
                 )}
               </Table.Td>
-              <Table.Td className={classes.cell}>{entry.status ?? '—'}</Table.Td>
-              <Table.Td className={classes.cell}>
-                <Badge size="xs" variant="light" color={FETCH_OUTCOME_COLORS[entry.outcome]}>
+              <Table.Td className={nowrap}>{entry.status ?? '—'}</Table.Td>
+              <Table.Td className={nowrap}>
+                <Badge size="xs" variant="light" color={FETCH_OUTCOME_COLORS[entry.outcome]} miw={TABLE_BADGE_MIN_WIDTH}>
                   {entry.outcome}
                 </Badge>
               </Table.Td>
-              <Table.Td className={classes.cell} ta="right">
+              <Table.Td className={nowrap} ta="right">
                 {formatBytes(entry.bytes)}
               </Table.Td>
-              <Table.Td className={classes.cell} ta="right">
+              <Table.Td className={nowrap} ta="right">
                 {entry.duration_ms === null ? '—' : `${formatCount(entry.duration_ms)} ms`}
               </Table.Td>
-              <Table.Td className={classes.cell} ta="right">
+              <Table.Td className={nowrap} ta="right">
                 {entry.attempt}
               </Table.Td>
-              <Table.Td className={classes.cell}>
+              <Table.Td className={nowrap}>
                 {entry.raw_snapshot_id && <SnapshotLink id={entry.raw_snapshot_id} />}
               </Table.Td>
               <Table.Td className={`${classes.cell} ${classes.message}`}>

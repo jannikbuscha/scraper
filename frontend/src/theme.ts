@@ -5,11 +5,19 @@ import {
   Badge,
   Button,
   createTheme,
+  ModalCloseButton,
   Popover,
   Table,
   Tooltip,
   type CSSVariablesResolver,
 } from '@mantine/core';
+
+/**
+ * The accessible name of every dialog's header close button (Mantine renders it
+ * as an icon without a name). Distinct from the "Close" buttons some dialogs
+ * have in their footer.
+ */
+export const DIALOG_CLOSE_LABEL = 'Close dialog';
 
 export const theme = createTheme({
   primaryColor: 'indigo',
@@ -32,6 +40,7 @@ export const theme = createTheme({
     ActionIcon: ActionIcon.extend({ defaultProps: { variant: 'subtle', color: 'gray' } }),
     Badge: Badge.extend({ defaultProps: { radius: 'sm', tt: 'none', fw: 500 } }),
     Button: Button.extend({ defaultProps: { size: 'xs' } }),
+    ModalCloseButton: ModalCloseButton.extend({ defaultProps: { 'aria-label': DIALOG_CLOSE_LABEL } }),
     Popover: Popover.extend({ defaultProps: { shadow: 'md', withinPortal: true } }),
     Table: Table.extend({ defaultProps: { fz: 'sm', verticalSpacing: 4, horizontalSpacing: 'xs' } }),
     Tooltip: Tooltip.extend({ defaultProps: { openDelay: 250, multiline: true, maw: 360, withArrow: true } }),

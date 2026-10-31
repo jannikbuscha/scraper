@@ -10,7 +10,7 @@ import type { Comment, CommentFeedItem } from '../../api/types';
 import { useUrlSearch } from '../../hooks/useUrlSearch';
 import { pluralize } from '../../lib/format';
 import { commentExcerpt } from '../changes/comment-text';
-import { FeedPagination } from '../changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../changes/FeedPagination';
 import { pagingParams } from '../changes/feed-query';
 import { pageTarget, threadTarget } from '../changes/targets';
 import { TargetLink } from '../changes/TargetLink';
@@ -62,7 +62,11 @@ export function TrashCommentList({ maxNoteChars }: { maxNoteChars: number }) {
   return (
     <Stack gap="sm">
       <div aria-busy={feed.isPlaceholderData}>
-        <TrashThreadRows items={feed.data.items} onUndelete={setTarget} />
+        {feed.data.items.length === 0 ? (
+          <FeedPastEnd total={feed.data.total} search={search} setSearch={setSearch} />
+        ) : (
+          <TrashThreadRows items={feed.data.items} onUndelete={setTarget} />
+        )}
       </div>
       <FeedPagination total={feed.data.total} search={search} setSearch={setSearch} />
       <UndeleteCommentModal

@@ -86,6 +86,32 @@ describe('detail page additions (docs/UI.md §8.7)', () => {
     expect(screen.getByRole('button', { name: 'Merge…' })).toBeInTheDocument();
   });
 
+  it('opens the collector provenance from the keyboard: focus moves into it, and Escape closes it and returns to the badge', async () => {
+    const { user } = renderDetail(project());
+    const badge = await screen.findByRole('button', { name: 'Provenance: collector:example_collector@run_EXAMPLE' });
+    badge.focus();
+    await user.keyboard('{Enter}');
+    const popover = await screen.findByRole('dialog');
+    // The dropdown is portaled: without moving focus into it, Tab would never reach its links.
+    await waitFor(() => {
+      expect(popover).toContainElement(document.activeElement as HTMLElement | null);
+    });
+    const visited = new Set<string>();
+    for (let step = 0; step < 4; step += 1) {
+      visited.add(document.activeElement?.textContent ?? '');
+      expect(popover).toContainElement(document.activeElement as HTMLElement | null);
+      await user.tab();
+    }
+    expect(visited).toContain('run run_EXAMPLE');
+    expect(visited).toContain('snapshot 1');
+
+    await user.keyboard('{Escape}');
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+    expect(badge).toHaveFocus();
+  });
+
   it('shows a merged record as merged into its survivor and unmerges it instead of undeleting', async () => {
     const { user, fetchMock } = renderDetail(
       project({ deleted_at: '2026-01-02T00:00:00.000000Z', deleted_by: 'user', merged_into: 'prj_SURVIVOR' }),

@@ -1,14 +1,16 @@
 // "Unmerge…" (docs/UI.md §8.7, docs/DATA_MODEL.md §18): reverses a merge with
 // a note; afterwards it lists the references that changed after the merge and
-// were therefore left as they are.
+// were therefore left as they are, with the records (and referenced records)
+// labelled from the lookup.
 import { Alert, Button, Group, List, Modal, Stack, Text, Textarea } from '@mantine/core';
 import { useState } from 'react';
 
-import type { UnmergeResponse } from '../../api/acquisition-types';
+import type { UnmergeResponse, UnmergeSkipped } from '../../api/acquisition-types';
 import { invalidState } from '../../api/client';
+import { useLookupIds } from '../../api/lookup';
 import { useUnmerge } from '../../api/proposals';
 import { useMeta } from '../../api/queries';
-import type { Item } from '../../api/types';
+import type { FieldSpec, Item, Meta } from '../../api/types';
 import { typeMetaOf } from '../../lib/entity';
 import { jsonText } from '../../lib/format';
 import { EntityLink } from '../EntityLink';
@@ -30,12 +32,27 @@ export function UnmergeDialog({ type, item, onClose }: UnmergeDialogProps) {
   );
 }
 
+/** The field spec of a skipped reference. */
+const skippedField = (meta: Meta | undefined, entry: UnmergeSkipped): FieldSpec | undefined =>
+  typeMetaOf(meta, entry.entity_type)?.fields.find((spec) => spec.name === entry.field);
+
 function UnmergeForm({ type, item, onClose }: { type: MergeableType; item: Item; onClose: () => void }) {
   const meta = useMeta();
   const unmerge = useUnmerge(type);
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<UnmergeResponse | null>(null);
+  // Skipped references name records by ID: label them, and the records they now point to.
+  const labels = useLookupIds(
+    (result?.skipped ?? []).flatMap((entry) => {
+      const current = skippedField(meta.data, entry)?.type === 'ref' && typeof entry.current === 'string' ? [entry.current] : [];
+      return [entry.id, ...current];
+    }),
+  ).byId;
+  const link = (id: string) => {
+    const found = labels.get(id);
+    return <EntityLink id={id} label={found?.label} type={found?.type} deleted={found?.deleted} />;
+  };
 
   if (result) {
     return (
@@ -50,10 +67,12 @@ function UnmergeForm({ type, item, onClose }: { type: MergeableType; item: Item;
             </Text>
             <List size="sm">
               {result.skipped.map((entry) => {
-                const field = typeMetaOf(meta.data, entry.entity_type)?.fields.find((spec) => spec.name === entry.field);
+                const field = skippedField(meta.data, entry);
+                const current =
+                  field?.type === 'ref' && typeof entry.current === 'string' ? link(entry.current) : <bdi>{jsonText(entry.current)}</bdi>;
                 return (
                   <List.Item key={`${entry.id}.${entry.field}`}>
-                    <EntityLink id={entry.id} /> · {field?.label ?? entry.field}: <bdi>{jsonText(entry.current)}</bdi>
+                    {link(entry.id)} · {field?.label ?? entry.field}: {current}
                   </List.Item>
                 );
               })}

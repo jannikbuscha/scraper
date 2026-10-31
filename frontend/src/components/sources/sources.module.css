@@ -1,0 +1,13 @@
+.observations td {
+  vertical-align: top;
+}
+
+/* Keys, labels and records break anywhere rather than widen the table. */
+.anywhere {
+  overflow-wrap: anywhere;
+}
+
+/* Times, badges and collector names stay on one line. */
+.nowrap {
+  white-space: nowrap;
+}

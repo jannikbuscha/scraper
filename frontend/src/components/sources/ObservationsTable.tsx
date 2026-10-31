@@ -1,7 +1,9 @@
 // Source observations (docs/UI.md §8.4, §8.7): what a collector saw per key,
 // read-only. The source page lists one collector's keys with their bound
 // record; the "Seen in sources" panel of a detail page lists the record's
-// observations with their collector and how they were bound.
+// observations with their collector and how they were bound. Times and
+// badges stay on one line; keys, labels and URLs wrap (URLs at any character),
+// so a long URL never pushes the record or the presence off-screen.
 import { Badge, Table, Text } from '@mantine/core';
 
 import type { Observation } from '../../api/acquisition-types';
@@ -10,7 +12,9 @@ import { pluralize } from '../../lib/format';
 import { AnchorLink } from '../AnchorLink';
 import { EntityLink } from '../EntityLink';
 import { ExternalLink } from '../ExternalLink';
+import { TABLE_BADGE_MIN_WIDTH } from '../runs/run-labels';
 import { Timestamp } from '../Timestamp';
+import classes from './sources.module.css';
 
 interface ObservationsTableProps {
   observations: readonly Observation[];
@@ -22,7 +26,7 @@ interface ObservationsTableProps {
 function Presence({ observation }: { observation: Observation }) {
   if (observation.present) {
     return (
-      <Badge size="xs" variant="light" color="green">
+      <Badge size="xs" variant="light" color="green" miw={TABLE_BADGE_MIN_WIDTH}>
         present
       </Badge>
     );
@@ -39,7 +43,7 @@ const BOUND_BY: Record<'auto' | 'proposal', string> = { auto: 'matching rule', p
 export function ObservationsTable({ observations, refs = {}, variant }: ObservationsTableProps) {
   return (
     <Table.ScrollContainer minWidth={900}>
-      <Table withTableBorder>
+      <Table withTableBorder className={classes.observations}>
         <Table.Thead>
           <Table.Tr>
             {variant === 'record' && <Table.Th>Collector</Table.Th>}
@@ -58,19 +62,19 @@ export function ObservationsTable({ observations, refs = {}, variant }: Observat
             return (
               <Table.Tr key={observation.id}>
                 {variant === 'record' && (
-                  <Table.Td>
+                  <Table.Td className={classes.nowrap}>
                     <AnchorLink to="/sources/$collector" params={{ collector: observation.collector }} size="sm">
                       {observation.collector}
                     </AnchorLink>
                   </Table.Td>
                 )}
-                <Table.Td>
+                <Table.Td className={classes.anywhere}>
                   <code>{observation.key}</code>
                 </Table.Td>
-                <Table.Td>{observation.label && <bdi>{observation.label}</bdi>}</Table.Td>
-                <Table.Td>{observation.url && <ExternalLink url={observation.url} />}</Table.Td>
+                <Table.Td className={classes.anywhere}>{observation.label && <bdi>{observation.label}</bdi>}</Table.Td>
+                <Table.Td>{observation.url && <ExternalLink url={observation.url} wrap />}</Table.Td>
                 {variant === 'source' ? (
-                  <Table.Td>
+                  <Table.Td className={classes.anywhere}>
                     {observation.subject_id ? (
                       <EntityLink id={observation.subject_id} label={ref?.label} type={ref?.type} deleted={ref?.deleted} />
                     ) : (
@@ -85,10 +89,10 @@ export function ObservationsTable({ observations, refs = {}, variant }: Observat
                 <Table.Td>
                   <Presence observation={observation} />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td className={classes.nowrap}>
                   <Timestamp value={observation.first_seen_at} />
                 </Table.Td>
-                <Table.Td>
+                <Table.Td className={classes.nowrap}>
                   <Timestamp value={observation.last_seen_at} />
                 </Table.Td>
               </Table.Tr>

@@ -119,5 +119,42 @@ describe('adding a document (docs/UI.md §8.6)', () => {
     expect(container).toHaveTextContent('archived copy');
     const contact = new ApiError(409, 'collector_unavailable', 'No', { reason: 'contact_email_missing' });
     expect(render(<>{fetchProblem(contact)}</>).container).toHaveTextContent('CONTACT_EMAIL');
+    // A URL the server still refuses (docs/API.md §7.8): its message, not a failed fetch.
+    const invalid = new ApiError(400, 'validation_error', 'Invalid input', {
+      url: ['a Wayback capture URL must contain the original URL with http:// or https://'],
+    });
+    const shown = render(<>{fetchProblem(invalid)}</>).container;
+    expect(shown).toHaveTextContent('url: a Wayback capture URL must contain the original URL');
+    expect(shown).not.toHaveTextContent('could not be fetched');
+  });
+
+  it('shows the message of a URL that only the server refuses, line by line', async () => {
+    // The client accepts the capture URL; the server refuses its original without
+    // http(s):// with 400 validation_error on `url` (docs/API.md §7.8, docs/UI.md §8.6).
+    const message = 'a Wayback capture URL must contain the original URL with http:// or https://';
+    const fetchMock = mockApi((url) => {
+      if (url.pathname === '/api/meta') return META;
+      if (url.pathname === '/api/documents/fetch') {
+        const error = { code: 'validation_error', message: 'Invalid input', details: { url: [message] } };
+        return new Response(JSON.stringify({ error }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+      return undefined;
+    });
+    const Page = () => <AddDocumentModal opened onClose={vi.fn()} />;
+    const { user } = renderRoute(Page, { url: '/documents', path: '/documents' });
+    const dialog = within(await screen.findByRole('dialog'));
+
+    await user.click(await dialog.findByRole('tab', { name: 'From URL' }));
+    await user.type(dialog.getByRole('textbox', { name: 'URL' }), 'https://web.archive.org/web/20200102030405/example.org/page');
+    await user.click(dialog.getByRole('button', { name: 'Fetch' }));
+
+    const alert = await dialog.findByRole('alert');
+    expect(jsonBody(callsTo(fetchMock, '/api/documents/fetch')[0]?.init)).toEqual({
+      url: 'https://web.archive.org/web/20200102030405/example.org/page',
+    });
+    // The summary and the field message each on a line of their own, as in the upload step.
+    expect(alert.textContent).toBe(`Invalid input\nurl: ${message}`);
+    expect(alert).toHaveStyle({ whiteSpace: 'pre-line' });
+    expect(alert).not.toHaveTextContent('could not be fetched');
   });
 });

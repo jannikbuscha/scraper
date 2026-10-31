@@ -24,3 +24,22 @@
   flex-shrink: 0;
   white-space: nowrap;
 }
+
+/* `wrap` (table cells): the text breaks at any character, so the link can be as
+   narrow as its column, and its lines are at most 32em long, so a long URL
+   leaves room for the other columns; the host moves below when it does not fit
+   beside the text. */
+.wrap {
+  flex-wrap: wrap;
+}
+
+.wrap .link {
+  max-width: 32em;
+  overflow: visible;
+}
+
+.wrap .text {
+  display: inline;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}

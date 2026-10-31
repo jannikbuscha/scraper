@@ -45,7 +45,6 @@ export function CopyLinkButton({ url }: { url: string }) {
           setState('idle');
         }}
         title="Copy the link"
-        closeButtonProps={{ 'aria-label': 'Close' }}
       >
         <Stack gap="xs">
           <Text size="sm">

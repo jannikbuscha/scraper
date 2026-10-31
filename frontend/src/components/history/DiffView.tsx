@@ -14,8 +14,8 @@ import {
   type FieldDiffRow,
 } from '../../lib/diff';
 import { asString, guessFieldType, jsonText, pluralize, syntheticField } from '../../lib/format';
-import { EntityLink } from '../EntityLink';
 import { ValueDisplay } from '../fields/FieldValue';
+import { LookupEntityLink } from '../LookupEntityLink';
 import { Timestamp } from '../Timestamp';
 import classes from './history.module.css';
 import { WordDiff } from './WordDiff';
@@ -81,7 +81,7 @@ function FieldChangeRow({ spec, row, refs }: { spec: FieldSpec; row: FieldDiffRo
 function PlainValue({ name, value }: { name: string; value: JsonValue }) {
   if (value === null) return <Text span c="dimmed">—</Text>;
   if (typeof value === 'string' && (name === 'at' || name.endsWith('_at'))) return <Timestamp value={value} />;
-  if (typeof value === 'string' && name === 'merged_into') return <EntityLink id={value} />;
+  if (typeof value === 'string' && name === 'merged_into') return <LookupEntityLink id={value} />;
   return <bdi>{jsonText(value)}</bdi>;
 }
 

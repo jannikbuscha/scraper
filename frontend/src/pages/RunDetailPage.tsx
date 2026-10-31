@@ -16,7 +16,7 @@ import { useChangeFeed, useMeta } from '../api/queries';
 import { useCancelRun, useRun, useRunFetches, useRunMessages, useStartRun } from '../api/runs';
 import { AnchorLink } from '../components/AnchorLink';
 import { ChangeFeedTable } from '../components/changes/ChangeFeedTable';
-import { FeedPagination } from '../components/changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
 import { withParam } from '../components/changes/feed-query';
 import { SegmentedFilter } from '../components/changes/SegmentedFilter';
 import { ErrorAlert, notifyError, notifySuccess } from '../components/feedback';
@@ -268,7 +268,11 @@ function MessagesPanel({ run, search, setSearch }: { run: Run } & UrlState) {
       ) : (
         <>
           <div aria-busy={messages.isPlaceholderData}>
-            <RunMessagesTable messages={messages.data.items} refs={messages.data.refs} />
+            {messages.data.items.length === 0 && messages.data.total > 0 ? (
+              <FeedPastEnd total={messages.data.total} search={search} setSearch={setSearch} />
+            ) : (
+              <RunMessagesTable messages={messages.data.items} refs={messages.data.refs} />
+            )}
           </div>
           {messages.data.total > 0 && <FeedPagination total={messages.data.total} search={search} setSearch={setSearch} />}
         </>
@@ -301,7 +305,11 @@ function FetchesPanel({ run, search, setSearch }: { run: Run } & UrlState) {
       ) : (
         <>
           <div aria-busy={fetches.isPlaceholderData}>
-            <FetchLogTable entries={fetches.data.items} />
+            {fetches.data.items.length === 0 && fetches.data.total > 0 ? (
+              <FeedPastEnd total={fetches.data.total} search={search} setSearch={setSearch} />
+            ) : (
+              <FetchLogTable entries={fetches.data.items} />
+            )}
           </div>
           {fetches.data.total > 0 && <FeedPagination total={fetches.data.total} search={search} setSearch={setSearch} />}
         </>
@@ -327,7 +335,7 @@ function ChangesPanel({ run, search, setSearch }: { run: Run } & UrlState) {
           Open in Recent changes
         </AnchorLink>
       </Group>
-      {feed.data.items.length > 0 && (
+      {feed.data.items.length > 0 ? (
         <ChangeFeedTable
           items={feed.data.items}
           meta={meta.data}
@@ -336,6 +344,8 @@ function ChangesPanel({ run, search, setSearch }: { run: Run } & UrlState) {
             void navigate({ to: '/changes', search: { batch_id: batchId } });
           }}
         />
+      ) : (
+        feed.data.total > 0 && <FeedPastEnd total={feed.data.total} search={search} setSearch={setSearch} />
       )}
       {feed.data.total > 0 && <FeedPagination total={feed.data.total} search={search} setSearch={setSearch} />}
     </Stack>

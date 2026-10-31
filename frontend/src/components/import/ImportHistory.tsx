@@ -11,7 +11,7 @@ import type { Meta } from '../../api/types';
 import type { SearchUpdate, SetSearchOptions } from '../../hooks/useUrlSearch';
 import type { SearchRecord } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
-import { FeedPagination } from '../changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../changes/FeedPagination';
 import { ErrorAlert } from '../feedback';
 import { Timestamp } from '../Timestamp';
 import { PlanRows } from './PlanView';
@@ -66,7 +66,9 @@ export function ImportHistory({ meta, search, setSearch }: ImportHistoryProps) {
   let body;
   if (imports.isError) body = <ErrorAlert title="Could not load the imports" error={imports.error} onRetry={() => void imports.refetch()} />;
   else if (imports.isPending) body = <Loader size="sm" />;
-  else if (imports.data.items.length === 0) {
+  else if (imports.data.items.length === 0 && imports.data.total > 0) {
+    body = <FeedPastEnd total={imports.data.total} search={search} setSearch={setSearch} />;
+  } else if (imports.data.items.length === 0) {
     body = (
       <Text size="sm" c="dimmed">
         No imports yet.

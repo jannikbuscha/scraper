@@ -8,7 +8,7 @@ import { useCommentFeed, useMeta } from '../api/queries';
 import type { Meta } from '../api/types';
 import { CommentFeedFilters } from '../components/changes/CommentFeedFilters';
 import { CommentFeedTable } from '../components/changes/CommentFeedTable';
-import { FeedPagination } from '../components/changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
 import { clearFilterParams, commentFeedRequest, hasCommentFilters } from '../components/changes/feed-query';
 import { ErrorAlert } from '../components/feedback';
 import { useUrlSearch } from '../hooks/useUrlSearch';
@@ -34,6 +34,8 @@ function CommentsScreen({ meta }: { meta: Meta }) {
     body = <ErrorAlert title="Could not load the comments" error={feed.error} onRetry={() => void feed.refetch()} />;
   } else if (feed.isPending) {
     body = <Loader size="sm" />;
+  } else if (feed.data.items.length === 0 && feed.data.total > 0) {
+    body = <FeedPastEnd total={feed.data.total} search={search} setSearch={setSearch} />;
   } else if (feed.data.items.length === 0) {
     body = hasCommentFilters(search) ? (
       <EmptyState icon={<IconFilterOff size={28} />} title="No threads match the filters">

@@ -96,3 +96,16 @@ describe('Comments page', () => {
     });
   });
 });
+
+describe('Comments page past the end (docs/UI.md §5)', () => {
+  it('says that a page is past the end instead of "No comments yet"', async () => {
+    mockApi((url) => {
+      if (url.pathname === '/api/meta') return exampleMeta;
+      if (url.pathname === '/api/comments') return { items: [], total: 2, page: 2, page_size: 50 };
+      return undefined;
+    });
+    renderRoute(CommentsPage, { url: '/comments?page=2', path: '/comments' });
+    expect(await screen.findByText('This page is past the end of the list')).toBeInTheDocument();
+    expect(screen.queryByText('No comments yet')).toBeNull();
+  });
+});

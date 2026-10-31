@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
 import type { RunMessagesResponse } from '../api/acquisition-types';
+import externalLinkClasses from '../components/ExternalLink.module.css';
 import { emptyStats, exampleRun } from '../test/acquisition-fixtures';
 import { callsTo, jsonBody, mockApi } from '../test/api-mock';
 import { renderRoute } from '../test/render';
@@ -57,6 +58,10 @@ describe('run page (docs/UI.md §8.3)', () => {
 
     const messages = await screen.findByRole('row', { name: /Example request failed/ });
     expect(within(messages).getByRole('link', { name: 'Example project A' })).toBeInTheDocument();
+    // The URL wraps instead of widening the table (docs/UI.md §1.4, §8.3).
+    expect(within(messages).getByRole('link', { name: 'https://example.org/page' }).parentElement).toHaveClass(
+      externalLinkClasses.wrap ?? 'missing-wrap-class',
+    );
     expect(screen.queryByRole('button', { name: 'Cancel' })).toBeNull();
 
     await user.click(screen.getByRole('button', { name: 'Run again' }));
@@ -65,6 +70,33 @@ describe('run page (docs/UI.md §8.3)', () => {
     });
     // `replay` is recorded by the server, never sent.
     expect(jsonBody(callsTo(fetchMock, '/api/runs')[0]?.init)).toEqual({ collector: 'example_collector', mode: 'full', params: { limit: 3 } });
+  });
+
+  it('says that a page of messages or requests is past the end instead of "No messages"', async () => {
+    mockApi((url) => {
+      if (url.pathname === '/api/runs/run_EXAMPLE') return { run: FAILED };
+      // Page 3 of 13 messages at 50 per page, e.g. from an old link.
+      if (url.pathname === '/api/runs/run_EXAMPLE/messages') return { ...MESSAGES, items: [], total: 13, page: 3 };
+      if (url.pathname === '/api/runs/run_EXAMPLE/fetches') return { items: [], total: 17, page: 3, page_size: 50 };
+      return undefined;
+    });
+    const { user, router } = renderRoute(RunDetailPage, { url: '/runs/run_EXAMPLE?page=3', path: '/runs/$id' });
+    expect(await screen.findByText('This page is past the end of the list')).toBeInTheDocument();
+    expect(screen.getByText('13 in total; the last page is page 1.')).toBeInTheDocument();
+    expect(screen.queryByText('No messages.')).toBeNull();
+    expect(screen.getByRole('navigation', { name: 'Pages' })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('tab', { name: 'Fetch log' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ tab: 'fetches' });
+    });
+    await router.navigate({ to: '/runs/$id', params: { id: 'run_EXAMPLE' }, search: { tab: 'fetches', page: '3' } });
+    expect(await screen.findByText('17 in total; the last page is page 1.')).toBeInTheDocument();
+    expect(screen.queryByText('No requests.')).toBeNull();
+    await user.click(screen.getByRole('button', { name: 'Go to the last page' }));
+    await waitFor(() => {
+      expect(router.state.location.search).toEqual({ tab: 'fetches' });
+    });
   });
 
   it('offers Cancel while the run is running', async () => {

@@ -35,6 +35,12 @@
   overflow-wrap: anywhere;
 }
 
+/* Short values (times, levels, codes, numbers, badges) stay on one line, so a
+   column of them never gets narrower than its values. */
+.nowrap {
+  white-space: nowrap;
+}
+
 .message {
   white-space: pre-wrap;
   overflow-wrap: anywhere;

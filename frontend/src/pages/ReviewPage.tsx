@@ -9,15 +9,14 @@ import { IconFilterOff, IconInbox } from '@tabler/icons-react';
 import { useState, type ReactNode } from 'react';
 
 import type { AcceptResponse, MergeResponse, Proposal } from '../api/acquisition-types';
-import { useLookupIds } from '../api/lookup';
 import { useAcceptProposal, useProposal, useProposals, useProposalSummary } from '../api/proposals';
 import { useMeta } from '../api/queries';
 import type { Meta, Refs } from '../api/types';
 import { AnchorLink } from '../components/AnchorLink';
-import { FeedPagination } from '../components/changes/FeedPagination';
-import { withParam } from '../components/changes/feed-query';
-import { EntityLink } from '../components/EntityLink';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
+import { withStateParam } from '../components/changes/feed-query';
 import { ErrorAlert } from '../components/feedback';
+import { LookupEntityLink } from '../components/LookupEntityLink';
 import { MergeDialog } from '../components/merge/MergeDialog';
 import { BulkBar, BulkDecisionModal } from '../components/review/BulkDecisions';
 import { decisionError, LinkExistingModal, MarkDuplicateModal, RejectModal } from '../components/review/DecisionModals';
@@ -42,6 +41,8 @@ interface Notice {
   text: string;
   resultId: string | null;
 }
+
+const SUPERSEDED_TEXT = 'Nothing was left to write; the proposal is closed as superseded.';
 
 type Dialog = { action: CardAction; proposal: Proposal } | null;
 
@@ -86,12 +87,6 @@ export function ReviewPage() {
   );
 }
 
-/** The record a decision wrote, labelled by the lookup (it may have left the list). */
-function ResultLink({ id }: { id: string }) {
-  const found = useLookupIds([id]).byId.get(id);
-  return <EntityLink id={id} label={found?.label} type={found?.type} deleted={found?.deleted} />;
-}
-
 /** The proposal a link opened (`proposal=<id>`) when it is not on the current page. */
 function LinkedProposal({ id, render }: { id: string; render: (proposal: Proposal, refs: Refs) => ReactNode }) {
   const detail = useProposal(id);
@@ -134,7 +129,14 @@ function ProposalsPanel({ meta, search, setSearch }: { meta: Meta } & UrlState) 
     setNotice({
       text: response.changed
         ? `Accepted the ${proposal.kind === 'create_entity' ? 'new record' : 'proposal'}.`
-        : 'Nothing was left to write; the proposal is closed as superseded.',
+        : SUPERSEDED_TEXT,
+      resultId: response.result_id,
+    });
+  };
+  // Link to existing (`match_id`) binds the source entry to the chosen record and writes nothing else.
+  const linked = (_proposal: Proposal, response: AcceptResponse) => {
+    setNotice({
+      text: response.changed ? 'Linked the source entry to an existing record; nothing else was written.' : SUPERSEDED_TEXT,
       resultId: response.result_id,
     });
   };
@@ -171,7 +173,8 @@ function ProposalsPanel({ meta, search, setSearch }: { meta: Meta } & UrlState) 
       meta={meta}
       expanded={expandedId === proposal.id}
       onToggleExpanded={() => {
-        setSearch((previous) => withParam(previous, 'proposal', expandedId === proposal.id ? null : proposal.id), {
+        // `proposal` is page state, not a filter: expanding or collapsing a card keeps the page.
+        setSearch((previous) => withStateParam(previous, 'proposal', expandedId === proposal.id ? null : proposal.id), {
           replace: true,
         });
       }}
@@ -195,7 +198,10 @@ function ProposalsPanel({ meta, search, setSearch }: { meta: Meta } & UrlState) 
   if (proposals.isError) {
     body = <ErrorAlert title="Could not load the proposals" error={proposals.error} onRetry={() => void proposals.refetch()} />;
   } else if (proposals.isPending) body = <Loader size="sm" />;
-  else if (items.length === 0) {
+  else if (items.length === 0 && proposals.data.total > 0) {
+    // E.g. after the last cards of the last page were decided: the inbox is not empty.
+    body = <FeedPastEnd total={proposals.data.total} search={search} setSearch={setSearch} />;
+  } else if (items.length === 0) {
     body = filtered ? (
       <EmptyState icon={<IconFilterOff size={28} />} title="No proposals match the filters">
         <EmptyState.Actions>
@@ -240,7 +246,7 @@ function ProposalsPanel({ meta, search, setSearch }: { meta: Meta } & UrlState) 
           {notice.resultId && (
             <>
               {' '}
-              Open <ResultLink id={notice.resultId} />.
+              Open <LookupEntityLink id={notice.resultId} />.
             </>
           )}
         </Alert>
@@ -285,7 +291,7 @@ function ProposalsPanel({ meta, search, setSearch }: { meta: Meta } & UrlState) 
         refs={refs}
         maxNoteChars={meta.limits.max_note_chars}
         onClose={close}
-        onAccepted={accepted}
+        onAccepted={linked}
       />
       <MarkDuplicateModal
         proposal={dialogFor('mark-duplicate')}

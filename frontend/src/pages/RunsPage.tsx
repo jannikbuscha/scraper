@@ -8,7 +8,7 @@ import { useState } from 'react';
 
 import { RUN_STATUSES, RUN_TRIGGERS } from '../api/acquisition-types';
 import { useCollectors, useRuns } from '../api/runs';
-import { FeedPagination } from '../components/changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
 import { ListParamFilter } from '../components/changes/ListParamFilter';
 import { ErrorAlert } from '../components/feedback';
 import { RunsTable } from '../components/runs/RunsTable';
@@ -43,7 +43,9 @@ export function RunsPage() {
   let body;
   if (runs.isError) body = <ErrorAlert title="Could not load the runs" error={runs.error} onRetry={() => void runs.refetch()} />;
   else if (runs.isPending) body = <Loader size="sm" />;
-  else if (runs.data.items.length === 0) {
+  else if (runs.data.items.length === 0 && runs.data.total > 0) {
+    body = <FeedPastEnd total={runs.data.total} search={search} setSearch={setSearch} />;
+  } else if (runs.data.items.length === 0) {
     body = hasFilters(search) ? (
       <EmptyState icon={<IconFilterOff size={28} />} title="No runs match the filters">
         <EmptyState.Actions>

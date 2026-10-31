@@ -183,7 +183,7 @@ function FetchStep({ onStored }: { onStored: (stored: Stored) => void }) {
           </Button>
         </Group>
         {problem && (
-          <Alert color="red" variant="light">
+          <Alert color="red" variant="light" style={{ whiteSpace: 'pre-line' }}>
             {problem}
           </Alert>
         )}

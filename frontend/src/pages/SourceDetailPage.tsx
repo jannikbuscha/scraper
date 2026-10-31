@@ -13,7 +13,7 @@ import { useMeta } from '../api/queries';
 import { useCollector } from '../api/runs';
 import { AnchorLink } from '../components/AnchorLink';
 import { DebouncedParamInput } from '../components/changes/DebouncedParamInput';
-import { FeedPagination } from '../components/changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
 import { withParam } from '../components/changes/feed-query';
 import { SegmentedFilter } from '../components/changes/SegmentedFilter';
 import { ErrorAlert } from '../components/feedback';
@@ -174,14 +174,18 @@ export function SourceDetailPage() {
           />
         ) : observations.isPending ? (
           <Loader size="sm" />
-        ) : observations.data.items.length === 0 ? (
+        ) : observations.data.total === 0 ? (
           <Text size="sm" c="dimmed">
             No observations match.
           </Text>
         ) : (
           <>
             <div aria-busy={observations.isPlaceholderData}>
-              <ObservationsTable observations={observations.data.items} refs={observations.data.refs} variant="source" />
+              {observations.data.items.length === 0 ? (
+                <FeedPastEnd total={observations.data.total} search={search} setSearch={setSearch} />
+              ) : (
+                <ObservationsTable observations={observations.data.items} refs={observations.data.refs} variant="source" />
+              )}
             </div>
             <FeedPagination total={observations.data.total} search={search} setSearch={setSearch} />
           </>

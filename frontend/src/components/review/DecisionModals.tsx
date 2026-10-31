@@ -2,13 +2,15 @@
 // note is required), Link to existing (a lookup restricted to the proposal's
 // type) and Mark as duplicate (documents: which of the two is the duplicate).
 import { Alert, Button, Group, Modal, Radio, Stack, Text, Textarea } from '@mantine/core';
+import { IconExternalLink } from '@tabler/icons-react';
 import { useState, type ReactNode, type SubmitEvent } from 'react';
 
 import type { AcceptResponse, Proposal } from '../../api/acquisition-types';
 import { invalidState, isApiError } from '../../api/client';
 import { useAcceptProposal, useRejectProposal } from '../../api/proposals';
 import type { Refs } from '../../api/types';
-import { EntityLink } from '../EntityLink';
+import { DETAIL_PATHS } from '../../lib/entity';
+import { AnchorLink } from '../AnchorLink';
 import { errorMessage } from '../feedback';
 import { RefSelect } from '../fields/inputs/RefSelect';
 
@@ -241,9 +243,26 @@ function MarkDuplicateForm({ proposal, refs, maxNoteChars, onClose, onAccepted }
         onChange={setDuplicate}
       >
         <Stack gap={6} mt={6}>
-          {pair.map((id) => (
-            <Radio key={id} value={id} label={<EntityLink id={id} label={refs[id]?.label} type="document" />} />
-          ))}
+          {pair.map((id) => {
+            const label = refs[id]?.label ?? id;
+            // The label only chooses; the document opens from its own link, in a new tab, so the dialog stays.
+            return (
+              <Group key={id} gap={6} wrap="nowrap" align="center">
+                <Radio value={id} label={<bdi>{label}</bdi>} />
+                <AnchorLink
+                  to={DETAIL_PATHS.document}
+                  params={{ id }}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Open ${label} in a new tab`}
+                  title="Open in a new tab"
+                  display="inline-flex"
+                >
+                  <IconExternalLink size={14} aria-hidden />
+                </AnchorLink>
+              </Group>
+            );
+          })}
         </Stack>
       </Radio.Group>
       <Textarea

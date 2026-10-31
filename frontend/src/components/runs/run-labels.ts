@@ -53,6 +53,13 @@ export const STAT_LABELS: readonly [keyof Omit<RunStats, 'extra'>, string][] = [
   ['warnings', 'Warnings'],
 ];
 
+/**
+ * `miw` of the badges in the run and observation tables: a Mantine badge cuts
+ * its label with an ellipsis, so it adds almost nothing to its column's
+ * minimum width and a table squeezes it to a letter ("e…" for "error").
+ */
+export const TABLE_BADGE_MIN_WIDTH = 'max-content';
+
 export const MESSAGE_LEVEL_COLORS: Record<MessageLevel, MantineColor> = {
   error: 'red',
   warning: 'orange',

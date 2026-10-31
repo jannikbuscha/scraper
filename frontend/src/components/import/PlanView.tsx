@@ -1,10 +1,13 @@
 // The plan of a dry run, or the result of an import (docs/UI.md §8.5): count
 // tiles and the row table (row number, action, record, changes as
 // "field: current → new", conflicts with their reason, errors). At most 500
-// rows are listed (errors first, then conflicts).
+// rows are listed (errors first, then conflicts). The plan names records by ID
+// only; their labels come from the lookup, so the person sees which record
+// each row matched before writing.
 import { Badge, Group, Paper, SimpleGrid, Stack, Table, Text } from '@mantine/core';
 
 import type { ImportConflictReason, Plan, PlanRow, PlanStats } from '../../api/acquisition-types';
+import { useLookupIds } from '../../api/lookup';
 import type { EntityTypeMeta, JsonValue, TableEntityType } from '../../api/types';
 import { jsonText, pluralize } from '../../lib/format';
 import { EntityLink } from '../EntityLink';
@@ -54,6 +57,7 @@ const valueText = (value: JsonValue): string => (Array.isArray(value) ? value.ma
 /** Row items: changes, conflicts and errors of each listed row. */
 export function PlanRows({ rows, type, typeMeta }: { rows: readonly PlanRow[]; type: TableEntityType; typeMeta: EntityTypeMeta | undefined }) {
   const labelOf = (field: string) => typeMeta?.fields.find((spec) => spec.name === field)?.label ?? field;
+  const records = useLookupIds(rows.flatMap((row) => (row.id ? [row.id] : []))).byId;
   if (rows.length === 0) {
     return (
       <Text size="sm" c="dimmed">
@@ -83,7 +87,13 @@ export function PlanRows({ rows, type, typeMeta }: { rows: readonly PlanRow[]; t
                   {row.action}
                 </Badge>
               </Table.Td>
-              <Table.Td>{row.id ? <EntityLink id={row.id} type={type} /> : '—'}</Table.Td>
+              <Table.Td>
+                {row.id ? (
+                  <EntityLink id={row.id} type={type} label={records.get(row.id)?.label} deleted={records.get(row.id)?.deleted} />
+                ) : (
+                  '—'
+                )}
+              </Table.Td>
               <Table.Td>
                 <Stack gap={2}>
                   {Object.entries(row.changes).map(([field, [current, next]]) => (

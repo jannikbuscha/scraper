@@ -46,8 +46,10 @@ function Details({ meta }: { meta: FieldMetaEntry }) {
 
 function CollectorProvenance({ meta, collector, runId }: { meta: FieldMetaEntry; collector: string; runId: string | null }) {
   const snapshots = meta.raw_snapshot_ids ?? [];
+  // The dropdown is portaled: focus moves into it on opening, so its links are reachable with Tab, and
+  // Escape (handled inside the dropdown) closes it and returns focus to the badge.
   return (
-    <Popover withArrow shadow="md" position="bottom-end">
+    <Popover withArrow shadow="md" position="bottom-end" trapFocus returnFocus>
       <Popover.Target>
         <UnstyledButton aria-label={`Provenance: ${meta.src}`} style={{ display: 'inline-flex' }}>
           <Badge size="xs" variant="outline" color={COLORS.collector} style={{ cursor: 'pointer' }}>

@@ -8,7 +8,7 @@ import { useChangeFeed, useMeta } from '../api/queries';
 import type { Meta } from '../api/types';
 import { ChangeFeedFilters } from '../components/changes/ChangeFeedFilters';
 import { ChangeFeedTable } from '../components/changes/ChangeFeedTable';
-import { FeedPagination } from '../components/changes/FeedPagination';
+import { FeedPagination, FeedPastEnd } from '../components/changes/FeedPagination';
 import { changeFeedRequest, clearFilterParams, hasChangeFilters, withParam } from '../components/changes/feed-query';
 import { ErrorAlert } from '../components/feedback';
 import { useUrlSearch } from '../hooks/useUrlSearch';
@@ -35,6 +35,8 @@ function RecentChangesScreen({ meta }: { meta: Meta }) {
     body = <ErrorAlert title="Could not load the changes" error={feed.error} onRetry={() => void feed.refetch()} />;
   } else if (feed.isPending) {
     body = <Loader size="sm" />;
+  } else if (feed.data.items.length === 0 && feed.data.total > 0) {
+    body = <FeedPastEnd total={feed.data.total} search={search} setSearch={setSearch} />;
   } else if (feed.data.items.length === 0) {
     body = filtered ? (
       <EmptyState icon={<IconFilterOff size={28} />} title="No changes match the filters">
