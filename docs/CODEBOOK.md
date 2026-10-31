@@ -384,3 +384,9 @@ Matched on normalised text (apostrophes unified to `ʼ`) near a project or servi
 | `legal_basis_adopted` | `ухвалив постанову`, `затвердив`, `постанова №` | resolution adopted, approved |
 
 The precision of each pattern (share of accepted proposals) is reported in the collector-run statistics, so the list can be improved on the basis of evidence.
+
+**Implementation:** `codebook/event_patterns.yaml` holds this list (one entry per Ukrainian stem or phrase and one per English cell, nothing added); the matching rules are in `docs/COLLECTORS.md` §7.7. Like `parameters.yaml` it is not a vocabulary.
+
+## 5. Source label mappings (draft)
+
+`codebook/collector_mappings.yaml` maps labels that sources use to codes of this codebook, for the collectors (`docs/COLLECTORS.md` §7.9): the document kinds of thedigital.gov.ua → `doc_type` (unmapped kinds: `other`) and the channel leads of diia.gov.ua service pages → `channel`. The mappings are draft coding rules, open to the team like the vocabularies; a target code must be an active term, and an unmapped label is reported to the collector run (`unmapped_label`).

@@ -1,6 +1,6 @@
 # Codebook files
 
-One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus `parameters.yaml`. The format is defined in `docs/DATA_MODEL.md` §9; the coding rules are in `docs/CODEBOOK.md`.
+One YAML file per controlled vocabulary (`<vocabulary>.yaml`, 26 files) plus three files that are not vocabularies (no `vocabulary` key, so `mdt seed` skips them): `parameters.yaml`, `event_patterns.yaml` and `collector_mappings.yaml`. The format is defined in `docs/DATA_MODEL.md` §9; the coding rules are in `docs/CODEBOOK.md`.
 
 ## Where the values come from
 
@@ -33,6 +33,14 @@ Cut-off dates and time zones, each with its source under `sources`:
 | `storage_timezone` | UTC | assignment §4 |
 
 `parameters.yaml` is not a vocabulary file: it has no `vocabulary` key. The backend reads it directly; the derived values (`period`, `war_trajectory`) use the two dates.
+
+## event_patterns.yaml
+
+The phrase patterns that turn a sentence with a project or service mention into a `create_event` proposal (never a fact): the draft phrase list of `docs/CODEBOOK.md` §4, nothing added, one entry per Ukrainian stem or phrase and one per English cell, each with an `id` (its precision is reported per `id`), an `event_type`, a `lang` and `stems`, `phrases` or `all_of`. Matching rules: `docs/COLLECTORS.md` §7.7. The file is read by the tagger; its SHA-256 is part of each collector run's `config_hash`.
+
+## collector_mappings.yaml
+
+Source labels mapped to vocabulary codes for the collectors (`docs/COLLECTORS.md` §7.9): the `kind.slug` of thedigital.gov.ua documents → `doc_type` (C4, fallback `other`) and the channel leads of diia.gov.ua service pages → `channel` (C3, "Результат" ignored). Draft coding rules, open to the team like the codebook. Every target code must be an active term of its vocabulary, otherwise runs of the collector that uses the mapping fail.
 
 ## Working copy and releases
 
