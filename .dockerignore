@@ -1,13 +1,13 @@
 # Build context allowlist: exclude everything, then re-include only what the
 # Dockerfile needs. This keeps .git, data/, releases/, .env and paper.docx out of
-# the image. New runtime inputs (e.g. sources.yaml in Phase 2) must be added
-# here and copied in the Dockerfile.
+# the image. New runtime inputs must be added here and copied in the Dockerfile.
 *
 !backend/
 !frontend/
 !codebook/
 !seed/
 !docker/
+!sources.yaml
 
 # Never send secrets, local environments, caches, reports or build output.
 **/.env

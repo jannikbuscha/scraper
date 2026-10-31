@@ -32,6 +32,7 @@ endif
 .PHONY: help install dev backend-dev frontend-dev build \
 	test e2e lint format typecheck check \
 	migrate seed recompute db-check \
+	collect fixtures sources-check \
 	up down logs docker-build
 
 ##@ General
@@ -103,6 +104,23 @@ recompute: ## Recompute all derived fields (mdt recompute)
 
 db-check: ## Run the database integrity report (mdt check)
 	$(MDT) check
+
+##@ Data acquisition (docs/COLLECTORS.md §11; CONTACT_EMAIL in .env)
+
+# Collector for `make collect` and `make fixtures`; MODE is incremental (default) or full.
+SOURCE ?=
+MODE ?= incremental
+
+collect: ## Run a collector in the foreground: make collect SOURCE=<name> [MODE=full]
+	@test -n "$(SOURCE)" || { echo "usage: make collect SOURCE=<name> [MODE=full]" >&2; exit 2; }
+	$(MDT) collect $(SOURCE) --mode $(MODE)
+
+fixtures: ## Capture a collector's fixture list: make fixtures SOURCE=wayback
+	@test -n "$(SOURCE)" || { echo "usage: make fixtures SOURCE=<name>" >&2; exit 2; }
+	$(MDT) fixtures capture $(SOURCE)
+
+sources-check: ## Check robots.txt and reachability of every source host from this machine
+	$(MDT) sources check
 
 ##@ Docker (published on HOST:PORT from .env, default 127.0.0.1:8080)
 

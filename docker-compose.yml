@@ -45,8 +45,12 @@ services:
       CODEBOOK_DIR: /app/codebook
       SEED_DIR: /app/seed
       FRONTEND_DIST: /app/frontend/dist
+      # Collector settings from the image (docs/COLLECTORS.md §3); the server's database
+      # never runs in replay mode, whatever .env says.
+      SOURCES_FILE: /app/sources.yaml
+      COLLECTOR_REPLAY_DIR: ""
     volumes:
-      # All runtime data (SQLite database; later raw snapshots, backups, imports).
+      # All runtime data (SQLite database, raw snapshots in data/raw; later backups).
       # Gitignored; if it is missing, the Docker daemon creates it as root and the
       # entrypoint hands it to the user "app" on every start.
       - ./data:/app/data

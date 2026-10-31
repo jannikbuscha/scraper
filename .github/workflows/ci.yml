@@ -148,6 +148,8 @@ jobs:
           grep -qi '<!doctype html' "${RUNNER_TEMP}/route.html"
           asset="$(grep -o -m 1 '/assets/index-[^"]*\.js' "${RUNNER_TEMP}/index.html")"
           curl -fsS -o /dev/null "http://127.0.0.1:8080${asset}"
+          # Phase 2: the image carries sources.yaml, and every collector module imports.
+          curl -fsS http://127.0.0.1:8080/api/collectors | python3 -c "import json, sys; names = {c['name'] for c in json.load(sys.stdin)['collectors']}; assert {'ministry_projects', 'tagger'} <= names, names"
       - name: Check that the start left no root-owned files in the checkout
         # The Docker daemon runs as root and creates a missing bind-mount source as root.
         # ./releases is part of the repository and the entrypoint hands ./data to the user

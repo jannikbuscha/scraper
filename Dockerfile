@@ -66,10 +66,12 @@ COPY backend/ ./
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
-# Runtime inputs: vocabularies, seed data, the built frontend, the entrypoint.
+# Runtime inputs: vocabularies, seed data, the collector settings, the built
+# frontend, the entrypoint.
 WORKDIR /app
 COPY codebook/ ./codebook/
 COPY seed/ ./seed/
+COPY sources.yaml ./sources.yaml
 COPY --from=frontend /build/frontend/dist/ ./frontend/dist/
 COPY --chmod=0755 docker/entrypoint.sh ./docker/entrypoint.sh
 
@@ -84,7 +86,8 @@ ENV HOST=0.0.0.0 \
     DATA_DIR=/app/data \
     CODEBOOK_DIR=/app/codebook \
     SEED_DIR=/app/seed \
-    FRONTEND_DIST=/app/frontend/dist
+    FRONTEND_DIST=/app/frontend/dist \
+    SOURCES_FILE=/app/sources.yaml
 
 EXPOSE 8080
 
