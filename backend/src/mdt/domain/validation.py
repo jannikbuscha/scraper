@@ -81,7 +81,8 @@ class RecordCheck:
     ``current`` and ``new`` hold every stored field in API representation (``current``
     is None on create). ``assigned`` are the fields this write sets: the provided and
     computed fields on create, the changed fields on update. ``provided`` is the
-    normalised payload as submitted.
+    normalised payload as submitted. ``moving_services`` maps the services whose project
+    changes together in one merge or unmerge to their new project (DATA_MODEL §18).
     """
 
     session: Session
@@ -95,6 +96,7 @@ class RecordCheck:
     provided: Mapping[str, Any]
     note: str | None
     warnings: list[WriteWarning] = field(default_factory=list)
+    moving_services: Mapping[str, str] = field(default_factory=dict)
 
     @property
     def creating(self) -> bool:
@@ -287,13 +289,19 @@ def _project_rules(check: RecordCheck, problems: Problems) -> None:
 
 
 def _service_rules(check: RecordCheck, problems: Problems) -> None:
+    """A parent belongs to the same project and creates no cycle; a service with live
+    children keeps its project, unless the whole family moves in one merge."""
+    moving = check.moving_services
     parent = check.new.get("parent_service_id")
     if parent and check.touches("parent_service_id", "project_id"):
         if parent == check.entity_id:
             problems.add("parent_service_id", "A service cannot be its own parent")
         else:
             parent_row = load_row(check.session, ENTITY_TYPES["service"], parent)
-            if parent_row is not None and parent_row["project_id"] != check.new.get("project_id"):
+            parent_project = (
+                moving.get(parent, parent_row["project_id"]) if parent_row is not None else None
+            )
+            if parent_row is not None and parent_project != check.new.get("project_id"):
                 problems.add(
                     "parent_service_id", "The parent service must belong to the same project"
                 )
@@ -303,7 +311,11 @@ def _service_rules(check: RecordCheck, problems: Problems) -> None:
         children = check.session.execute(
             select(func.count())
             .select_from(Service)
-            .where(Service.parent_service_id == check.entity_id, Service.deleted_at.is_(None))
+            .where(
+                Service.parent_service_id == check.entity_id,
+                Service.deleted_at.is_(None),
+                Service.id.not_in(list(moving)),
+            )
         ).scalar_one()
         if children:
             problems.add(

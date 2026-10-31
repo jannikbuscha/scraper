@@ -10,7 +10,7 @@ one revision with a full snapshot.
 from __future__ import annotations
 
 import copy
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
@@ -214,14 +214,15 @@ def complete_links(
     The origin is provenance. On channel ui a stored link keeps its origin, a new link
     gets ``manual``, and the read-only keys of the input are ignored. Collectors create
     ``auto`` links. A restore brings back the links of a stored snapshot as recorded
-    (origin and match details). The other machine channels may state the origin of new
-    links.
+    (origin and match details), and a merge or unmerge writes the links it combined or
+    put back with their origin (DATA_MODEL §18). The other machine channels may state the
+    origin of new links.
     """
     stored = {link["subject_id"]: link for link in current or []}
     result = []
     for link in links:
         existing = stored.get(link["subject_id"])
-        if actor.channel == "restore":
+        if actor.channel in ("restore", "merge"):
             origin = link.get("origin") or (existing["origin"] if existing else "manual")
         elif existing is not None:
             origin = existing["origin"]
@@ -313,7 +314,7 @@ def insert_revision(
         "action": action,
         "note": note,
         "run_id": unit.actor.run_id,
-        "proposal_id": None,
+        "proposal_id": unit.actor.proposal_id,
         "restored_from": restored_from,
         "restored_from_version": restored_from_version,
         "batch_id": batch_id,
@@ -378,11 +379,13 @@ def create_record(
     note: str | None,
     batch_id: str | None,
     extra_values: Mapping[str, Any] | None = None,
+    field_snapshots: Mapping[str, Sequence[str]] | None = None,
 ) -> ChangeResult:
     """Create a record from normalised ``provided`` values (DATA_MODEL §6.2 step 2).
 
     ``extra_values`` are values set by the domain layer (defaults computed by the caller,
     e.g. a comment's status); they count as assigned but get no provenance entry.
+    ``field_snapshots`` name the raw snapshots of collected or accepted values (§5).
     """
     spec, session, actor = unit.spec, unit.session, unit.actor
     entity_id = new_id(spec.prefix)
@@ -412,10 +415,11 @@ def create_record(
     validate_record(check)
 
     meta: dict[str, Any] = {}
+    snapshots = field_snapshots or {}
     if spec.curated:
         for name, value in provided.items():
             if spec.field(name).tracked and not is_empty(value):
-                meta[name] = value_entry(actor, unit.ts)
+                meta[name] = value_entry(actor, unit.ts, snapshots=snapshots.get(name))
         if "canonical_url" in computed and new.get("canonical_url") and "url" in meta:
             meta["canonical_url"] = copy.deepcopy(meta["url"])
         for name in extra_values or {}:
@@ -483,10 +487,14 @@ def update_record(
     batch_id: str | None,
     action: str = "update",
     restore: RestoreMeta | None = None,
+    field_snapshots: Mapping[str, Sequence[str]] | None = None,
+    moving_services: Mapping[str, str] | None = None,
 ) -> ChangeResult:
     """Apply normalised changes to a live row (DATA_MODEL §6.2 step 3).
 
     No differing value → no-op (no revision, no version bump, ``changed = False``).
+    ``field_snapshots`` name the raw snapshots of collected or accepted values (§5);
+    ``moving_services`` are the services that change project together in a merge (§18).
     """
     spec, session, actor = unit.spec, unit.session, unit.actor
     entity_id = row["id"]
@@ -515,13 +523,7 @@ def update_record(
             snapshot=snapshot_of(spec, row, links),
         )
     if actor.channel == "collector":
-        locked = [
-            name
-            for name in changed
-            if not spec.field(name).computed_from and (old_meta.get(name) or {}).get("locked")
-        ]
-        if locked:
-            raise LockedFieldError(locked)
+        _check_collector_change(spec, changed, current, new, old_meta)
     check = RecordCheck(
         session=session,
         spec=spec,
@@ -533,15 +535,19 @@ def update_record(
         assigned=frozenset(changed),
         provided=provided,
         note=note,
+        moving_services=dict(moving_services or {}),
     )
     validate_record(check)
 
     meta = copy.deepcopy(old_meta)
+    snapshots = field_snapshots or {}
     if spec.curated:
         for name in changed:
             field_spec = spec.field(name)
             if not field_spec.tracked or field_spec.computed_from:
                 continue
+            if name == "links" and actor.channel == "collector" and name in meta:
+                continue  # suggested links leave the entry unchanged (§15.8)
             if restore is not None:
                 meta[name] = value_entry(
                     actor,
@@ -550,7 +556,7 @@ def update_record(
                     restored_from_version=restore.version,
                 )
             else:
-                meta[name] = value_entry(actor, unit.ts)
+                meta[name] = value_entry(actor, unit.ts, snapshots=snapshots.get(name))
         if "canonical_url" in changed and "url" in meta:
             meta["canonical_url"] = copy.deepcopy(meta["url"])
 
@@ -595,6 +601,33 @@ def update_record(
     )
 
 
+def _check_collector_change(
+    spec: EntityTypeSpec,
+    changed: set[str],
+    current: Mapping[str, Any],
+    new: Mapping[str, Any],
+    meta: Mapping[str, Any],
+) -> None:
+    """Channel ``collector`` never changes a locked field (DATA_MODEL §5), except system
+    fields (§15.5) and appending suggested links (§15.8), which are add-only: an existing
+    link is never changed or removed."""
+    if "links" in changed:
+        added = {link["subject_id"]: link for link in new.get("links") or []}
+        for link in current.get("links") or []:
+            if added.get(link["subject_id"]) != link:
+                raise ValueError("collectors only add document links; existing links stay")
+    locked = [
+        name
+        for name in changed
+        if name != "links"
+        and not spec.field(name).computed_from
+        and not spec.field(name).system
+        and (meta.get(name) or {}).get("locked")
+    ]
+    if locked:
+        raise LockedFieldError(locked)
+
+
 def write_state_change(
     unit: WriteUnit,
     row: Row,
@@ -603,8 +636,11 @@ def write_state_change(
     note: str | None,
     batch_id: str | None,
     deleted: bool,
+    merged_into: str | None = None,
 ) -> ChangeResult:
-    """Soft delete or undelete one row: state change, version bump, revision."""
+    """Soft delete or undelete one row: state change, version bump, revision. A merge
+    deletes with ``merged_into`` set (DATA_MODEL §18); every other state change, an
+    unmerge included, leaves ``merged_into`` empty."""
     spec = unit.spec
     links = links_of(unit, row)
     before = snapshot_of(spec, row, links)
@@ -614,6 +650,8 @@ def write_state_change(
         "updated_at": unit.ts,
         "updated_by": unit.actor.by,
     }
+    if spec.curated:
+        values["merged_into"] = merged_into
     version = update_row(unit, row, values)
     after_row = {**row, **values, "version": version}
     snapshot = snapshot_of(spec, after_row, links)

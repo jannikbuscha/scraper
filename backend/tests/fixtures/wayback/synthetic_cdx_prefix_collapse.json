@@ -1,0 +1,7 @@
+[["urlkey", "timestamp", "original", "statuscode", "mimetype"],
+["org,example)/projects/example-beta", "20160704000000", "http://example.org/projects/example-beta", "200", "text/html"],
+["org,example)/projects/page/2", "20160801000000", "http://example.org/projects/page/2", "200", "text/html"],
+["org,example)/projects/regions/example-alpha", "20170301000000", "http://example.org/projects/regions/example-alpha", "200", "text/html"],
+["org,example)/projects/technologies/example-alpha", "20200615000000", "https://example.org/projects/technologies/example-alpha", "200", "text/html"],
+["org,example)/projects/technologies/example-alpha", "20180510000000", "http://www.example.org/projects/technologies/example-alpha/", "200", "text/html"],
+["org,example)/projects/technologies/example-gamma", "20200102030405", "https://example.org/projects/technologies/example-gamma", "200", "text/html"]]

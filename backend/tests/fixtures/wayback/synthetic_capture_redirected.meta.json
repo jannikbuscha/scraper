@@ -1,0 +1,28 @@
+{
+  "fixture": "synthetic_capture_redirected",
+  "body": "synthetic_capture_redirected.html",
+  "collector": "wayback",
+  "source": "S5",
+  "purpose": "Manual documents (docs/COLLECTORS.md §10.3): an id_ capture whose request redirects to the nearest capture at another timestamp (via = wayback:<timestamp of the final URL>)",
+  "url": "https://web.archive.org/web/20200102000000id_/https://example.org/projects/technologies/example-gamma",
+  "final_url": "https://web.archive.org/web/20200102030405id_/https://example.org/projects/technologies/example-gamma",
+  "redirects": [
+    "302 https://web.archive.org/web/20200102030405id_/https://example.org/projects/technologies/example-gamma"
+  ],
+  "status": 200,
+  "retrieved_at": "2026-10-30T21:14:58.801900Z",
+  "content_type": "text/html; charset=utf-8",
+  "headers": {
+    "content-type": "text/html; charset=utf-8"
+  },
+  "sha256_original": "e1a176706a7ae5ae3c00a3832a06266d61f2fa0a6f1a4dd5a899a601bdc08db8",
+  "bytes_original": 414,
+  "sha256_stored": "e1a176706a7ae5ae3c00a3832a06266d61f2fa0a6f1a4dd5a899a601bdc08db8",
+  "bytes_stored": 414,
+  "trimmed": false,
+  "trim_note": "synthetic body written for this repository, not a capture (nothing trimmed)",
+  "licence": "synthetic test data written for this repository",
+  "attribution": "none needed: synthetic test data written for this repository, no third-party content",
+  "capture": "synthetic: written by hand on 2026-10-30 as an id_ capture (original bytes) of the form documented for the Wayback Machine (docs/SOURCES.md S5); not retrieved from any server",
+  "synthetic": true
+}

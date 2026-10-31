@@ -6,7 +6,9 @@ SPA fallback); the exception handlers turn every error into the error envelope.
 Startup creates nothing: migrations and the seed are CLI steps (``mdt db upgrade``,
 ``mdt seed``). :func:`preflight` refuses to start with a clear message when SQLite lacks
 FTS5, the database is missing or not at the current schema, or
-``codebook/parameters.yaml`` is unusable.
+``codebook/parameters.yaml`` or ``sources.yaml`` is unusable. While the app runs, it
+recovers stale collector runs at startup and asks its own running run to stop at shutdown
+(docs/COLLECTORS.md §6.2, §6.3).
 """
 
 from __future__ import annotations
@@ -22,9 +24,26 @@ from sqlalchemy.engine import make_url
 from sqlalchemy.exc import OperationalError
 
 from mdt import __version__
-from mdt.api import comments, entities, frontend, meta, revisions
+from mdt.api import (
+    collectors,
+    comments,
+    entities,
+    frontend,
+    imports,
+    manual_documents,
+    merge,
+    meta,
+    observations,
+    proposals,
+    revisions,
+    runs,
+    snapshots,
+    uploads,
+)
 from mdt.api.deps import AppContext
 from mdt.api.errors import install_error_handlers
+from mdt.collectors.runs import RunLauncher, recover_stale_runs
+from mdt.collectors.sources import SourcesError, load_sources
 from mdt.config import Settings, get_settings
 from mdt.db.engine import create_db_engine
 from mdt.db.migrate import head_revision
@@ -82,6 +101,10 @@ def preflight(settings: Settings, engine: Engine | None = None) -> None:
         load_parameters(settings.codebook_path)
     except CodebookError as exc:
         raise StartupError(f"codebook: {exc}") from exc
+    try:
+        load_sources(settings.sources_path)
+    except SourcesError as exc:
+        raise StartupError(f"sources: {exc}") from exc
     own_engine = engine is None
     checked = create_db_engine(settings.sqlalchemy_url) if engine is None else engine
     try:
@@ -101,11 +124,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         engine.dispose()
         raise
 
+    session_factory = create_session_factory(engine, settings)
+    launcher = RunLauncher(settings, session_factory)
+
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         try:
+            with session_factory() as session:
+                recover_stale_runs(session, settings)
             yield
         finally:
+            launcher.shutdown()
             engine.dispose()
 
     app = FastAPI(
@@ -118,9 +147,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
         telemetry=TELEMETRY_OFF,
     )
-    app.state.mdt = AppContext(settings, engine, create_session_factory(engine, settings))
+    app.state.mdt = AppContext(settings, engine, session_factory)
+    app.state.runs = launcher
     install_error_handlers(app)
-    for routes in (meta, entities, comments, revisions):
+    for routes in (
+        meta,
+        entities,
+        comments,
+        revisions,
+        collectors,
+        runs,
+        snapshots,
+        proposals,
+        observations,
+        merge,
+        uploads,
+        manual_documents,
+        imports,
+    ):
         routes.register(app)
     frontend.install(app, settings.frontend_dist_path)
     return app

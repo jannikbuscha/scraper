@@ -1,5 +1,8 @@
 """Shared fixtures.
 
+* ``no_network`` (autouse): every test stays offline (docs/COLLECTORS.md §12). A real
+  ``httpx2`` transport refuses every host but the loopback interface, which the threaded
+  local-server tests of the polite client use.
 * ``template_db``: one migrated database per test session (``alembic upgrade head``,
   never ``create_all``), seeded with the synthetic codebook and focal organisation.
 * ``db``: a fresh copy of the template per test. After the test, ``mdt check`` must find
@@ -16,6 +19,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import httpx2
 import pytest
 from sqlalchemy import Engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -27,6 +31,21 @@ from mdt.db.session import create_session_factory
 from mdt.domain.check import run_check
 from mdt.domain.seed import run_seed
 from tests import synthetic
+
+_LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})
+
+
+@pytest.fixture(autouse=True)
+def no_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A real transport refuses every host but the loopback interface."""
+    original = httpx2.HTTPTransport.handle_request
+
+    def guarded(self: httpx2.HTTPTransport, request: httpx2.Request) -> httpx2.Response:
+        if request.url.host not in _LOOPBACK:
+            raise AssertionError(f"tests must not reach the network: {request.url}")
+        return original(self, request)
+
+    monkeypatch.setattr(httpx2.HTTPTransport, "handle_request", guarded)
 
 
 def make_settings(root: Path, codebook: Path, seed: Path, **overrides: Any) -> Settings:

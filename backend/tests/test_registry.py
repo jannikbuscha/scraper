@@ -393,16 +393,21 @@ def test_quick_filters() -> None:
         "open_comments": "f.open_comments=range:1..",
         "no_start_date": "f.launch=empty:true",
         "in_scope": "f.in_paper_scope=eq:true",
+        "open_proposals": "f.open_proposals=range:1..",
         "period": None,
     }
     chips = meta["project"]["quick_filters"][-1]
     assert (chips["kind"], chips["field"]) == ("chips", "period")
     assert queries("service")["in_scope"] == "f.project_in_paper_scope=eq:true"
+    # Phase 2: records with open proposals, and records that collectors created.
+    assert queries("service")["collected"] == "f.created_by=contains:collector:"
     assert queries("event") == {
         "unverified": "f.verification_status=in:unverified",
         "open_comments": "f.open_comments=range:1..",
         "undated": "f.date=empty:true",
         "in_scope": "f.subject_in_paper_scope=eq:true",
+        "open_proposals": "f.open_proposals=range:1..",
+        "collected": "f.created_by=contains:collector:",
         "period": None,
     }
 
@@ -425,6 +430,8 @@ def test_quick_filters() -> None:
     }
     assert all(set(p) == {"key", "label", "query"} for p in event_presets["presets"])
     document = queries("document")
+    assert document["open_proposals"] == "f.open_proposals=range:1.."
+    assert document["collected"] == "f.created_by=contains:collector:"
     assert document["unscreened"] == "f.screening_status=in:unscreened"
     assert document["in_scope"] == "f.linked_in_paper_scope=eq:true"
     document_presets = presets("document")

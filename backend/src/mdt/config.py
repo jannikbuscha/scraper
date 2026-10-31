@@ -1,22 +1,39 @@
 """Application settings from environment variables and an optional ``.env`` file.
 
-Relative paths (``DATA_DIR``, ``CODEBOOK_DIR``, ``SEED_DIR``, ``FRONTEND_DIST`` and the
-``.env`` file itself) resolve against the repository root, so the CLI behaves the same
-whether it runs from the repository root (``uv run --project backend mdt``), from
-``backend/`` or inside the container (``/app``). Absolute values are used unchanged.
+Relative paths (``DATA_DIR``, ``CODEBOOK_DIR``, ``SEED_DIR``, ``FRONTEND_DIST``,
+``SOURCES_FILE``, ``COLLECTOR_REPLAY_DIR`` and the ``.env`` file itself) resolve against the
+repository root, so the CLI behaves the same whether it runs from the repository root
+(``uv run --project backend mdt``), from ``backend/`` or inside the container (``/app``).
+Absolute values are used unchanged.
+
+The collector settings and the rules for ``CONTACT_EMAIL`` are those of
+docs/COLLECTORS.md §3 and §4.4.
 """
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any
 
-from pydantic import AfterValidator, Field
+from pydantic import AfterValidator, BeforeValidator, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy.engine import make_url
 
 _LOG_LEVELS = ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")
+
+#: A plain e-mail address as it may appear in the User-Agent (no spaces, quotes,
+#: parentheses or semicolons, which would break the header's comment syntax).
+_EMAIL_RE = re.compile(
+    r"^[A-Za-z0-9._%+-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$"
+)
+#: Reserved example domains (RFC 2606, RFC 6761): a contact address there reaches nobody,
+#: so it is refused like a missing one (the ``.env.example`` placeholder is one of them).
+RESERVED_EMAIL_DOMAINS = ("example.org", "example.com", "example.net", "localhost")
+RESERVED_EMAIL_TLDS = ("example", "invalid", "test", "localhost")
+#: The optional project URL of the User-Agent: http(s), no whitespace, parentheses or ";".
+_PROJECT_URL_RE = re.compile(r"^https?://[^\s();]+$")
 
 
 def _detect_repo_root() -> Path:
@@ -48,6 +65,41 @@ def _upper_log_level(value: str) -> str:
     return level
 
 
+def _check_project_url(value: str) -> str:
+    url = value.strip()
+    if url and not _PROJECT_URL_RE.fullmatch(url):
+        raise ValueError("PROJECT_URL must be an http(s) URL without spaces, parentheses or ';'")
+    return url
+
+
+def _empty_to_none(value: Any) -> Any:
+    """An empty setting (e.g. ``COLLECTOR_REPLAY_DIR=``, as compose pins it) means unset."""
+    if isinstance(value, str) and not value.strip():
+        return None
+    return value
+
+
+def contact_email_problem(value: str | None) -> str | None:
+    """Why ``value`` cannot serve as ``CONTACT_EMAIL`` for collector runs and manual
+    fetches, or None if it can (docs/COLLECTORS.md §4.4). The message never repeats the
+    address."""
+    address = (value or "").strip()
+    if not address:
+        return "CONTACT_EMAIL is not set in .env; collectors need a contact address"
+    if not _EMAIL_RE.fullmatch(address):
+        return "CONTACT_EMAIL is not set to a plain e-mail address"
+    domain = address.rsplit("@", 1)[1].lower()
+    reserved = domain in RESERVED_EMAIL_DOMAINS or any(
+        domain.endswith(f".{name}") for name in RESERVED_EMAIL_DOMAINS
+    )
+    if reserved or domain.rsplit(".", 1)[-1] in RESERVED_EMAIL_TLDS:
+        return (
+            "CONTACT_EMAIL is not set to a real address (a reserved example domain such as "
+            "the .env.example placeholder)"
+        )
+    return None
+
+
 class Settings(BaseSettings):
     """Runtime configuration. Field names map to upper-case environment variables."""
 
@@ -68,6 +120,11 @@ class Settings(BaseSettings):
     max_comment_chars: int = Field(default=10_000, ge=1)
     focal_org_seed_key: str = "ministry-of-digital-transformation"
     contact_email: str | None = None
+    project_url: Annotated[str, AfterValidator(_check_project_url)] = ""
+    sources_file: Path = Path("sources.yaml")
+    run_stale_after_s: int = Field(default=300, ge=1)
+    collector_replay_dir: Annotated[Path | None, BeforeValidator(_empty_to_none)] = None
+    collector_run_inline: bool = False
     log_level: Annotated[str, AfterValidator(_upper_log_level)] = "INFO"
 
     @property
@@ -89,6 +146,21 @@ class Settings(BaseSettings):
     def frontend_dist_path(self) -> Path:
         """Absolute directory of the built frontend."""
         return _resolve(self.frontend_dist)
+
+    @property
+    def sources_path(self) -> Path:
+        """Absolute path of ``sources.yaml`` (docs/COLLECTORS.md §3)."""
+        return _resolve(self.sources_file)
+
+    @property
+    def replay_path(self) -> Path | None:
+        """Absolute fixture directory of replay mode, or None (docs/COLLECTORS.md §4.10)."""
+        return None if self.collector_replay_dir is None else _resolve(self.collector_replay_dir)
+
+    @property
+    def raw_path(self) -> Path:
+        """Directory of the raw snapshot files (docs/DATA_MODEL.md §14.1)."""
+        return self.data_path / "raw"
 
     @property
     def sqlalchemy_url(self) -> str:

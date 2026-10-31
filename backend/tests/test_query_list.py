@@ -132,7 +132,7 @@ def test_fifty_project_items_with_refs_and_counts(catalog: Catalog) -> None:
         result = list_entities(session, "project", {"page_size": str(PAGE_ITEMS)})
     assert len(result["items"]) == PAGE_ITEMS
     for item in result["items"]:
-        assert item["virtual"] == {"open_comments": 1, "comment_count": 1}
+        assert item["virtual"] == {"open_comments": 1, "comment_count": 1, "open_proposals": 0}
         assert item["refs"]["derived.launch_event_id"]["type"] == "event"
         assert item["label"].startswith("Bulk project")
     assert len(statements) <= 12

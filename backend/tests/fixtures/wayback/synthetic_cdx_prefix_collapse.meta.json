@@ -1,0 +1,26 @@
+{
+  "fixture": "synthetic_cdx_prefix_collapse",
+  "body": "synthetic_cdx_prefix_collapse.json",
+  "collector": "wayback",
+  "source": "S5",
+  "purpose": "C5: the page after the resume key (collapse=urlkey): rows under example.org/projects/ with a pre-relaunch /projects/<slug> row, another-rubric row, a pagination row and two rows of one URL in reverse order",
+  "url": "https://web.archive.org/cdx/search/cdx?url=example.org/projects/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=5000&showResumeKey=true&resumeKey=org%2Cexample%29%2Fprojects%2Fexample-beta+20160704000000%21",
+  "final_url": "https://web.archive.org/cdx/search/cdx?url=example.org/projects/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=5000&showResumeKey=true&resumeKey=org%2Cexample%29%2Fprojects%2Fexample-beta+20160704000000%21",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-30T21:14:58.801900Z",
+  "content_type": "application/json",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "sha256_original": "5aa3321c7b86d70386ff3a47c3add9c3052aae50cfb822368af5ded8a4f7b055",
+  "bytes_original": 893,
+  "sha256_stored": "5aa3321c7b86d70386ff3a47c3add9c3052aae50cfb822368af5ded8a4f7b055",
+  "bytes_stored": 893,
+  "trimmed": false,
+  "trim_note": "synthetic body written for this repository, not a capture (nothing trimmed)",
+  "licence": "synthetic test data written for this repository",
+  "attribution": "none needed: synthetic test data written for this repository, no third-party content",
+  "capture": "synthetic: written by hand on 2026-10-30 in the documented CDX JSON format of the wayback-cdx-server README (docs/SOURCES.md S5); not retrieved from any server",
+  "synthetic": true
+}

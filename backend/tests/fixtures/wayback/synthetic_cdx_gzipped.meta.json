@@ -1,0 +1,26 @@
+{
+  "fixture": "synthetic_cdx_gzipped",
+  "body": "synthetic_cdx_gzipped.json.gz",
+  "collector": "wayback",
+  "source": "S5",
+  "purpose": "C5: a gzip-compressed body without a Content-Encoding header (the CDX server's default)",
+  "url": "https://web.archive.org/cdx/search/cdx?url=example.org/services/example-two&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1",
+  "final_url": "https://web.archive.org/cdx/search/cdx?url=example.org/services/example-two&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-30T21:14:58.801900Z",
+  "content_type": "application/json",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "sha256_original": "a996143719ed22e582091912c731c764489ee9efa26396d46a50063c997d6adc",
+  "bytes_original": 143,
+  "sha256_stored": "a996143719ed22e582091912c731c764489ee9efa26396d46a50063c997d6adc",
+  "bytes_stored": 143,
+  "trimmed": false,
+  "trim_note": "synthetic body written for this repository, not a capture (nothing trimmed)",
+  "licence": "synthetic test data written for this repository",
+  "attribution": "none needed: synthetic test data written for this repository, no third-party content",
+  "capture": "synthetic: written by hand on 2026-10-30 in the documented CDX JSON format of the wayback-cdx-server README (docs/SOURCES.md S5); not retrieved from any server",
+  "synthetic": true
+}

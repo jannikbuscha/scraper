@@ -5,15 +5,20 @@ description = "MDT Portfolio: research data platform on the portfolio of the Min
 requires-python = ">=3.12"
 dependencies = [
     "alembic",
+    "beautifulsoup4",
     "fastapi",
+    "httpx2",
     "markdown-it-py[linkify]",
     "openpyxl",
+    "protego",
     "pydantic>=2",
     "pydantic-settings",
+    "pypdf",
     "python-ulid",
     "pyyaml",
     "sqlalchemy>=2",
     "typer",
+    "tzdata",
     "uvicorn[standard]",
 ]
 
@@ -22,7 +27,6 @@ mdt = "mdt.cli:app"
 
 [dependency-groups]
 dev = [
-    "httpx2",
     "mypy",
     "pytest",
     "ruff",

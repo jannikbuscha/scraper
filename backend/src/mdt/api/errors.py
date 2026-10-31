@@ -114,9 +114,11 @@ def _http_error(status: int) -> DomainError | None:
 
 
 async def domain_error_handler(request: Request, exc: Exception) -> JSONResponse:
-    """A :class:`DomainError` from a handler or domain function → its envelope."""
+    """A :class:`DomainError` from a handler or domain function → its envelope. A 500 is
+    logged and answered as ``internal_error`` with a request ID; other 5xx errors (``502
+    fetch_failed``, docs/API.md §7.8) are expected answers and keep their envelope."""
     assert isinstance(exc, DomainError)
-    if exc.status >= 500:
+    if exc.status == 500:
         return internal_error_response(request, exc)
     return error_response(exc)
 

@@ -155,6 +155,18 @@ class FixedCodeError(DomainError):
     default_message = "Fixed codes cannot be added or deactivated"
 
 
+class MergeConflictError(DomainError):
+    """409: a merge would break a rule (DATA_MODEL §18); nothing was changed. ``details``
+    lists the conflicts as ``{kind, id, label, message}``."""
+
+    code = "merge_conflict"
+    status = 409
+    default_message = "The records cannot be merged"
+
+    def __init__(self, conflicts: Sequence[Mapping[str, Any]]):
+        super().__init__(details={"conflicts": [dict(conflict) for conflict in conflicts]})
+
+
 class LockedFieldError(DomainError):
     """A collector tried to change fields that a person locked (internal; channel collector
     is never reachable over HTTP). The reconciler turns these into proposals."""

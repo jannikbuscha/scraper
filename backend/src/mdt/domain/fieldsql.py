@@ -40,7 +40,15 @@ from sqlalchemy import (
     type_coerce,
 )
 
-from mdt.db.models import Comment, Derived, DocumentLink, Project, Service, VocabularyTerm
+from mdt.db.models import (
+    Comment,
+    Derived,
+    DocumentLink,
+    Project,
+    Proposal,
+    Service,
+    VocabularyTerm,
+)
 from mdt.domain.listquery import FieldFilter, SortKey
 from mdt.domain.records import table_of
 from mdt.domain.registry import ENTITY_TYPES, ROW_VIRTUALS, EntityTypeSpec, FieldSpec
@@ -123,6 +131,20 @@ def comment_count_expression(entity_id: ColumnElement[Any]) -> ColumnElement[Any
             comment.c.subject_id == entity_id,
             comment.c.deleted_at.is_(None),
             or_(comment.c.parent_id.is_(None), root.c.deleted_at.is_(None)),
+        )
+        .scalar_subquery()
+    )
+
+
+def open_proposals_expression(entity_id: ColumnElement[Any]) -> ColumnElement[Any]:
+    """Open proposals whose ``subject_id`` or ``related_id`` is the entity (Phase 2)."""
+    proposal = _table(Proposal).alias()
+    return (
+        select(func.count())
+        .select_from(proposal)
+        .where(
+            proposal.c.state == "open",
+            or_(proposal.c.subject_id == entity_id, proposal.c.related_id == entity_id),
         )
         .scalar_subquery()
     )
@@ -224,6 +246,8 @@ class Source:
             return open_comments_expression(columns.id)
         if name == "comment_count":
             return comment_count_expression(columns.id)
+        if name == "open_proposals":
+            return open_proposals_expression(columns.id)
         if name == "project_in_paper_scope":
             return _as_flag(columns.project_id.in_(in_scope_project_ids()))
         if name == "subject_in_paper_scope":

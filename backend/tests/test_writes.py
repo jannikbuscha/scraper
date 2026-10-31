@@ -42,6 +42,7 @@ def entry(src: str, by: str, at: str, *, locked: bool = True) -> dict[str, objec
         "verified": "unverified",
         "evidence_id": None,
         "restored_from_version": None,
+        "raw_snapshot_ids": None,
     }
 
 
@@ -388,11 +389,15 @@ def test_collector_may_write_system_fields_clients_may_not(db: Db) -> None:
             session,
             "document",
             None,
-            {"title": "Example document", "source_id": "example_source", "text_hash": "abc"},
+            {
+                "title": "Example document",
+                "source_id": "example_source",
+                "extraction_method": "txt",
+            },
             COLLECTOR,
         )
         row = load(session, "document", document.entity_id)
-        assert (row["source_id"], row["text_hash"]) == ("example_source", "abc")
+        assert (row["source_id"], row["extraction_method"]) == ("example_source", "txt")
         with pytest.raises(ValidationError):
             apply_change(
                 session,

@@ -14,13 +14,14 @@ from typing import Any, Final
 from sqlalchemy import Table, func, select
 from sqlalchemy.orm import Session
 
-from mdt.db.models import Comment, Derived, DocumentText, Revision
+from mdt.db.models import Comment, Derived, DocumentText, Proposal, Revision
 from mdt.db.session import read_transaction
 from mdt.domain.comments import edited_comment_ids, render_markdown
 from mdt.domain.derived import INITIAL
 from mdt.domain.errors import NotFoundError
 from mdt.domain.fieldsql import Source
 from mdt.domain.labels import RefInfo, ref_infos, refs_payload
+from mdt.domain.observations import observations_of_record
 from mdt.domain.records import (
     Row,
     field_meta_for_reading,
@@ -161,6 +162,26 @@ def open_comments_by_field(session: Session, entity_id: str) -> dict[str, int]:
     return {str(field): int(count) for field, count in rows}
 
 
+def open_proposals_by_field(session: Session, entity_id: str) -> dict[str, int]:
+    """Open ``update_field`` proposals of the record per field (Phase 2, API §2)."""
+    proposal = Proposal.__table__
+    assert isinstance(proposal, Table)
+    rows = session.execute(
+        select(proposal.c.field, func.count())
+        .where(
+            proposal.c.subject_id == entity_id,
+            proposal.c.kind == "update_field",
+            proposal.c.state == "open",
+        )
+        .group_by(proposal.c.field)
+    )
+    return {str(field): int(count) for field, count in rows}
+
+
+#: Types whose detail items list their source observations (API §2, UI §8.7).
+OBSERVED_TYPES: Final = ("project", "service", "document")
+
+
 def document_text(session: Session, text_hash: str | None) -> str | None:
     """The stored text of a document's current text version, or None."""
     if not text_hash:
@@ -214,8 +235,10 @@ def serialize_items(
 ) -> list[dict[str, Any]]:
     """Items of API §2 for stored rows, loaded in batches.
 
-    ``detail`` adds ``virtual.open_comments_by_field`` and, for documents,
-    ``fields.text``; ``match`` (an FTS expression) adds search snippets to documents.
+    ``detail`` adds ``virtual.open_comments_by_field``, ``virtual.open_proposals_by_field``
+    (types with proposals), ``observations`` (project, service, document) and, for
+    documents, ``fields.text``; ``match`` (an FTS expression) adds search snippets to
+    documents.
     """
     ids = [row["id"] for row in rows]
     links = load_links(session, ids) if spec.has_field("links") else {}
@@ -248,6 +271,10 @@ def serialize_items(
         values = dict(virtual.get(entity_id, {}))
         if detail:
             values["open_comments_by_field"] = open_comments_by_field(session, entity_id)
+            if spec.has_field("open_proposals"):
+                values["open_proposals_by_field"] = open_proposals_by_field(session, entity_id)
+            if spec.name in OBSERVED_TYPES:
+                item["observations"] = observations_of_record(session, entity_id)
             if spec.name == "document":
                 fields["text"] = document_text(session, row["text_hash"])
         item["fields"] = fields

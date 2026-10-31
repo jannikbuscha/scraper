@@ -8,7 +8,8 @@ from tests.api.helpers import USER, ApiClient, error_of
 
 ITEM_KEYS = {
     "id", "entity_type", "entity_id", "entity_label", "version", "at", "author", "channel",
-    "action", "note", "changed_fields", "restored_from_version", "batch_id", "context",
+    "action", "note", "changed_fields", "restored_from_version", "batch_id", "run_id",
+    "proposal_id", "context",
 }  # fmt: skip
 
 

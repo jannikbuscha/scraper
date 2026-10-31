@@ -93,6 +93,7 @@ def test_restore_applies_the_old_values_with_provenance(db: Db) -> None:
             "verified": "unverified",
             "evidence_id": None,
             "restored_from_version": 1,
+            "raw_snapshot_ids": None,
         }
         assert meta["notes"]["src"] == "manual"  # no entry in version 1
         assert meta["notes"]["restored_from_version"] == 1

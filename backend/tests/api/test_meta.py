@@ -80,6 +80,7 @@ def test_meta_entity_types(client: ApiClient) -> None:
         "open_comments",
         "no_start_date",
         "in_scope",
+        "open_proposals",
         "period",
     ]
     fields = {field["name"]: field for field in project["fields"]}

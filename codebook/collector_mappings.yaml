@@ -1,0 +1,67 @@
+# Source labels → vocabulary codes for the collectors (docs/COLLECTORS.md §7.9). Not a vocabulary.
+#
+# Draft coding rules, open to the team like the codebook. Every target code must be an active
+# term of its vocabulary, otherwise runs of the collector that uses the mapping fail (fatal).
+# Labels are compared after case folding and whitespace collapsing. A label without a mapping
+# gives the run warning unmapped_label and the fallback code (or no code without a fallback);
+# labels under "ignore" are skipped without a warning.
+version: 1
+mappings:
+  # C4: the kind.slug of thedigital.gov.ua documents (36 values on 2026-10-29) → doc_type.
+  ministry_document_kinds:
+    collector: ministry_news
+    vocabulary: doc_type
+    fallback: other
+    codes:
+      legal_act:
+        - decision
+        - order
+        - nakaz
+        - legislative-act
+        - zakon
+        - decree
+        - proekt-ukazu
+        - resolution
+        - directive
+        - draft-regulatory-act
+        - license-conditions
+        - convention
+        - agreement
+      report:
+        - report
+        - audit-report
+        - vnutrishniy-audyt
+        - richna-finansova-zvitnist
+        - richna-konsolidovana-finansova-zvitnist
+      strategy_policy:
+        - plan
+      statistics:
+        - dashbord
+      other:
+        - regulation  # the site applies it to the ministry's annual work plans (SOURCES S4)
+        - protocol
+        - proposal
+        - recommendation
+        - appeal-statement
+        - contract
+        - declaration
+        - methodological-document
+        - instruction
+        - budget-request
+        - project
+        - application-form
+        - other
+        - pasport-biudzetnykh-prohram
+        - upravlinnia-aktyvamy
+        - koshtorys
+  # C3: the leads under "Як отримати послугу" on diia.gov.ua service pages (SOURCES S3) → channel.
+  diia_portal_channels:
+    collector: diia_catalog
+    vocabulary: channel
+    codes:
+      portal:
+        - "Онлайн"
+      physical:
+        - "Офлайн"
+    ignore:
+      - "Результат"  # the result lead on every captured service page

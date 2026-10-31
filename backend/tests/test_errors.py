@@ -31,6 +31,7 @@ API_CODES = {
     "reference_deleted": 409,
     "not_deletable": 409,
     "fixed_code": 409,
+    "merge_conflict": 409,
     "internal_error": 500,
 }
 

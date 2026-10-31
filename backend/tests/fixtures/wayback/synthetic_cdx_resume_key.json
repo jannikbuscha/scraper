@@ -1,0 +1,5 @@
+[["urlkey", "timestamp", "original", "statuscode", "mimetype"],
+["org,example)/projects/business", "20170101000000", "http://example.org/projects/business", "200", "text/html"],
+["org,example)/projects/business/example-beta", "20210301223000", "https://example.org/projects/business/example-beta", "200", "text/html"],
+[],
+["org%2Cexample%29%2Fprojects%2Fexample-beta+20160704000000%21"]]

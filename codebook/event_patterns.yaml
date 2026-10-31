@@ -1,0 +1,68 @@
+# Phrase patterns for create_event proposals (docs/CODEBOOK.md §4, docs/COLLECTORS.md §7.7). Not a vocabulary.
+#
+# Initial content: the draft phrase list of docs/CODEBOOK.md §4, nothing added. Ukrainian
+# cells give one entry per stem or phrase, English cells one entry per cell (as in the
+# example of docs/COLLECTORS.md §7.7), so the precision per pattern_id can be reported.
+#
+# Matching (on each sentence of a document's stored text, normalised with
+# normalize_for_search and case-folded; words are runs of letters and digits, any other
+# non-space character is a word of its own):
+#   stems:   a word that starts with the stem (CODEBOOK "запуст-" = stem "запуст");
+#   phrases: the sequence of words; a word written with a trailing "-" is a stem
+#            ("доступн- для");
+#   all_of:  stems that must all occur in the same sentence ("тестов-" + "режим").
+# A pattern applies to documents of its lang; documents without a language get all
+# patterns. A sentence with a pattern match and an alias match of a project or service
+# yields one create_event proposal per (subject, event type), never a fact.
+version: 1
+patterns:
+  # launch
+  - {id: launch_uk_zapust, event_type: launch, lang: uk, stems: ["запуст"]}
+  - {id: launch_uk_zapratsiu, event_type: launch, lang: uk, stems: ["запрацю"]}
+  - {id: launch_uk_zjavyl, event_type: launch, lang: uk, stems: ["зʼявил"]}
+  - {id: launch_uk_startu, event_type: launch, lang: uk, stems: ["старту"]}
+  - {id: launch_en_launched, event_type: launch, lang: en, phrases: ["launched", "now available", "went live"]}
+  # beta_launch
+  - {id: beta_uk_test_mode, event_type: beta_launch, lang: uk, all_of: ["тестов", "режим"]}
+  - {id: beta_uk_pilot, event_type: beta_launch, lang: uk, stems: ["пілот"]}
+  - {id: beta_uk_beta, event_type: beta_launch, lang: uk, phrases: ["бета"]}
+  - {id: beta_en_beta, event_type: beta_launch, lang: en, phrases: ["beta", "pilot", "test mode"]}
+  # announced
+  - {id: announced_uk_anonsu, event_type: announced, lang: uk, stems: ["анонсу"]}
+  - {id: announced_uk_oholosy, event_type: announced, lang: uk, stems: ["оголоси"]}
+  - {id: announced_uk_prezentu, event_type: announced, lang: uk, stems: ["презенту"]}
+  - {id: announced_uk_planu, event_type: announced, lang: uk, stems: ["плану"]}
+  - {id: announced_en_announced, event_type: announced, lang: en, phrases: ["announced", "presented", "plans to"]}
+  # expansion
+  - {id: expansion_uk_rozshyr, event_type: expansion, lang: uk, stems: ["розшир"]}
+  - {id: expansion_uk_masshtabu, event_type: expansion, lang: uk, stems: ["масштабу"]}
+  - {id: expansion_uk_dostupn_dlia, event_type: expansion, lang: uk, phrases: ["доступн- для"]}
+  - {id: expansion_en_expanded, event_type: expansion, lang: en, phrases: ["expanded", "scaled", "now also available for"]}
+  # major_update
+  - {id: major_update_uk_onovyl, event_type: major_update, lang: uk, stems: ["оновил"]}
+  - {id: major_update_uk_onovlen, event_type: major_update, lang: uk, stems: ["оновлен"]}
+  - {id: major_update_uk_nova_versiia, event_type: major_update, lang: uk, phrases: ["нова версія"]}
+  - {id: major_update_en_updated, event_type: major_update, lang: en, phrases: ["updated", "new version"]}
+  # rebrand
+  - {id: rebrand_uk_pereimenuva, event_type: rebrand, lang: uk, stems: ["перейменува"]}
+  - {id: rebrand_uk_rebrendynh, event_type: rebrand, lang: uk, phrases: ["ребрендинг"]}
+  - {id: rebrand_en_renamed, event_type: rebrand, lang: en, phrases: ["renamed", "rebranded"]}
+  # governance_change
+  - {id: governance_uk_perepidporiadkuva, event_type: governance_change, lang: uk, stems: ["перепідпорядкува"]}
+  - {id: governance_uk_peredano_v_upravlinnia, event_type: governance_change, lang: uk, phrases: ["передано в управління"]}
+  - {id: governance_uk_perekhodyt_v_upravlinnia, event_type: governance_change, lang: uk, phrases: ["переходить в управління"]}
+  - {id: governance_uk_koordynats, event_type: governance_change, lang: uk, stems: ["координац"]}
+  - {id: governance_en_transferred, event_type: governance_change, lang: en, phrases: ["transferred", "now coordinated by"]}
+  # suspension
+  - {id: suspension_uk_pryzupyn, event_type: suspension, lang: uk, stems: ["призупин"]}
+  - {id: suspension_uk_tymchasovo_nedostup, event_type: suspension, lang: uk, phrases: ["тимчасово недоступ-"]}
+  - {id: suspension_en_suspended, event_type: suspension, lang: en, phrases: ["suspended", "temporarily unavailable"]}
+  # discontinuation
+  - {id: discontinuation_uk_prypyn, event_type: discontinuation, lang: uk, stems: ["припин"]}
+  - {id: discontinuation_uk_zakry, event_type: discontinuation, lang: uk, stems: ["закри"]}
+  - {id: discontinuation_en_discontinued, event_type: discontinuation, lang: en, phrases: ["discontinued", "closed"]}
+  # legal_basis_adopted
+  - {id: legal_basis_uk_ukhvalyv_postanovu, event_type: legal_basis_adopted, lang: uk, phrases: ["ухвалив постанову"]}
+  - {id: legal_basis_uk_zatverdyv, event_type: legal_basis_adopted, lang: uk, phrases: ["затвердив"]}
+  - {id: legal_basis_uk_postanova_no, event_type: legal_basis_adopted, lang: uk, phrases: ["постанова №"]}
+  - {id: legal_basis_en_resolution_adopted, event_type: legal_basis_adopted, lang: en, phrases: ["resolution adopted", "approved"]}

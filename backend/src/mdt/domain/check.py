@@ -10,10 +10,22 @@ from sqlalchemy.orm import Session
 
 from mdt.config import Settings
 from mdt.db.ddl import REVISION_TRIGGER_NAMES, existing_revision_triggers
-from mdt.db.models import Derived, DocumentLink, Evidence, Revision, SearchKey
+from mdt.db.models import (
+    Derived,
+    Document,
+    DocumentLink,
+    DocumentText,
+    Evidence,
+    FetchLog,
+    Proposal,
+    RawSnapshot,
+    Revision,
+    SearchKey,
+    SourceObservation,
+)
 from mdt.db.session import read_transaction, session_settings
 from mdt.domain import derived
-from mdt.domain.normalize import canonical_json
+from mdt.domain.normalize import canonical_json, is_empty
 from mdt.domain.records import field_meta_of, load_links, state_of, table_of, tracked_values
 from mdt.domain.registry import ENTITY_TYPES
 from mdt.domain.snapshots import diff_fields
@@ -62,6 +74,8 @@ def run_check(session: Session, settings: Settings | None = None) -> CheckReport
         _check_derived(session, settings, collector)
         _check_revisions(session, collector)
         _check_verifications(session, collector)
+        _check_acquisition_references(session, existing, collector)
+        _check_merges(session, existing, collector)
     return report
 
 
@@ -197,7 +211,11 @@ def _check_revisions(session: Session, collector: _Collector) -> None:
                 )
             fields = tracked_values(spec, row, links.get(row["id"]))
             changes, missing = diff_fields(spec, snapshot.get("fields") or {}, fields)
-            differing = list(changes) + missing
+            # A field added by a later migration is not recorded in older snapshots; that
+            # is fine while it is still empty (e.g. document.source_record_at, 0002).
+            differing = list(changes) + [
+                name for name in missing if name not in fields or not is_empty(fields[name])
+            ]
             if differing:
                 collector.add(
                     "revision", f"{row['id']} differs from its snapshot in {_names(differing)}"
@@ -250,6 +268,79 @@ def _check_verifications(session: Session, collector: _Collector) -> None:
                     collector.add(
                         "verification", f"{where} with evidence {evidence_id} without a quote"
                     )
+
+
+def _check_acquisition_references(
+    session: Session, existing: dict[str, str], collector: _Collector
+) -> None:
+    """Phase 2 references (DATA_MODEL §13): raw snapshots named by documents, evidence,
+    proposals, the fetch log and ``field_meta[*].raw_snapshot_ids``; document texts; the
+    records named by observations and open proposals."""
+    snapshots = set(session.execute(select(RawSnapshot.id)).scalars())
+    for kind, rows in (
+        ("document", select(Document.id, Document.raw_snapshot_id)),
+        ("evidence", select(Evidence.id, Evidence.raw_snapshot_id)),
+        ("proposal", select(Proposal.id, Proposal.raw_snapshot_id)),
+        ("fetch_log", select(FetchLog.id, FetchLog.raw_snapshot_id)),
+    ):
+        for row_id, snapshot_id in session.execute(rows):
+            if snapshot_id is not None and snapshot_id not in snapshots:
+                collector.add(
+                    "reference", f"{kind} {row_id} refers to missing raw snapshot {snapshot_id}"
+                )
+    for spec in ENTITY_TYPES.values():
+        if not spec.curated:
+            continue
+        table = table_of(spec)
+        for entity_id, field_meta in session.execute(select(table.c.id, table.c.field_meta)):
+            for name, entry in sorted((field_meta or {}).items()):
+                ids = entry.get("raw_snapshot_ids") if isinstance(entry, dict) else None
+                for snapshot_id in ids or ():
+                    if snapshot_id not in snapshots:
+                        collector.add(
+                            "reference",
+                            f"{entity_id}.{name} names missing raw snapshot {snapshot_id}",
+                        )
+    texts = set(session.execute(select(DocumentText.text_hash)).scalars())
+    for document_id, text_hash in session.execute(
+        select(Document.id, Document.text_hash).where(Document.text_hash.is_not(None))
+    ):
+        if text_hash not in texts:
+            collector.add("reference", f"{document_id} has no document text {text_hash}")
+    for observation_id, subject_id in session.execute(
+        select(SourceObservation.id, SourceObservation.subject_id).where(
+            SourceObservation.subject_id.is_not(None)
+        )
+    ):
+        if subject_id not in existing:
+            collector.add(
+                "reference", f"observation {observation_id} refers to missing {subject_id}"
+            )
+    for proposal_id, subject_id, related_id in session.execute(
+        select(Proposal.id, Proposal.subject_id, Proposal.related_id).where(
+            Proposal.state == "open"
+        )
+    ):
+        for value in (subject_id, related_id):
+            if value is not None and value not in existing:
+                collector.add("reference", f"open proposal {proposal_id} refers to missing {value}")
+
+
+def _check_merges(session: Session, existing: dict[str, str], collector: _Collector) -> None:
+    """Merged records stay deleted and name an existing survivor (DATA_MODEL §13, §18)."""
+    for spec in ENTITY_TYPES.values():
+        if not spec.curated:
+            continue
+        table = table_of(spec)
+        for entity_id, merged_into, deleted_at in session.execute(
+            select(table.c.id, table.c.merged_into, table.c.deleted_at).where(
+                table.c.merged_into.is_not(None)
+            )
+        ):
+            if deleted_at is None:
+                collector.add("merge", f"{entity_id} is merged into {merged_into} but not deleted")
+            if merged_into not in existing:
+                collector.add("merge", f"{entity_id} is merged into missing {merged_into}")
 
 
 def _names(names: Iterable[str]) -> str:

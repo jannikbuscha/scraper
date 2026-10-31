@@ -41,6 +41,8 @@ FEED_KEYS = {
     "changed_fields",
     "restored_from_version",
     "batch_id",
+    "run_id",
+    "proposal_id",
     "context",
 }
 

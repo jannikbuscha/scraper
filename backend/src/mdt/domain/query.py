@@ -14,6 +14,7 @@ from typing import Any, Final
 from sqlalchemy import ColumnElement, FromClause, Select, Table, distinct, func, not_, select, true
 from sqlalchemy.orm import Session
 
+from mdt.collectors.runs import runs_summary
 from mdt.db.models import Comment, DocumentLink, SearchKey, Vocabulary, VocabularyTerm
 from mdt.db.session import read_transaction
 from mdt.domain.errors import BadFilterError
@@ -28,6 +29,7 @@ from mdt.domain.listquery import (
     parse_list_query,
     parse_scope,
 )
+from mdt.domain.proposal_queries import open_proposal_count
 from mdt.domain.records import table_of
 from mdt.domain.registry import VOCABULARY_TERM, EntityTypeSpec, FieldSpec, generic_types
 from mdt.domain.search import match_subquery
@@ -284,7 +286,8 @@ def _open_comment_count(session: Session) -> int:
 
 def entity_stats(session: Session) -> dict[str, Any]:
     """``GET /api/stats``: per generic type the live rows (``total``), the live
-    unverified rows and the deleted rows, plus the number of open comment threads."""
+    unverified rows and the deleted rows, the number of open comment threads and, in
+    Phase 2, of open proposals, and the running and the last finished collector run."""
     entities: dict[str, dict[str, int]] = {}
     with read_transaction(session):
         for spec in generic_types():
@@ -303,7 +306,13 @@ def entity_stats(session: Session) -> dict[str, Any]:
                 "deleted": int(deleted),
             }
         open_comments = _open_comment_count(session)
-    return {"entities": entities, "open_comments": open_comments}
+        open_proposals = open_proposal_count(session)
+    return {
+        "entities": entities,
+        "open_comments": open_comments,
+        "open_proposals": open_proposals,
+        "runs": runs_summary(session),
+    }
 
 
 def vocabulary_usage(session: Session) -> dict[tuple[str, str], int]:

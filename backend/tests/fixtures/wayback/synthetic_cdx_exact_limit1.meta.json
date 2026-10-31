@@ -1,0 +1,26 @@
+{
+  "fixture": "synthetic_cdx_exact_limit1",
+  "body": "synthetic_cdx_exact_limit1.json",
+  "collector": "wayback",
+  "source": "S5",
+  "purpose": "C5: single-URL query (limit=1) of a domain root (an official URL): one capture",
+  "url": "https://web.archive.org/cdx/search/cdx?url=example.com/&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1",
+  "final_url": "https://web.archive.org/cdx/search/cdx?url=example.com/&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1",
+  "redirects": [],
+  "status": 200,
+  "retrieved_at": "2026-10-30T21:14:58.801900Z",
+  "content_type": "application/json",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "sha256_original": "5bf4ea2815556e5ddc5b4d60165bb054516fe3e91093555af7ac6f8a6a84797d",
+  "bytes_original": 144,
+  "sha256_stored": "5bf4ea2815556e5ddc5b4d60165bb054516fe3e91093555af7ac6f8a6a84797d",
+  "bytes_stored": 144,
+  "trimmed": false,
+  "trim_note": "synthetic body written for this repository, not a capture (nothing trimmed)",
+  "licence": "synthetic test data written for this repository",
+  "attribution": "none needed: synthetic test data written for this repository, no third-party content",
+  "capture": "synthetic: written by hand on 2026-10-30 in the documented CDX JSON format of the wayback-cdx-server README (docs/SOURCES.md S5); not retrieved from any server",
+  "synthetic": true
+}

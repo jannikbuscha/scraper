@@ -71,6 +71,7 @@ ROW_VIRTUALS: frozenset[str] = frozenset(
     {
         "open_comments",
         "comment_count",
+        "open_proposals",
         "project_in_paper_scope",
         "subject_in_paper_scope",
         "linked_in_paper_scope",
@@ -641,6 +642,16 @@ def _common(table_type: bool) -> tuple[FieldSpec, ...]:
     )
 
 
+def _open_proposals() -> FieldSpec:
+    """The open proposals that concern the record (Phase 2, DATA_MODEL §2.4)."""
+    return _virtual(
+        "open_proposals",
+        "int",
+        "Open proposals",
+        help="Number of open proposals of the collectors about this record (review inbox).",
+    )
+
+
 def _system_columns() -> tuple[FieldSpec, ...]:
     return (
         _system_column("created_at", "datetime", "Created at"),
@@ -774,6 +785,7 @@ PROJECT = EntityTypeSpec(
             *_wartime(),
             *_framework(),
             *_derived_fields(launch_in_list=True, period_in_list=True),
+            _open_proposals(),
             table_type=True,
         ),
         [
@@ -877,6 +889,7 @@ SERVICE = EntityTypeSpec(
                 "Project in paper scope",
                 help="Whether the service's project is in the paper's scope.",
             ),
+            _open_proposals(),
             table_type=True,
         ),
         [
@@ -954,6 +967,7 @@ EVENT = EntityTypeSpec(
                 "Subject in paper scope",
                 help="Whether the subject is an in-scope project or a service of one.",
             ),
+            _open_proposals(),
             table_type=True,
         ),
         [
@@ -1063,6 +1077,17 @@ DOCUMENT = EntityTypeSpec(
                 "sources",
                 help="Retrieval time of the current content version (UTC); required with a URL.",
             ),
+            _system(
+                "source_record_at",
+                "datetime",
+                "Source record time",
+                filter="date_range",
+                sortable=True,
+                help=(
+                    "Timestamp the source attaches to its record of the document when that is "
+                    "not a publication date; never copied into Published."
+                ),
+            ),
             _system("source_id", "string", "Source", help="Source key (sources.yaml)."),
             _system("external_id", "string", "External ID", help="Identifier given by the source."),
             _system(
@@ -1143,6 +1168,7 @@ DOCUMENT = EntityTypeSpec(
                 detail_only=True,
                 help="Extracted text of the current version, shown as plain text.",
             ),
+            _open_proposals(),
             table_type=True,
         ),
         [
@@ -1701,13 +1727,26 @@ def quick_filters(entity_type: str, parameters: PeriodParameters | None) -> list
         "field": "period",
         "values": list(PERIOD_CODES),
     }
-    if entity_type in ("project", "service"):
-        scope_field = "in_paper_scope" if entity_type == "project" else "project_in_paper_scope"
+    # Phase 2: records with open proposals, and records that collectors created.
+    open_proposals = _toggle("open_proposals", "Open proposals", "f.open_proposals=range:1..")
+    collected = _toggle("collected", "Collected", "f.created_by=contains:collector:")
+    if entity_type == "project":
         return [
             unverified,
             open_comments,
             _toggle("no_start_date", "No start date", "f.launch=empty:true"),
-            _toggle("in_scope", "In paper scope", f"f.{scope_field}=eq:true"),
+            _toggle("in_scope", "In paper scope", "f.in_paper_scope=eq:true"),
+            open_proposals,
+            chips,
+        ]
+    if entity_type == "service":
+        return [
+            unverified,
+            open_comments,
+            _toggle("no_start_date", "No start date", "f.launch=empty:true"),
+            _toggle("in_scope", "In paper scope", "f.project_in_paper_scope=eq:true"),
+            open_proposals,
+            collected,
             chips,
         ]
     if entity_type == "event":
@@ -1716,6 +1755,8 @@ def quick_filters(entity_type: str, parameters: PeriodParameters | None) -> list
             open_comments,
             _toggle("undated", "Undated", "f.date=empty:true"),
             _toggle("in_scope", "In paper scope", "f.subject_in_paper_scope=eq:true"),
+            open_proposals,
+            collected,
         ]
         return filters + ([period_presets("date", parameters)] if parameters else [])
     if entity_type == "document":
@@ -1724,6 +1765,8 @@ def quick_filters(entity_type: str, parameters: PeriodParameters | None) -> list
             open_comments,
             _toggle("unscreened", "Unscreened", "f.screening_status=in:unscreened"),
             _toggle("in_scope", "In paper scope", "f.linked_in_paper_scope=eq:true"),
+            open_proposals,
+            collected,
         ]
         return filters + ([period_presets("published", parameters)] if parameters else [])
     if entity_type == "organization":

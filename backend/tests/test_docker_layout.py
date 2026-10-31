@@ -90,3 +90,39 @@ def test_bind_mount_sources_in_the_repository_exist_in_every_clone() -> None:
             checked.add(source)
     # Guards against a vacuous pass: the documented release directory was found and checked.
     assert "./releases" in checked
+
+
+def test_collector_settings_are_pinned_in_the_container() -> None:
+    """docs/COLLECTORS.md §3: the image carries sources.yaml, compose pins SOURCES_FILE to it,
+    and COLLECTOR_REPLAY_DIR is pinned empty, so the server's database never runs in replay
+    mode whatever .env says."""
+    environment = compose_services()["app"]["environment"]
+    assert environment["SOURCES_FILE"] == "/app/sources.yaml"
+    assert environment["COLLECTOR_REPLAY_DIR"] == ""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY sources.yaml ./sources.yaml" in dockerfile
+    allowlist = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    assert "!sources.yaml" in allowlist
+
+
+def test_the_image_carries_the_collector_inputs_and_the_settings_are_documented() -> None:
+    """The image copies the codebook (with the two collector files of docs/COLLECTORS.md
+    §7.7 and §7.9) and sets SOURCES_FILE; .env.example documents every collector setting
+    except the test-only COLLECTOR_RUN_INLINE (docs/COLLECTORS.md §3)."""
+    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
+    assert "COPY codebook/ ./codebook/" in dockerfile
+    assert "SOURCES_FILE=/app/sources.yaml" in dockerfile
+    allowlist = (REPO_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+    assert "!codebook/" in allowlist
+    for name in ("event_patterns.yaml", "collector_mappings.yaml"):
+        assert (REPO_ROOT / "codebook" / name).is_file(), name
+    example = (REPO_ROOT / ".env.example").read_text(encoding="utf-8")
+    for setting in (
+        "CONTACT_EMAIL",
+        "PROJECT_URL",
+        "SOURCES_FILE",
+        "RUN_STALE_AFTER_S",
+        "COLLECTOR_REPLAY_DIR",
+    ):
+        assert f"{setting}=" in example, setting
+    assert "COLLECTOR_RUN_INLINE" not in example

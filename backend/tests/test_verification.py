@@ -75,6 +75,7 @@ def test_verification_sets_status_evidence_and_lock(db: Db) -> None:
             "verified": "verified",
             "evidence_id": evidence_id,
             "restored_from_version": None,
+            "raw_snapshot_ids": None,
         }
         assert row["updated_by"] == USER.by
         revision = revisions_of(session, project_id)[-1]

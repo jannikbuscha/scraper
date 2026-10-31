@@ -43,6 +43,7 @@ ACTIONS: Final = (
     "undelete",
     "restore",
     "merge",
+    "unmerge",
     "resolve",
     "reopen",
 )
@@ -89,8 +90,8 @@ def _time_bound(name: str, raw: str | None, *, end: bool) -> str | None:
 
 def recent_changes(session: Session, params: QueryParams) -> dict[str, Any]:
     """``GET /api/revisions``: revisions of every type (comments, terms and saved views
-    included), newest first, with filters on type, channel, action, time, entity and
-    batch."""
+    included), newest first, with filters on type, channel, action, time, entity, batch,
+    collector run and accepted proposal."""
     pairs = param_pairs(params)
     revision = _table(Revision)
     conditions: list[ColumnElement[bool]] = []
@@ -108,7 +109,7 @@ def recent_changes(session: Session, params: QueryParams) -> dict[str, Any]:
     until = _time_bound("until", last_param(pairs, "until"), end=True)
     if until is not None:
         conditions.append(revision.c.at <= until)
-    for name in ("entity_id", "batch_id"):
+    for name in ("entity_id", "batch_id", "run_id", "proposal_id"):
         value = (last_param(pairs, name) or "").strip()
         if value:
             conditions.append(revision.c[name] == value)
@@ -128,6 +129,8 @@ def recent_changes(session: Session, params: QueryParams) -> dict[str, Any]:
             "diff",
             "restored_from_version",
             "batch_id",
+            "run_id",
+            "proposal_id",
         )
     ]
     with read_transaction(session):
@@ -164,6 +167,8 @@ def recent_changes(session: Session, params: QueryParams) -> dict[str, Any]:
                 "changed_fields": changed_fields(row["diff"] or {}),
                 "restored_from_version": row["restored_from_version"],
                 "batch_id": row["batch_id"],
+                "run_id": row["run_id"],
+                "proposal_id": row["proposal_id"],
                 "context": contexts.get(row["entity_id"]),
             }
         )

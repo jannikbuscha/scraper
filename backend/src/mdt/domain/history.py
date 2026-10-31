@@ -1,8 +1,8 @@
 """Revision lookups and representations (docs/DATA_MODEL.md §6.3, docs/API.md §3.2).
 
 ``RevisionSummary`` = ``{id, version, at, author, channel, action, note, changed_fields,
-restored_from, restored_from_version, batch_id}``; ``RevisionFull`` adds ``snapshot``,
-``diff`` and ``schema_revision``.
+restored_from, restored_from_version, batch_id, run_id, proposal_id}``; ``RevisionFull``
+adds ``snapshot``, ``diff`` and ``schema_revision``.
 """
 
 from __future__ import annotations
@@ -46,6 +46,8 @@ def revision_summary(revision: Revision) -> dict[str, Any]:
         "restored_from": revision.restored_from,
         "restored_from_version": revision.restored_from_version,
         "batch_id": revision.batch_id,
+        "run_id": revision.run_id,
+        "proposal_id": revision.proposal_id,
     }
 
 

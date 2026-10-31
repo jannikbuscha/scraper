@@ -42,6 +42,7 @@ def test_create_returns_the_item_and_its_revision(client: ApiClient) -> None:
         "verified": "unverified",
         "evidence_id": None,
         "restored_from_version": None,
+        "raw_snapshot_ids": None,
     }
     assert "seed_key" not in item["fields"]
     assert body["warnings"] == []
@@ -145,6 +146,8 @@ def test_a_manual_change_creates_a_revision_with_author_and_note(client: ApiClie
         "restored_from": None,
         "restored_from_version": None,
         "batch_id": None,
+        "run_id": None,
+        "proposal_id": None,
     }
     full = client.ok(client.get(f"/api/entities/project/{seeded['id']}/revisions/2"))
     diff = full["revision"]["diff"]

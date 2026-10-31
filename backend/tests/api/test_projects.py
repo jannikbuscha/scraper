@@ -63,7 +63,7 @@ def test_the_seeded_projects_are_listed(client: ApiClient) -> None:
         assert item["label"] == (project.get("name_en") or project.get("name_uk") or slug)
         assert item["created_by"] == "seed"
         assert item["derived"]["period"] == "unknown"
-        assert item["virtual"] == {"open_comments": 0, "comment_count": 0}
+        assert item["virtual"] == {"open_comments": 0, "comment_count": 0, "open_proposals": 0}
 
 
 def test_the_default_order_is_cluster_then_name(client: ApiClient) -> None:

@@ -4,10 +4,17 @@ Every fixture is a body file plus ``<name>.meta.json``. The checks keep the fixt
 (source URL, retrieval time, SHA-256 of the original capture and of the stored file) and free of
 the data lead's contact address: the polite fetcher sent it in its User-Agent, so no meta file may
 carry a User-Agent field or a ``mailto:`` address, and no body may echo the User-Agent.
+
+Synthetic fixtures (written by hand, never captured; docs/COLLECTORS.md §8.5) follow their own
+rules, checked below: a ``synthetic_`` name together with ``"synthetic": true``, a ``capture``
+that starts with ``synthetic:`` and names its documentation, the fixed licence phrase, no
+trimming, and bodies whose URLs use only reserved example hosts and whose CDX digests and lengths
+are obviously made up, so no synthetic row can be mistaken for an archive fact about a real site.
 """
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import json
 import os
@@ -15,6 +22,7 @@ import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import parse_qs, unquote, urlsplit
 
 import pytest
 
@@ -54,6 +62,14 @@ USER_AGENT_KEY = re.compile(r"user[\s_-]*agent", re.IGNORECASE)
 USER_AGENT_PRODUCT = b"MDT-Portfolio-Research"
 # Inline bot-manager token of www.kmu.gov.ua; its value encodes the requesting client's IP address.
 BOT_MANAGER_TOKEN = b"__uzdbm"
+# Synthetic fixtures (README.md, "Synthetic fixtures").
+SYNTHETIC_PREFIX = "synthetic_"
+SYNTHETIC_LICENCE = "synthetic test data written for this repository"
+RESERVED_HOSTS = frozenset({"example.org", "www.example.org", "example.com"})
+# SURT host prefixes of the reserved hosts as they open a CDX urlkey (``org,example)/…``).
+RESERVED_URLKEYS = ("org,example)", "com,example)")
+URL_IN_TEXT = re.compile(r"[A-Za-z][A-Za-z0-9+.-]*://[^\s\"'<>]+")
+GZIP_MAGIC = b"\x1f\x8b"
 
 
 def meta_files() -> list[Path]:
@@ -125,7 +141,8 @@ def test_meta_has_required_keys_and_types(path: Path) -> None:
     for key in ("status", "bytes_original", "bytes_stored"):
         assert not isinstance(meta[key], bool), f"{rel(path)}: {key!r} must be an integer"
     assert path.name == f"{meta['fixture']}{META_SUFFIX}"
-    assert Path(meta["body"]).stem == meta["fixture"]
+    # The body is the fixture name plus its extension(s), e.g. ``.json.gz``.
+    assert meta["body"].partition(".")[0] == meta["fixture"]
     assert meta["collector"] == path.parent.name
     assert meta["url"].startswith("https://")
     assert meta["final_url"].startswith(("https://", "http://"))
@@ -167,6 +184,95 @@ def test_body_is_small_and_carries_no_client_data(path: Path) -> None:
     assert len(data) <= MAX_BODY_BYTES, f"{rel(path)}: {len(data)} bytes (limit {MAX_BODY_BYTES})"
     assert USER_AGENT_PRODUCT not in data, f"{rel(path)}: echoes the fetcher's User-Agent"
     assert BOT_MANAGER_TOKEN not in data, f"{rel(path)}: contains the kmu.gov.ua bot-manager token"
+
+
+def is_synthetic(meta: dict[str, Any]) -> bool:
+    return str(meta["fixture"]).startswith(SYNTHETIC_PREFIX) or "synthetic" in meta
+
+
+SYNTHETIC_PARAMS = [
+    pytest.param(path, id=rel(path)) for path in meta_files() if is_synthetic(load_meta(path))
+]
+
+
+def decoded_body(data: bytes) -> str:
+    """A body as text, decompressed first when it is gzip (the CDX server's default)."""
+    return (gzip.decompress(data) if data.startswith(GZIP_MAGIC) else data).decode("utf-8")
+
+
+def reserved_url(url: str) -> bool:
+    """An http(s) URL on a reserved example host."""
+    parts = urlsplit(url)
+    return parts.scheme in ("http", "https") and (parts.hostname or "") in RESERVED_HOSTS
+
+
+def described_urls(meta: dict[str, Any]) -> list[str]:
+    """The source URLs a synthetic fixture's request names: the ``url=`` value of a CDX
+    query (prefix forms without a scheme count as http) or the original URL of a capture
+    URL (``/web/<timestamp>[id_]/<original>``)."""
+    found: list[str] = []
+    for url in [meta["url"], meta["final_url"]]:
+        parts = urlsplit(url)
+        for value in parse_qs(parts.query).get("url", []):
+            found.append(value if "://" in value else f"http://{value}")
+        capture = re.match(r"/web/\d{14}(?:id_)?/(.+)", parts.path)
+        if capture:
+            found.append(capture.group(1))
+    return found
+
+
+def cdx_rows(text: str) -> list[list[str]] | None:
+    """The rows of a CDX JSON body (header first), or None for other bodies."""
+    try:
+        data = json.loads(text)
+    except ValueError:
+        return None
+    if isinstance(data, list) and all(isinstance(row, list) for row in data):
+        return data
+    return None
+
+
+def test_synthetic_fixtures_exist() -> None:
+    assert SYNTHETIC_PARAMS, "the synthetic C5 fixtures of docs/COLLECTORS.md §8.5 are missing"
+
+
+@pytest.mark.parametrize("path", SYNTHETIC_PARAMS)
+def test_synthetic_fixture_meta_follows_the_rules(path: Path) -> None:
+    meta = load_meta(path)
+    where = rel(path)
+    assert str(meta["fixture"]).startswith(SYNTHETIC_PREFIX), f"{where}: name must start synthetic_"
+    assert meta.get("synthetic") is True, f'{where}: synthetic fixtures carry "synthetic": true'
+    assert meta["capture"].startswith("synthetic:"), f"{where}: capture must start synthetic:"
+    assert "docs/SOURCES.md" in meta["capture"], f"{where}: capture must cite its documentation"
+    assert meta["licence"] == SYNTHETIC_LICENCE, where
+    assert meta["trimmed"] is False, f"{where}: a synthetic body is never trimmed"
+    urls = described_urls(meta)
+    assert urls, f"{where}: the request names no source URL"
+    assert all(reserved_url(url) for url in urls), f"{where}: {urls}"
+
+
+@pytest.mark.parametrize("path", SYNTHETIC_PARAMS)
+def test_synthetic_fixture_body_names_only_reserved_hosts(path: Path) -> None:
+    meta = load_meta(path)
+    where = rel(path)
+    text = decoded_body((path.parent / meta["body"]).read_bytes())
+    urls = URL_IN_TEXT.findall(text)
+    assert all(reserved_url(url) for url in urls), f"{where}: {urls}"
+    rows = cdx_rows(text)
+    if not rows:
+        return
+    header, data = rows[0], rows[1:]
+    if len(data) >= 2 and data[-2] == [] and len(data[-1]) == 1:  # resume key
+        assert unquote(data[-1][0].replace("+", " ")).startswith(RESERVED_URLKEYS), where
+        data = data[:-2]
+    column = {name: index for index, name in enumerate(header)}
+    for row in data:
+        assert row[column["urlkey"]].startswith(RESERVED_URLKEYS), f"{where}: {row}"
+        assert reserved_url(row[column["original"]]), f"{where}: {row}"
+        if "digest" in column:
+            assert row[column["digest"]].startswith("SYNTHETIC"), f"{where}: digest {row}"
+        if "length" in column:
+            assert row[column["length"]] == "0", f"{where}: length {row}"
 
 
 def configured_contact_email() -> str | None:

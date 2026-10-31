@@ -1,0 +1,96 @@
+# Collector settings (docs/COLLECTORS.md §3). No secrets; CONTACT_EMAIL comes from .env.
+#
+# Operational settings only: intervals, timeouts, limits, hosts, licences, options and
+# fixture lists. What a collector parses and may write is code (docs/COLLECTORS.md §8).
+# The file is validated when the app starts and by every CLI command that uses it.
+# Dates are quoted, so that they stay strings.
+version: 1
+defaults:
+  min_interval_s: 1.0          # per host, between the end of one request and the start of the next
+  timeout_connect_s: 10
+  timeout_read_s: 30
+  max_bytes: 26214400          # 25 MiB per response
+  max_redirects: 5
+  retries: 2                   # extra attempts after 429/502/503/504 and network errors
+  backoff_base_s: 5
+  max_wait_s: 600              # longest Retry-After or Crawl-delay waited for (§4.6)
+  discontinued_after_runs: 2   # DATA_MODEL §15.7
+  exclude_hosts: [codeua.com]  # out of scope (data lead, 2026-10-30, SOURCES S2); never requested, C5 included
+collectors:
+  ministry_projects:
+    label: "Ministry project list (thedigital.gov.ua/projects)"
+    source: S1                 # ID in docs/SOURCES.md
+    enabled: true
+    licence: {code: cc_by_4_0, statement: "Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше"}
+    options:
+      check_url: "https://thedigital.gov.ua/projects"   # mdt sources check (§11)
+  project_sites:
+    label: "Official URLs of the projects (generic pass)"
+    source: S2
+    enabled: true
+    licence: {code: unknown}   # decided per page (§8.2)
+    options:
+      soft_404_patterns: {usf.com.ua: ["Post not found"]}
+  diia_catalog:
+    label: "Diia portal service catalogue (diia.gov.ua/services)"
+    source: S3
+    enabled: true
+    licence: {code: all_rights_reserved, statement: "Всі права захищені"}
+    options:
+      project_seed_key: diia   # services are created under this seed project (§8.3)
+      check_url: "https://diia.gov.ua/services"
+  ministry_news:
+    label: "Ministry news, documents, /ministry, microsites and files (thedigital.gov.ua)"
+    source: S4
+    enabled: true
+    licence: {code: cc_by_4_0, statement: "Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше"}
+    options:
+      parts: [news, documents, ministry, microsites]
+      check_url:
+        - "https://thedigital.gov.ua/news"
+        - "https://2years.thedigital.gov.ua/"
+        - "https://5years.thedigital.gov.ua/"
+        - "https://2025.thedigital.gov.ua/"
+  kmu_news:
+    label: "Ministry news on the Government portal (www.kmu.gov.ua)"
+    source: S4b
+    enabled: true
+    licence: {code: cc_by_4_0, statement: "Весь контент доступний за ліцензією Creative Commons Attribution 4.0 International license, якщо не зазначено інше"}
+    options:
+      window_from: "2019-08-29"
+      window_to: null
+      keywords:                # regular expressions over the slug, both transliteration styles (SOURCES S4b)
+        - 'mincifr'
+        - 'cifrovoyi-transformaciyi'
+        - 'ministerstv[a-z]*-cifrov'
+        - 'mintsyfr'
+        - 'tsyfrovoi-transformatsii'
+        - 'ministerstv[a-z]*-tsyfrov'
+        - 'fedorov'
+        - '\bdiia\b'
+        - '\bdiya\b'
+      recall_from: "2019-09-01"
+      recall_to: "2022-02-23"
+      check_url: "https://www.kmu.gov.ua/sitemap.xml"
+  wayback:
+    label: "Wayback Machine (CDX API)"
+    source: S5
+    enabled: true
+    needs_server_check: true   # shown in the UI until the server checks are done (SOURCES §5)
+    hosts:
+      web.archive.org: {min_interval_s: 5.0}
+    licence: {code: unknown, statement: "Archived third-party content; cite as archive copy"}
+    options:
+      prefixes: ["thedigital.gov.ua/projects/", "diia.gov.ua/services/", "diia.gov.ua./services/"]
+      page_limit: 5000
+      check_url: "https://web.archive.org/cdx/search/cdx?url=diia.gov.ua/services&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1"
+    fixtures:                  # mdt fixtures capture wayback (§11, §8.5); run on the target server
+      - {name: robots_web_archive, url: "https://web.archive.org/robots.txt", purpose: "robots.txt of the CDX host"}
+      - {name: cdx_prefix_projects_collapse, url: "https://web.archive.org/cdx/search/cdx?url=thedigital.gov.ua/projects/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=50&showResumeKey=true", purpose: "CDX prefix query (collapse=urlkey) for thedigital.gov.ua/projects/, limit 50, with a resume key"}
+      - {name: cdx_exact_diia_services_earliest, url: "https://web.archive.org/cdx/search/cdx?url=diia.gov.ua/services&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1", purpose: "CDX single-URL query: earliest capture of diia.gov.ua/services"}
+      - {name: cdx_resume_key_news, url: "https://web.archive.org/cdx/search/cdx?url=thedigital.gov.ua/news/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=5&showResumeKey=true", purpose: "CDX prefix query with limit 5: the resume key format"}
+      - {name: cdx_no_captures, url: "https://web.archive.org/cdx/search/cdx?url=thedigital.gov.ua/projects/mdt-portfolio-fixture-no-such-page&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1", purpose: "CDX single-URL query for a path that does not exist: the answer without captures"}
+  tagger:
+    label: "Alias tagging and event patterns (no network)"
+    builtin: true
+    enabled: true

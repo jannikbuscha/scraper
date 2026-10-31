@@ -185,6 +185,8 @@ def test_revision_representations(db: Db) -> None:
         "restored_from",
         "restored_from_version",
         "batch_id",
+        "run_id",
+        "proposal_id",
     }
     assert summary["changed_fields"] == ["deleted"]
     assert (summary["action"], summary["note"], summary["version"]) == ("delete", "Gone", 2)

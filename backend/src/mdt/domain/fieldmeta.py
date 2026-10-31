@@ -1,25 +1,45 @@
 """Field provenance entries (docs/DATA_MODEL.md §5).
 
 ``field_meta`` maps a tracked field name to
-``{src, by, at, locked, verified, evidence_id, restored_from_version}``. Entries are
-never removed; clearing a field writes an entry like any other change.
+``{src, by, at, locked, verified, evidence_id, restored_from_version, raw_snapshot_ids}``.
+Entries are never removed; clearing a field writes an entry like any other change.
+``raw_snapshot_ids`` (Phase 2) names the raw snapshots a collected value was parsed from;
+entries written before Phase 2 lack the key, which reads as null.
 """
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from typing import Any
 
 from mdt.domain.actor import Actor
 
 #: Entry keys in their canonical order.
-ENTRY_KEYS = ("src", "by", "at", "locked", "verified", "evidence_id", "restored_from_version")
+ENTRY_KEYS = (
+    "src",
+    "by",
+    "at",
+    "locked",
+    "verified",
+    "evidence_id",
+    "restored_from_version",
+    "raw_snapshot_ids",
+)
 #: Keys compared in diffs; ``at`` changes with every write and is left out.
 DIFF_KEYS = tuple(key for key in ENTRY_KEYS if key != "at")
 
 
-def source_of(actor: Actor, restored_src: str | None = None) -> str:
-    """The ``src`` of a value written by ``actor`` (DATA_MODEL §5 table)."""
+def takes_snapshots(actor: Actor) -> bool:
+    """True if values written by ``actor`` record the snapshots they were parsed from:
+    collector writes, and observed values a person accepts from a proposal (§5)."""
+    return actor.channel == "collector" or (
+        actor.channel == "ui" and actor.proposal_src is not None
+    )
+
+
+def source_of(actor: Actor, restored_src: str | None = None, *, observed: bool = False) -> str:
+    """The ``src`` of a value written by ``actor`` (DATA_MODEL §5 table). ``observed``
+    marks a value that an accepted proposal takes unchanged from its source."""
     channel = actor.channel
     if channel == "seed":
         return "seed"
@@ -27,6 +47,8 @@ def source_of(actor: Actor, restored_src: str | None = None) -> str:
         return f"import:{actor.file}"
     if channel == "collector":
         return f"{actor.name}@{actor.run_id}"
+    if channel == "ui" and observed and actor.proposal_src:
+        return actor.proposal_src
     if channel in ("restore", "merge", "system") and restored_src:
         return restored_src
     return "manual"
@@ -43,16 +65,24 @@ def value_entry(
     *,
     restored_src: str | None = None,
     restored_from_version: int | None = None,
+    snapshots: Sequence[str] | None = None,
 ) -> dict[str, Any]:
-    """The entry for a value change: verification reset, provenance per channel."""
+    """The entry for a value change: verification reset, provenance per channel.
+
+    ``snapshots`` are the raw snapshots the value was parsed from. They are recorded on
+    channel ``collector`` and, for a value taken unchanged from an accepted proposal, on
+    channel ``ui`` (whose ``src`` is then the proposal's source); otherwise ignored.
+    """
+    recorded = snapshots is not None and takes_snapshots(actor)
     return {
-        "src": source_of(actor, restored_src),
+        "src": source_of(actor, restored_src, observed=recorded),
         "by": actor.by,
         "at": at,
         "locked": is_locked(actor),
         "verified": "unverified",
         "evidence_id": None,
         "restored_from_version": restored_from_version,
+        "raw_snapshot_ids": list(snapshots) if recorded and snapshots is not None else None,
     }
 
 

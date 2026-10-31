@@ -1,6 +1,6 @@
 # Test fixtures
 
-Responses of the source hosts, captured once in Phase 0b (2026-10-29) for the offline tests of the Phase 2 collectors and of the polite HTTP client. The source checks behind them are documented in [`docs/SOURCES.md`](../../../docs/SOURCES.md); the collector strategy is in [`PLAN.md`](../../../PLAN.md) §5.2.
+Responses of the source hosts, captured once in Phase 0b (2026-10-29) for the offline tests of the Phase 2 collectors and of the polite HTTP client, plus synthetic Wayback Machine responses written by hand for C5 (see "Synthetic fixtures"). The source checks behind them are documented in [`docs/SOURCES.md`](../../../docs/SOURCES.md); the collector strategy is in [`PLAN.md`](../../../PLAN.md) §5.2.
 
 **Fixtures are not data.** They are test input for parsers. Nothing in this folder is a fact for the dataset, nothing here is imported, and no value may be copied from a fixture into the seed, the codebook or the database. Every fixture is a snapshot of one day; the live sources have changed since and will change again.
 
@@ -39,8 +39,9 @@ Each fixture is a body file `<name>.<ext>` (HTML, XML, JSON, text or PDF) plus `
 | `trimmed`, `trim_note` | whether the body differs from the original capture, and exactly what was kept, removed or redacted |
 | `licence`, `attribution` | licence as stated by the source (quoted from the page) and the attribution to give |
 | `capture` | how and by which Phase 0b explorer the response was fetched |
+| `synthetic` | only in synthetic fixtures: `true` (see "Synthetic fixtures" below) |
 
-`backend/tests/test_fixtures.py` checks the format: every body has a meta file with these keys, the stored SHA-256 matches, `trimmed` is a boolean, untrimmed bodies equal the original capture, no body is larger than 1 MiB, no meta file carries a User-Agent field or a `mailto:` address, no body echoes the fetcher's User-Agent or contains the kmu.gov.ua bot-manager token, and, where `CONTACT_EMAIL` is configured locally (not in CI), no fixture contains that address.
+`backend/tests/test_fixtures.py` checks the format: every body has a meta file with these keys, the stored SHA-256 matches, `trimmed` is a boolean, untrimmed bodies equal the original capture, no body is larger than 1 MiB, no meta file carries a User-Agent field or a `mailto:` address, no body echoes the fetcher's User-Agent or contains the kmu.gov.ua bot-manager token, and, where `CONTACT_EMAIL` is configured locally (not in CI), no fixture contains that address. It also enforces the rules of the synthetic fixtures below.
 
 ## How the fixtures were captured
 
@@ -56,13 +57,25 @@ Each fixture is a body file `<name>.<ext>` (HTML, XML, JSON, text or PDF) plus `
 - **Redacted wherever they occur:** personal names and e-mail addresses from feeds and contact fields (data.gov.ua authors and contact points, a staff address on a ministry document page, CNAP phone numbers and e-mail addresses), per-request or per-visitor tokens (kmu.gov.ua bot-manager script, Cloudflare `/cdn-cgi/content?id=` values and challenge tokens, Telegram `data-view` attributes and `tme` download tokens, Sentry baggage values), and an embedded public API key (osvita.diia.gov.ua runtime config, removed with its script). Functional addresses of institutions (e.g. `hello@thedigital.gov.ua`) and the names of officials and authors that the pages publish as part of their content are kept.
 - The PDF `ministry_news/storage_pdf_draft_resolution.pdf` carries no licence statement of its own; it is linked from a CC BY page. It is the one fixture of unclear licence that keeps its original bytes, because an excerpt would break what it tests (the file name is the MD5 of the content; text extraction). Whether the site footer ("якщо не зазначено інше") covers linked files is decision 6 in `docs/SOURCES.md` §5; if the answer is no, remove or replace this fixture before the repository is pushed.
 
+## Synthetic fixtures
+
+The Wayback Machine did not answer from the development environment (`docs/SOURCES.md` S5), so the C5 tests run against **synthetic fixtures** written by hand in the documented CDX JSON format (`docs/COLLECTORS.md` §8.5): `wayback/synthetic_*`. They are not captures and say nothing about any real site. Rules, enforced by `backend/tests/test_fixtures.py`:
+
+- the fixture name starts with `synthetic_`, and the meta file has every key of the table above plus `"synthetic": true` (a name and the flag always come together);
+- `capture` starts with `synthetic:` and cites the documentation the body follows (for C5: the wayback-cdx-server README, as recorded in `docs/SOURCES.md` S5); `licence` is exactly "synthetic test data written for this repository"; `retrieved_at` is the time of writing; `trimmed` is `false` (both SHA-256 values describe the body as written);
+- every URL inside the body (gzip bodies are decompressed first) and every source URL the request names (the `url=` value of a CDX query, the original URL of a capture URL) uses a reserved example host: `example.org`, `www.example.org` or `example.com`; every CDX `urlkey`, also inside a resume key, starts with `org,example)` or `com,example)`;
+- digests and lengths are obviously made up: every `digest` value starts with `SYNTHETIC` and every `length` value is `0`;
+- each CDX fixture's `url` is exactly a query that C5 builds for the test sources file of `docs/COLLECTORS.md` §12.1 (prefix `example.org/projects/`, the synthetic projects and services of `backend/tests/collectors/wayback_helpers.py`); the C5 tests check this.
+
+The real C5 fixtures come from `mdt fixtures capture wayback` on the target server (`docs/COLLECTORS.md` §11). After that capture, the C5 parser tests also run against them, and every difference from the documented format is recorded in `docs/SOURCES.md` S5 and corrected in the synthetic fixtures.
+
 ## Adding or refreshing fixtures
 
 Phase 2 adds `mdt fixtures capture <source>` (`PLAN.md` §5.7), which fetches a fixed URL list through the polite client and writes the same body and meta format. Until then, add a fixture by hand only from a capture with known URL, time and SHA-256, keep the format above, and run `uv run pytest -q tests/test_fixtures.py` in `backend/`. Captures still missing are listed in `docs/SOURCES.md` (Phase 0b results, "from the target server").
 
 ## Fixture list
 
-103 fixtures in 12 directories, 3.0 MB of bodies: 44 with the original bytes, 59 trimmed or redacted.
+111 fixtures in 12 directories, 3.0 MB of bodies: 44 with the original bytes, 59 trimmed or redacted, 8 synthetic (written by hand, see "Synthetic fixtures").
 
 | Directory | Fixture | Source | URL | HTTP | Trimmed |
 |---|---|---|---|---|---|
@@ -169,3 +182,11 @@ Phase 2 adds `mdt fixtures capture <source>` (`PLAN.md` §5.7), which fetches a 
 | `telegram` | `mintsyfra_preview_latest.html` | S7a | https://t.me/s/mintsyfra | 200 | yes |
 | `telegram` | `mintsyfra_preview_oldest_before_30.html` | S7a | https://t.me/s/mintsyfra?before=30 | 200 | yes |
 | `wayback` | `availability_429.html` | S5 | https://archive.org/wayback/available?url=thedigital.gov.ua/projects&timestamp=20191231 | 429 | no |
+| `wayback` | `synthetic_capture_redirected.html` | S5 | https://web.archive.org/web/20200102000000id_/https://example.org/projects/technologies/example-gamma | 200 | synthetic |
+| `wayback` | `synthetic_cdx_empty.json` | S5 | https://web.archive.org/cdx/search/cdx?url=www.example.org/&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_exact_limit1.json` | S5 | https://web.archive.org/cdx/search/cdx?url=example.com/&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_extra_columns.json` | S5 | https://web.archive.org/cdx/search/cdx?url=example.org/services/example-one&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_gzipped.json.gz` | S5 | https://web.archive.org/cdx/search/cdx?url=example.org/services/example-two&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_header_only.json` | S5 | https://web.archive.org/cdx/search/cdx?url=example.org/about&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=1 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_prefix_collapse.json` | S5 | https://web.archive.org/cdx/search/cdx?url=example.org/projects/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=5000&showResumeKey=true&resumeKey=org%2Cexample%29%2Fprojects%2Fexample-beta+20160704000000%21 | 200 | synthetic |
+| `wayback` | `synthetic_cdx_resume_key.json` | S5 | https://web.archive.org/cdx/search/cdx?url=example.org/projects/&matchType=prefix&collapse=urlkey&output=json&fl=urlkey,timestamp,original,statuscode,mimetype&filter=statuscode:200&limit=5000&showResumeKey=true | 200 | synthetic |

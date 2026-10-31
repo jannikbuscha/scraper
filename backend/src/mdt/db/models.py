@@ -1,7 +1,7 @@
-"""SQLAlchemy models for every table of docs/DATA_MODEL.md §2.3, §3 and §4.
+"""SQLAlchemy models for every table of docs/DATA_MODEL.md §2.3, §3, §4 and §14.
 
 The FTS5 virtual tables (``fts_entity``, ``fts_document``) and the append-only triggers
-on ``revision`` are not models; their DDL lives in :mod:`mdt.db.ddl`.
+on ``revision`` and ``raw_snapshot`` are not models; their DDL lives in :mod:`mdt.db.ddl`.
 
 The write path (:mod:`mdt.domain.revisions`) uses the ``__table__`` objects through
 SQLAlchemy Core, so every row update explicitly bumps ``version``.
@@ -174,6 +174,7 @@ class Document(CuratedMixin, Base):
             unique=True,
             sqlite_where=text("deleted_at IS NULL AND canonical_url IS NOT NULL"),
         ),
+        Index("ix_document_source_id_external_id", "source_id", "external_id"),
     )
 
     title: Mapped[str] = mapped_column(Text, nullable=False)
@@ -203,6 +204,8 @@ class Document(CuratedMixin, Base):
     )
     screening_reason: Mapped[str | None] = mapped_column(Text)
     screening_note: Mapped[str | None] = mapped_column(Text)
+    # Phase 2 (migration 0002, added with ALTER TABLE, so it is the table's last column).
+    source_record_at: Mapped[str | None] = mapped_column(UtcTimestamp)
 
 
 class Organization(CuratedMixin, Base):
@@ -480,6 +483,250 @@ class AppState(Base):
 
     key: Mapped[str] = mapped_column(Text, primary_key=True)
     value: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+# --------------------------------------------------------------------------------------
+# Data acquisition tables (DATA_MODEL §14, migration 0002). Not curated entities: no
+# field_meta, no revisions; nothing here is ever deleted in Phase 2.
+# --------------------------------------------------------------------------------------
+
+
+class CollectorRun(Base):
+    """One collector run (DATA_MODEL §14.2); at most one is ``running``."""
+
+    __tablename__ = "collector_run"
+    __table_args__ = (
+        Index(
+            "uq_collector_run_running",
+            "status",
+            unique=True,
+            sqlite_where=text("status = 'running'"),
+        ),
+        Index("ix_collector_run_collector_started_at", "collector", "started_at"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    collector: Mapped[str] = mapped_column(Text, nullable=False)
+    trigger: Mapped[str] = mapped_column(Text, nullable=False)
+    mode: Mapped[str] = mapped_column(Text, nullable=False)
+    params: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+    status: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    started_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    finished_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    heartbeat_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    cancel_requested_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    complete_listing: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, server_default=text("0")
+    )
+    stats: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+    error: Mapped[str | None] = mapped_column(Text)
+    code_version: Mapped[str] = mapped_column(Text, nullable=False)
+    config_hash: Mapped[str] = mapped_column(Text, nullable=False)
+
+
+class RawSnapshot(Base):
+    """A kept response body, upload or replayed fixture (DATA_MODEL §14.1); immutable."""
+
+    __tablename__ = "raw_snapshot"
+    __table_args__ = (Index("ix_raw_snapshot_source_id_fetched_at", "source_id", "fetched_at"),)
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    run_id: Mapped[str | None] = mapped_column(Text, _restrict("collector_run.id"), index=True)
+    source_id: Mapped[str] = mapped_column(Text, nullable=False)
+    via: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str | None] = mapped_column(Text, index=True)
+    final_url: Mapped[str | None] = mapped_column(Text)
+    redirects: Mapped[list[Any]] = _list_column()
+    http_status: Mapped[int | None] = mapped_column(Integer)
+    fetched_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    headers: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+    content_type: Mapped[str | None] = mapped_column(Text)
+    filename: Mapped[str | None] = mapped_column(Text)
+    sha256: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+
+
+class FetchLog(Base):
+    """One HTTP request attempt, or one URL the client decided not to request (§14.3)."""
+
+    __tablename__ = "fetch_log"
+    __table_args__ = (
+        Index("ix_fetch_log_run_id_id", "run_id", "id"),
+        Index("ix_fetch_log_host_at", "host", "at"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str | None] = mapped_column(Text, _restrict("collector_run.id"))
+    at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    method: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    host: Mapped[str] = mapped_column(Text, nullable=False)
+    purpose: Mapped[str] = mapped_column(Text, nullable=False)
+    attempt: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    status: Mapped[int | None] = mapped_column(Integer)
+    outcome: Mapped[str] = mapped_column(Text, nullable=False)
+    bytes: Mapped[int | None] = mapped_column(Integer)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    raw_snapshot_id: Mapped[str | None] = mapped_column(Text, _restrict("raw_snapshot.id"))
+    retry_after_s: Mapped[float | None] = mapped_column(Float)
+    error: Mapped[str | None] = mapped_column(Text)
+
+
+class RunMessage(Base):
+    """A notable event of a run: error, warning or note (DATA_MODEL §14.4)."""
+
+    __tablename__ = "run_message"
+    __table_args__ = (
+        Index("ix_run_message_run_id_level_id", "run_id", "level", "id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[str] = mapped_column(Text, _restrict("collector_run.id"), nullable=False)
+    at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    level: Mapped[str] = mapped_column(Text, nullable=False)
+    code: Mapped[str] = mapped_column(Text, nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    url: Mapped[str | None] = mapped_column(Text)
+    raw_snapshot_id: Mapped[str | None] = mapped_column(Text)
+    subject_id: Mapped[str | None] = mapped_column(Text)
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+
+
+class SourceObservation(Base):
+    """What a collector saw per stable key, and the key's binding to a record (§14.5)."""
+
+    __tablename__ = "source_observation"
+    __table_args__ = (
+        UniqueConstraint("collector", "key"),
+        Index("ix_source_observation_collector_present", "collector", "present"),
+        Index("ix_source_observation_collector_external_id", "collector", "external_id"),
+        {"sqlite_autoincrement": True},
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    collector: Mapped[str] = mapped_column(Text, nullable=False)
+    key: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[str | None] = mapped_column(Text, index=True)
+    bound_by: Mapped[str | None] = mapped_column(Text)
+    bound_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    external_id: Mapped[str | None] = mapped_column(Text)
+    url: Mapped[str | None] = mapped_column(Text)
+    label: Mapped[str | None] = mapped_column(Text)
+    first_seen_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    first_seen_run: Mapped[str] = mapped_column(Text, nullable=False)
+    last_seen_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    last_seen_run: Mapped[str] = mapped_column(Text, nullable=False)
+    present: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("1"))
+    missing_since_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    missing_since_run: Mapped[str | None] = mapped_column(Text)
+    missing_runs: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    last_snapshot_id: Mapped[str | None] = mapped_column(Text, _restrict("raw_snapshot.id"))
+    details: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+
+
+class Proposal(Base):
+    """A change a collector suggests for the review inbox (DATA_MODEL §14.6, §16)."""
+
+    __tablename__ = "proposal"
+    __table_args__ = (
+        Index(
+            "uq_proposal_dedup_key_open",
+            "dedup_key",
+            unique=True,
+            sqlite_where=text("state = 'open'"),
+        ),
+        Index("ix_proposal_state_kind", "state", "kind"),
+        Index("ix_proposal_subject_id_state", "subject_id", "state"),
+        Index("ix_proposal_related_id_state", "related_id", "state"),
+        Index("ix_proposal_collector_state", "collector", "state"),
+    )
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    kind: Mapped[str] = mapped_column(Text, nullable=False)
+    state: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    subject_id: Mapped[str | None] = mapped_column(Text)
+    related_id: Mapped[str | None] = mapped_column(Text)
+    field: Mapped[str | None] = mapped_column(Text)
+    current_value: Mapped[Any] = mapped_column(NullableJson, nullable=True)
+    proposed_value: Mapped[Any] = mapped_column(NullableJson, nullable=True)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+    collector: Mapped[str] = mapped_column(Text, nullable=False)
+    first_run_id: Mapped[str] = mapped_column(Text, _restrict("collector_run.id"), nullable=False)
+    last_run_id: Mapped[str] = mapped_column(
+        Text, _restrict("collector_run.id"), nullable=False, index=True
+    )
+    raw_snapshot_id: Mapped[str | None] = mapped_column(Text, _restrict("raw_snapshot.id"))
+    source_url: Mapped[str | None] = mapped_column(Text)
+    quote: Mapped[str | None] = mapped_column(Text)
+    locator: Mapped[str | None] = mapped_column(Text)
+    observation_id: Mapped[int | None] = mapped_column(Integer, _restrict("source_observation.id"))
+    dedup_key: Mapped[str] = mapped_column(Text, nullable=False)
+    seen_count: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
+    created_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    last_seen_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    decided_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    decided_by: Mapped[str | None] = mapped_column(Text)
+    decision_note: Mapped[str | None] = mapped_column(Text)
+    result_id: Mapped[str | None] = mapped_column(Text)
+
+
+class MergeLog(Base):
+    """Record of a merge and, later, of its unmerge (DATA_MODEL §14.7, §18)."""
+
+    __tablename__ = "merge_log"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    survivor_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    merged_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    batch_id: Mapped[str] = mapped_column(Text, nullable=False)
+    proposal_id: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    field_choices: Mapped[dict[str, Any]] = mapped_column(
+        JsonValue, nullable=False, server_default=EMPTY_OBJECT
+    )
+    changes: Mapped[list[Any]] = _list_column()
+    unmerged_at: Mapped[str | None] = mapped_column(UtcTimestamp)
+    unmerge_batch_id: Mapped[str | None] = mapped_column(Text)
+
+
+class ImportRun(Base):
+    """One tabular import that was run (DATA_MODEL §14.8, §17.1)."""
+
+    __tablename__ = "import_run"
+
+    id: Mapped[str] = mapped_column(Text, primary_key=True)
+    upload_id: Mapped[str] = mapped_column(Text, _restrict("raw_snapshot.id"), nullable=False)
+    filename: Mapped[str] = mapped_column(Text, nullable=False)
+    file_label: Mapped[str] = mapped_column(Text, nullable=False)
+    entity_type: Mapped[str] = mapped_column(Text, nullable=False)
+    sheet: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    mapping: Mapped[dict[str, Any]] = mapped_column(JsonValue, nullable=False)
+    key_field: Mapped[str | None] = mapped_column(Text)
+    note: Mapped[str | None] = mapped_column(Text)
+    stats: Mapped[dict[str, Any]] = mapped_column(JsonValue, nullable=False)
+    errors: Mapped[list[Any]] = _list_column()
+    error: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(UtcTimestamp, nullable=False)
+    finished_at: Mapped[str | None] = mapped_column(UtcTimestamp)
 
 
 #: Model class per curated entity type, in registry order.

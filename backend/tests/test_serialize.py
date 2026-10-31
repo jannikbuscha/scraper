@@ -120,7 +120,9 @@ def test_project_item_shape(db: Db) -> None:
             Actor.seed(),
         )
         result = item(session, "project", project.entity_id)
-    assert set(result) == ITEM_KEYS | {"derived"}
+    # Phase 2: the detail of a project lists its source observations.
+    assert set(result) == ITEM_KEYS | {"derived", "observations"}
+    assert result["observations"] == []
     assert result["type"] == "project"
     assert result["label"] == "Seeded example"
     assert result["version"] == 1
@@ -138,7 +140,9 @@ def test_project_item_shape(db: Db) -> None:
     assert result["virtual"] == {
         "open_comments": 0,
         "comment_count": 0,
+        "open_proposals": 0,
         "open_comments_by_field": {},
+        "open_proposals_by_field": {},
     }
     assert result["refs"] == {}
     assert result["search_snippet"] is None
@@ -149,6 +153,7 @@ def test_list_items_omit_detail_only_values(db: Db) -> None:
         create_project(session)
         listed = list_entities(session, "project", {})["items"][0]
     assert "open_comments_by_field" not in listed["virtual"]
+    assert "open_proposals_by_field" not in listed["virtual"]
     assert set(listed) == ITEM_KEYS | {"derived"}
 
 

@@ -120,10 +120,13 @@ def apply_change(
     *,
     note: str | None = None,
     batch_id: str | None = None,
+    field_snapshots: Mapping[str, Sequence[str]] | None = None,
 ) -> ChangeResult:
     """Create (``entity_id=None``) or update a record through the one write path.
 
-    Comments are delegated to :mod:`mdt.domain.comments`, which adds their rules.
+    ``field_snapshots`` maps fields to the raw snapshots their values were parsed from
+    (``field_meta[*].raw_snapshot_ids``, DATA_MODEL §5, §6.2). Comments are delegated to
+    :mod:`mdt.domain.comments`, which adds their rules.
     """
     if entity_type == "comment":
         from mdt.domain import comments
@@ -138,11 +141,20 @@ def apply_change(
         if entity_id is None:
             provided = normalize_changes(unit, changes, creating=True)
             provided, extra = _create_defaults(unit, provided)
-            return create_record(unit, provided, note=clean, batch_id=batch_id, extra_values=extra)
+            return create_record(
+                unit,
+                provided,
+                note=clean,
+                batch_id=batch_id,
+                extra_values=extra,
+                field_snapshots=field_snapshots,
+            )
         row = require_row(unit, entity_id)
         ensure_live(row)
         provided = normalize_changes(unit, changes, creating=False)
-        return update_record(unit, row, provided, note=clean, batch_id=batch_id)
+        return update_record(
+            unit, row, provided, note=clean, batch_id=batch_id, field_snapshots=field_snapshots
+        )
 
 
 def _create_defaults(
@@ -422,6 +434,10 @@ def undelete(
         row = require_row(unit, entity_id)
         if row["deleted_at"] is None:
             raise InvalidStateError("live", "The record is not deleted")
+        if spec.curated and row["merged_into"] is not None:
+            raise InvalidStateError(
+                "merged", "The record was merged into another one; unmerge it instead"
+            )
         targets = _batch_targets(session, spec, row) if cascade else [(spec, row)]
         if all(target["id"] != entity_id for _, target in targets):
             targets.insert(0, (spec, row))
@@ -478,6 +494,8 @@ def restore_version(
         links = links_of(unit, row)
         current = stored_values(spec, row, links)
         provided, changes, skipped = _restore_plan(spec, revision.snapshot, current, fields)
+        if spec.name == "document":
+            _restore_text_version(revision.snapshot, current, provided, changes, skipped)
         if dry_run or not changes:
             return RestoreResult(
                 spec.name,
@@ -563,6 +581,35 @@ def _restore_plan(
             )
         provided["scope_note"] = current.get("scope_note")
     return provided, changes, skipped
+
+
+#: The system fields of a document's text version besides ``retrieved_at`` (§15.6).
+TEXT_VERSION_SYSTEM_FIELDS = ("text_hash", "raw_snapshot_id", "extraction_method")
+
+
+def _restore_text_version(
+    snapshot: Mapping[str, Any],
+    current: Mapping[str, Any],
+    provided: dict[str, Any],
+    changes: dict[str, list[Any]],
+    skipped: list[str],
+) -> None:
+    """A document's text version is restored as one unit (DATA_MODEL §6.4): restoring
+    ``retrieved_at`` from a version with another ``text_hash`` also restores the text
+    version's system fields, and they are never restored without it."""
+    recorded: Mapping[str, Any] = snapshot.get("fields") or {}
+    if "retrieved_at" not in provided or "text_hash" not in recorded:
+        return
+    if recorded["text_hash"] == current.get("text_hash"):
+        return
+    for name in TEXT_VERSION_SYSTEM_FIELDS:
+        if name not in recorded:
+            continue
+        if recorded[name] != current.get(name):
+            provided[name] = recorded[name]
+            changes[name] = [current.get(name), recorded[name]]
+        if name in skipped:
+            skipped.remove(name)
 
 
 # --------------------------------------------------------------------------------------
