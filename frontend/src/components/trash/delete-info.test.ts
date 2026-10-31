@@ -17,6 +17,8 @@ const deletion = (id: number, entityId: string, batchId: string | null, note: st
   changed_fields: ['deleted'],
   restored_from_version: null,
   batch_id: batchId,
+  run_id: null,
+  proposal_id: null,
   context: null,
 });
 

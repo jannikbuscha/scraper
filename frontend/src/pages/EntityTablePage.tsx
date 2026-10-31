@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import { isApiError } from '../api/client';
 import { useEntityList, useMeta } from '../api/queries';
 import type { EntityTypeMeta, Item, Meta, TableEntityType } from '../api/types';
+import { AddDocumentModal } from '../components/documents/AddDocumentModal';
 import { ErrorAlert } from '../components/feedback';
 import { BulkEditModal, type BulkEditRequest } from '../components/table/BulkEditModal';
 import { CreateEntityModal } from '../components/table/CreateEntityModal';
@@ -101,6 +102,7 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
   const selected = items.filter((item) => rowSelection[item.id] === true);
 
   const [creating, setCreating] = useState(false);
+  const [addingDocument, setAddingDocument] = useState(false);
   const [bulk, setBulk] = useState<BulkEditRequest | null>(null);
   const openBulk = (preset?: BulkEditRequest['preset']) => {
     setBulk({ targets: selected.map((item) => ({ id: item.id, label: item.label, values: item.fields })), preset });
@@ -145,6 +147,13 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
           onCreate={() => {
             setCreating(true);
           }}
+          onAddDocument={
+            type === 'document'
+              ? () => {
+                  setAddingDocument(true);
+                }
+              : undefined
+          }
         />
         {body}
         {list.data && list.data.total > 0 && (
@@ -178,6 +187,14 @@ function EntityTableScreen({ type, meta, typeMeta }: EntityTableScreenProps) {
           setBulk(null);
         }}
       />
+      {type === 'document' && (
+        <AddDocumentModal
+          opened={addingDocument}
+          onClose={() => {
+            setAddingDocument(false);
+          }}
+        />
+      )}
     </TableContext.Provider>
   );
 }

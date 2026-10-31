@@ -1,4 +1,4 @@
-// Code-based routes of docs/UI.md §2. Search params are a flat string record,
+// Code-based routes of docs/UI.md §2 and §8.1. Search params are a flat string record,
 // serialised exactly as docs/UI.md §1.2 prescribes.
 import { createRootRoute, createRoute, createRouter, useParams } from '@tanstack/react-router';
 import type { ReactElement } from 'react';
@@ -10,11 +10,17 @@ import { CodebookPage } from './pages/CodebookPage';
 import { CommentsPage } from './pages/CommentsPage';
 import { EntityDetailPage } from './pages/EntityDetailPage';
 import { EntityTablePage } from './pages/EntityTablePage';
+import { ImportPage } from './pages/ImportPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { OverviewPage } from './pages/OverviewPage';
 import { RecentChangesPage } from './pages/RecentChangesPage';
 import { RecordPage } from './pages/RecordPage';
+import { ReviewPage } from './pages/ReviewPage';
 import { RouteErrorPage } from './pages/RouteErrorPage';
+import { RunDetailPage } from './pages/RunDetailPage';
+import { RunsPage } from './pages/RunsPage';
+import { SourceDetailPage } from './pages/SourceDetailPage';
+import { SourcesPage } from './pages/SourcesPage';
 import { TrashPage } from './pages/TrashPage';
 
 /** Detail route component: remounts the page when the ID changes. */
@@ -27,6 +33,18 @@ function DetailRoute({ type }: { type: TableEntityType }) {
 function RecordRoute() {
   const { id = '' } = useParams({ strict: false });
   return <RecordPage key={id} id={id} />;
+}
+
+/** A run's page: remounts when the ID changes (e.g. after "Run again"). */
+function RunRoute() {
+  const { id = '' } = useParams({ strict: false });
+  return <RunDetailPage key={id} />;
+}
+
+/** A collector's page: remounts when the collector changes. */
+function SourceRoute() {
+  const { collector = '' } = useParams({ strict: false });
+  return <SourceDetailPage key={collector} />;
 }
 
 // One component per route; React Fast Refresh and the hooks lint rules need
@@ -70,6 +88,13 @@ const routeTree = rootRoute.addChildren([
   route('/comments', CommentsPage),
   route('/trash', TrashPage),
   route('/codebook', CodebookPage),
+  // Phase 2 (docs/UI.md §8.1)
+  route('/review', ReviewPage),
+  route('/runs', RunsPage),
+  route('/runs/$id', RunRoute),
+  route('/sources', SourcesPage),
+  route('/sources/$collector', SourceRoute),
+  route('/import', ImportPage),
 ]);
 
 export const router = createRouter({

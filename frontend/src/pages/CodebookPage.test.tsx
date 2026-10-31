@@ -124,6 +124,8 @@ const termRevision = (version: number, changed: string[]) => ({
   restored_from: null,
   restored_from_version: null,
   batch_id: null,
+  run_id: null,
+  proposal_id: null,
 });
 
 /** History of cluster_a (version 3): v2 and v3 changed its definition. */

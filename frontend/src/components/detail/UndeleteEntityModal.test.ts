@@ -15,6 +15,8 @@ const revision = (overrides: Partial<RevisionSummary>): RevisionSummary => ({
   restored_from: null,
   restored_from_version: null,
   batch_id: 'batch_A',
+  run_id: null,
+  proposal_id: null,
   ...overrides,
 });
 

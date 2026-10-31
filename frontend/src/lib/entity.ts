@@ -1,5 +1,13 @@
 // Entity types, ID prefixes (docs/DATA_MODEL.md §3) and their UI routes.
-import { TABLE_ENTITY_TYPES, type EntityType, type RecordType, type TableEntityType } from '../api/types';
+import {
+  ENTITY_TYPES,
+  TABLE_ENTITY_TYPES,
+  type EntityType,
+  type EntityTypeMeta,
+  type Meta,
+  type RecordType,
+  type TableEntityType,
+} from '../api/types';
 
 const ID_PREFIXES: Readonly<Record<string, RecordType>> = {
   prj: 'project',
@@ -73,3 +81,9 @@ export const detailHref = (type: DetailEntityType, id: string): string =>
 
 /** Narrows an entity type to one with a detail page (null for vocabulary terms). */
 export const detailType = (type: EntityType): DetailEntityType | null => (hasDetailPage(type) ? type : null);
+
+/** The registry entry of a type named by the server as a plain string (undefined for unknown names). */
+export function typeMetaOf(meta: Meta | undefined, type: string): EntityTypeMeta | undefined {
+  const known = ENTITY_TYPES.find((candidate) => candidate === type);
+  return known ? meta?.entity_types[known] : undefined;
+}

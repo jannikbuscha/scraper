@@ -1,9 +1,11 @@
-// EntityDetailPage (docs/UI.md §4): header with actions, the Details tab
-// (view or edit mode) and the History tab, and the collapsible comments panel.
+// EntityDetailPage (docs/UI.md §4, §8.7): header with actions, the Details tab
+// (view or edit mode) and the History tab, and the collapsible comments panel;
+// projects and services can be merged and a merged one unmerged.
 // URL state: tab=details|history, from/to (compare), comments=open,
 // thread=<id>, edit=1.
 import { Loader, Stack, Tabs, Tooltip } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
+import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { isApiError } from '../api/client';
@@ -20,9 +22,11 @@ import { EditForm } from '../components/detail/EditForm';
 import { HistoryTab } from '../components/detail/HistoryTab';
 import { detailTab, patchSearch } from '../components/detail/search-params';
 import { UndeleteEntityModal } from '../components/detail/UndeleteEntityModal';
-import { ErrorAlert } from '../components/feedback';
+import { ErrorAlert, notifySuccess } from '../components/feedback';
+import { MergeDialog } from '../components/merge/MergeDialog';
+import { UnmergeDialog } from '../components/merge/UnmergeDialog';
 import { useUrlSearch } from '../hooks/useUrlSearch';
-import { isTableType, TABLE_PATHS, type DetailEntityType } from '../lib/entity';
+import { DETAIL_PATHS, isTableType, TABLE_PATHS, type DetailEntityType } from '../lib/entity';
 
 export interface EntityDetailPageProps {
   /** A table type, or a record-page type (`/records/$id`). */
@@ -69,7 +73,10 @@ interface DetailScreenProps {
 
 function DetailScreen({ type, item, meta, typeMeta }: DetailScreenProps) {
   const [search, setSearch] = useUrlSearch();
-  const [dialog, setDialog] = useState<'delete' | 'undelete' | null>(null);
+  const navigate = useNavigate();
+  const [dialog, setDialog] = useState<'delete' | 'undelete' | 'merge' | 'unmerge' | null>(null);
+  // Duplicates of projects and services are merged (docs/DATA_MODEL.md §18).
+  const mergeType = type === 'project' || type === 'service' ? type : null;
   const [commentFocus, setCommentFocus] = useState<CommentFocus | null>(null);
   const deleted = item.deleted_at !== null;
   const commentsOpen = search.comments === 'open';
@@ -105,6 +112,20 @@ function DetailScreen({ type, item, meta, typeMeta }: DetailScreenProps) {
           setCommentFocus(null);
           setSearch((previous) => patchSearch(previous, { comments: commentsOpen ? null : 'open', thread: null }));
         }}
+        onMerge={
+          mergeType
+            ? () => {
+                setDialog('merge');
+              }
+            : undefined
+        }
+        onUnmerge={
+          mergeType
+            ? () => {
+                setDialog('unmerge');
+              }
+            : undefined
+        }
       />
       {deleted && !editing && (
         <DeletedBanner
@@ -112,6 +133,13 @@ function DetailScreen({ type, item, meta, typeMeta }: DetailScreenProps) {
           onUndelete={() => {
             setDialog('undelete');
           }}
+          onUnmerge={
+            mergeType
+              ? () => {
+                  setDialog('unmerge');
+                }
+              : undefined
+          }
         />
       )}
 
@@ -189,6 +217,33 @@ function DetailScreen({ type, item, meta, typeMeta }: DetailScreenProps) {
           setDialog(null);
         }}
       />
+      {mergeType && (
+        <>
+          <MergeDialog
+            type={mergeType}
+            opened={dialog === 'merge'}
+            survivor={{ id: item.id, label: item.label }}
+            onClose={() => {
+              setDialog(null);
+            }}
+            onMerged={(response) => {
+              notifySuccess(
+                'Merged. The other record is in the trash, marked as merged into this one; it can be unmerged there.',
+              );
+              if (response.item.id !== item.id) {
+                void navigate({ to: DETAIL_PATHS[mergeType], params: { id: response.item.id } });
+              }
+            }}
+          />
+          <UnmergeDialog
+            type={mergeType}
+            item={dialog === 'unmerge' ? item : null}
+            onClose={() => {
+              setDialog(null);
+            }}
+          />
+        </>
+      )}
     </Stack>
   );
 }

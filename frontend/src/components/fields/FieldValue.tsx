@@ -25,6 +25,7 @@ import { urlHost } from '../../lib/urls';
 import { termLabel } from '../../lib/vocab';
 import { EntityLink } from '../EntityLink';
 import { ExternalLink } from '../ExternalLink';
+import { SnapshotLink } from '../SnapshotLink';
 import { Timestamp } from '../Timestamp';
 import classes from './fields.module.css';
 import { isVerificationStatus, VerificationDot } from './VerificationDot';
@@ -164,9 +165,19 @@ interface ValueDisplayProps {
 }
 
 /** A value of `field`, outside any item context (e.g. in diffs). */
+/** System fields that name a stored raw snapshot (docs/DATA_MODEL.md §14.1): downloadable on detail pages. */
+const SNAPSHOT_FIELDS: ReadonlySet<string> = new Set(['raw_snapshot_id']);
+
 export function ValueDisplay({ field, value, refs, variant = 'full' }: ValueDisplayProps) {
   const vocab = useVocabIndex();
   if (isEmptyValue(value)) return <Empty variant={variant} />;
+  if (variant === 'full' && SNAPSHOT_FIELDS.has(field.name) && typeof value === 'string') {
+    return (
+      <span className={classes.nowrap}>
+        <SnapshotLink id={value} /> <code>{value}</code>
+      </span>
+    );
+  }
 
   switch (field.type) {
     case 'vocab':

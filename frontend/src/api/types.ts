@@ -1,5 +1,7 @@
 // TypeScript types for every request and response of docs/API.md (field
-// semantics in docs/DATA_MODEL.md). Keep in sync with the contract.
+// semantics in docs/DATA_MODEL.md). Keep in sync with the contract. The
+// Phase 2 endpoints (docs/API.md §7) are typed in acquisition-types.ts.
+import type { Observation, RunsSummary } from './acquisition-types';
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonValue[] | { [key: string]: JsonValue };
@@ -198,6 +200,10 @@ export interface EntityStats {
 export interface StatsResponse {
   entities: Partial<Record<EntityType, EntityStats>>;
   open_comments: number;
+  /** Phase 2: open proposals in the review inbox. */
+  open_proposals: number;
+  /** Phase 2: the running collector run and the last finished one. */
+  runs: RunsSummary;
 }
 
 export interface LookupItem {
@@ -233,6 +239,8 @@ export interface FieldMetaEntry {
   verified: VerificationStatus;
   evidence_id: string | null;
   restored_from_version: number | null;
+  /** Phase 2: the raw snapshots the value was parsed from; null or absent elsewhere. */
+  raw_snapshot_ids?: string[] | null;
 }
 
 /** Label of a referenced row (`refs` maps). */
@@ -284,10 +292,15 @@ export interface Item {
   field_meta: Partial<Record<string, FieldMetaEntry>>;
   /** Present for project and service: launch, launch_start, …, computed_at. */
   derived?: JsonObject | null;
-  /** open_comments, comment_count, *_in_paper_scope; detail adds open_comments_by_field. */
+  /**
+   * open_comments, comment_count, *_in_paper_scope and (Phase 2) open_proposals;
+   * detail adds open_comments_by_field and open_proposals_by_field.
+   */
   virtual: JsonObject;
   refs: Refs;
   search_snippet: SnippetSegment[] | null;
+  /** Phase 2, detail of project, service and document: its source observations (at most 50). */
+  observations?: Observation[];
 }
 
 export interface ListResponse {
@@ -437,6 +450,7 @@ export type RevisionAction =
   | 'undelete'
   | 'restore'
   | 'merge'
+  | 'unmerge'
   | 'resolve'
   | 'reopen';
 
@@ -452,6 +466,10 @@ export interface RevisionSummary {
   restored_from: number | null;
   restored_from_version: number | null;
   batch_id: string | null;
+  /** Phase 2: the collector run of a write on channel `collector`. */
+  run_id: string | null;
+  /** Phase 2: the proposal whose acceptance wrote this revision. */
+  proposal_id: string | null;
 }
 
 /** `[old, new]` pairs; empty sections are omitted. */
@@ -527,6 +545,8 @@ export interface ChangeFeedItem {
   changed_fields: string[];
   restored_from_version: number | null;
   batch_id: string | null;
+  run_id: string | null;
+  proposal_id: string | null;
   context: ChangeContext | null;
 }
 

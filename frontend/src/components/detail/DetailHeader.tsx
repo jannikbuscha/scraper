@@ -1,13 +1,15 @@
-// Header of the detail page (docs/UI.md §4): breadcrumb, label, badges
-// (verification status, project cluster, paper scope, deleted, version) and
-// the actions Edit, Delete / Undelete, Copy link and the comments toggle.
+// Header of the detail page (docs/UI.md §4, §8.7): breadcrumb, label, badges
+// (verification status, project cluster, paper scope, deleted or merged,
+// version, open proposals) and the actions Edit, Merge… (projects and
+// services), Delete / Undelete (Unmerge… for a merged record), Copy link and
+// the comments toggle.
 import { Badge, Breadcrumbs, Button, Group, Stack, Title } from '@mantine/core';
-import { IconMessage, IconPencil, IconRestore, IconTrash } from '@tabler/icons-react';
+import { IconGitMerge, IconMessage, IconPencil, IconRestore, IconTrash } from '@tabler/icons-react';
 
 import type { EntityTypeMeta, Item } from '../../api/types';
 import { useVocabIndex } from '../../hooks/useVocabIndex';
 import { detailHref, isTableType, TABLE_PATHS, type DetailEntityType } from '../../lib/entity';
-import { asBoolean, asNumber, asString } from '../../lib/format';
+import { asBoolean, asNumber, asString, pluralize } from '../../lib/format';
 import { termLabel } from '../../lib/vocab';
 import { AnchorLink } from '../AnchorLink';
 import { isVerificationStatus, VerificationDot } from '../fields/VerificationDot';
@@ -43,6 +45,10 @@ interface DetailHeaderProps {
   onDelete: () => void;
   onUndelete: () => void;
   onToggleComments: () => void;
+  /** Projects and services: merge a duplicate into this record (Phase 2). */
+  onMerge?: (() => void) | undefined;
+  /** A merged record is unmerged, not undeleted. */
+  onUnmerge?: (() => void) | undefined;
 }
 
 export function DetailHeader({
@@ -55,6 +61,8 @@ export function DetailHeader({
   onDelete,
   onUndelete,
   onToggleComments,
+  onMerge,
+  onUnmerge,
 }: DetailHeaderProps) {
   const vocab = useVocabIndex();
   const deleted = item.deleted_at !== null;
@@ -63,6 +71,8 @@ export function DetailHeader({
   const clusterField = typeMeta.fields.find((field) => field.name === 'paper_cluster');
   const cluster = clusterField ? asString(item.fields[clusterField.name]) : null;
   const openComments = asNumber(item.virtual.open_comments) ?? 0;
+  const openProposals = asNumber(item.virtual.open_proposals) ?? 0;
+  const merged = item.merged_into !== null;
 
   return (
     <Stack gap={6}>
@@ -98,13 +108,20 @@ export function DetailHeader({
             {clusterField && cluster !== null && <VocabBadge vocabulary={clusterField.vocabulary} code={cluster} />}
             <ScopeBadge item={item} typeMeta={typeMeta} />
             {deleted && (
-              <Badge color="red" variant="filled">
-                deleted
+              <Badge color={merged ? 'grape' : 'red'} variant="filled">
+                {merged ? 'merged' : 'deleted'}
               </Badge>
             )}
             <Badge variant="default" title="Version">
               v{item.version}
             </Badge>
+            {openProposals > 0 && (
+              <AnchorLink to="/review" search={{ subject_id: item.id }} underline="never">
+                <Badge variant="light" color="indigo" style={{ cursor: 'pointer' }}>
+                  {pluralize(openProposals, 'open proposal')}
+                </Badge>
+              </AnchorLink>
+            )}
           </Group>
         </Stack>
         <Group gap="xs">
@@ -118,7 +135,18 @@ export function DetailHeader({
               Edit
             </Button>
           )}
-          {deleted ? (
+          {onMerge && !deleted && !editing && (
+            <Button variant="light" color="grape" leftSection={<IconGitMerge size={14} />} onClick={onMerge}>
+              Merge…
+            </Button>
+          )}
+          {deleted && merged ? (
+            onUnmerge && (
+              <Button variant="light" color="grape" leftSection={<IconGitMerge size={14} />} onClick={onUnmerge}>
+                Unmerge…
+              </Button>
+            )
+          ) : deleted ? (
             <Button variant="light" leftSection={<IconRestore size={14} />} onClick={onUndelete}>
               Undelete
             </Button>

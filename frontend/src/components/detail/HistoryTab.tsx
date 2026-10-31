@@ -12,7 +12,7 @@ import type { SearchRecord } from '../../lib/query-string';
 import { ErrorAlert } from '../feedback';
 import { CompareDiff } from '../history/CompareDiff';
 import { DiffView } from '../history/DiffView';
-import { ActionBadge, ChannelBadge } from '../history/RevisionBadges';
+import { ActionBadge, ChannelBadge, RevisionSource } from '../history/RevisionBadges';
 import { RevisionList } from '../history/RevisionList';
 import { Timestamp } from '../Timestamp';
 import { fieldLabels } from './field-groups';
@@ -47,6 +47,13 @@ function RevisionDiff({
         <Timestamp value={revision.at} />
         <ChannelBadge channel={revision.channel} />
         <ActionBadge action={revision.action} />
+        <RevisionSource
+          channel={revision.channel}
+          author={revision.author}
+          batchId={revision.batch_id}
+          runId={revision.run_id}
+          proposalId={revision.proposal_id}
+        />
       </Group>
       {revision.note && (
         <Text size="sm" style={{ whiteSpace: 'pre-wrap' }}>

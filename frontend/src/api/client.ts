@@ -1,5 +1,6 @@
 // Fetch wrapper for /api (docs/UI.md §1.6, docs/API.md §1): JSON in and out,
 // one error envelope.
+import type { FetchFailedReason, MergeConflict, UnavailableReason } from './acquisition-types';
 import {
   ENTITY_TYPES,
   type HasDependentsDetails,
@@ -69,6 +70,57 @@ export function hasDependents(error: unknown): HasDependentsDetails | null {
   return result;
 }
 
+/** `409 invalid_state {state}`, e.g. a proposal that is no longer open or a run that has finished. */
+export function invalidState(error: unknown): string | null {
+  if (!isApiError(error, 'invalid_state') || !isRecord(error.details)) return null;
+  return typeof error.details.state === 'string' ? error.details.state : null;
+}
+
+/** `409 run_in_progress {run_id}` (Phase 2): another collector run is running. */
+export function runInProgress(error: unknown): { runId: string | null } | null {
+  if (!isApiError(error, 'run_in_progress')) return null;
+  const runId = isRecord(error.details) ? error.details.run_id : null;
+  return { runId: typeof runId === 'string' ? runId : null };
+}
+
+/** `409 collector_unavailable {reason}` (Phase 2). */
+export function collectorUnavailable(error: unknown): { reason: UnavailableReason | null } | null {
+  if (!isApiError(error, 'collector_unavailable')) return null;
+  const reason = isRecord(error.details) ? error.details.reason : null;
+  return { reason: reason === 'disabled' || reason === 'contact_email_missing' ? reason : null };
+}
+
+/** `409 merge_conflict {conflicts}` (Phase 2, docs/DATA_MODEL.md §18). */
+export function mergeConflicts(error: unknown): MergeConflict[] | null {
+  if (!isApiError(error, 'merge_conflict') || !isRecord(error.details)) return null;
+  const { conflicts } = error.details;
+  if (!Array.isArray(conflicts)) return [];
+  return conflicts.filter(isRecord).map((conflict) => ({
+    kind: typeof conflict.kind === 'string' ? conflict.kind : '',
+    id: typeof conflict.id === 'string' ? conflict.id : '',
+    label: typeof conflict.label === 'string' ? conflict.label : '',
+    message: typeof conflict.message === 'string' ? conflict.message : '',
+  }));
+}
+
+const FETCH_FAILED_REASONS: readonly FetchFailedReason[] = [
+  'robots_disallowed',
+  'robots_unavailable',
+  'blocked',
+  'throttled',
+  'http_error',
+  'network_error',
+  'too_large',
+];
+
+/** `502 fetch_failed {reason, status}` (Phase 2, manual fetches). */
+export function fetchFailed(error: unknown): { reason: FetchFailedReason | null; status: number | null } | null {
+  if (!isApiError(error, 'fetch_failed')) return null;
+  const details = isRecord(error.details) ? error.details : {};
+  const reason = FETCH_FAILED_REASONS.find((candidate) => candidate === details.reason) ?? null;
+  return { reason, status: typeof details.status === 'number' ? details.status : null };
+}
+
 // ---------------------------------------------------------------------------
 // Requests
 // ---------------------------------------------------------------------------
@@ -96,6 +148,22 @@ interface FetchOptions {
   signal?: AbortSignal | undefined;
 }
 
+/**
+ * Sends a request as given and returns the successful response; failures
+ * throw ApiError. Uploads (api/uploads.ts) send their raw body through it.
+ */
+export async function sendRequest(path: string, init: RequestInit): Promise<Response> {
+  let response: Response;
+  try {
+    response = await fetch(path, init);
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new ApiError(0, 'network_error', 'The server could not be reached.');
+  }
+  if (!response.ok) throw await errorFromResponse(response);
+  return response;
+}
+
 /** Sends a request and returns the successful response; failures throw ApiError. */
 export async function fetchApi(path: string, options: FetchOptions = {}): Promise<Response> {
   const method = options.method ?? 'GET';
@@ -105,15 +173,7 @@ export async function fetchApi(path: string, options: FetchOptions = {}): Promis
     headers.set('Content-Type', 'application/json');
     body = JSON.stringify(options.body ?? {});
   }
-  let response: Response;
-  try {
-    response = await fetch(path, { method, headers, body, signal: options.signal });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') throw error;
-    throw new ApiError(0, 'network_error', 'The server could not be reached.');
-  }
-  if (!response.ok) throw await errorFromResponse(response);
-  return response;
+  return sendRequest(path, { method, headers, body, signal: options.signal });
 }
 
 async function json<T>(response: Response): Promise<T> {

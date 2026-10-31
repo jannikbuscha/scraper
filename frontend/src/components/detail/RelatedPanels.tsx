@@ -15,6 +15,7 @@ import { searchFromQuery } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
 import { EntityLink } from '../EntityLink';
 import { CreateEntityModal } from '../table/CreateEntityModal';
+import { DocumentLinksPanel } from '../documents/DocumentLinksPanel';
 import { DocumentTextPanel } from './DocumentTextPanel';
 import { RelatedList, type RelatedListProps } from './RelatedList';
 
@@ -210,6 +211,7 @@ export function RelatedPanels({ type, item, meta }: { type: DetailEntityType; it
       <ParentLinks type={type} item={item} meta={meta} />
       {type === 'saved_view' && <SavedViewTableLink item={item} />}
       {type === 'document' && <DocumentTextPanel item={item} />}
+      {type === 'document' && <DocumentLinksPanel item={item} />}
       {lists.map(({ key, add, ...list }) => (
         <RelatedList
           key={key}

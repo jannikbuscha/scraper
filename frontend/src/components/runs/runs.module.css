@@ -1,0 +1,41 @@
+.clickable {
+  cursor: pointer;
+}
+
+.runs td {
+  vertical-align: top;
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--mantine-spacing-xs);
+  margin: 0;
+}
+
+.stat {
+  padding: 6px 10px;
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-sm);
+}
+
+.stat dt {
+  font-size: var(--mantine-font-size-xs);
+  color: var(--mantine-color-dimmed);
+}
+
+.stat dd {
+  margin: 0;
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 600;
+}
+
+.cell {
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.message {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

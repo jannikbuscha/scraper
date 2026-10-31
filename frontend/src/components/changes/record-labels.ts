@@ -51,6 +51,7 @@ const ACTION_LABELS: Record<RevisionAction, string> = {
   undelete: 'undelete',
   restore: 'restore',
   merge: 'merge',
+  unmerge: 'unmerge',
   resolve: 'resolve',
   reopen: 'reopen',
 };

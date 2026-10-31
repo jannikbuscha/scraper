@@ -1,11 +1,13 @@
 // Deleted records of one trash tab (docs/UI.md §5): label, deletion time,
 // "deleted together with n others" for cascades, the deletion note, and
-// Undelete.
+// Undelete; a merged project or service reads "Merged into …" and offers
+// Unmerge instead (§8.7).
 import { Button, Table, Text, VisuallyHidden } from '@mantine/core';
-import { IconRestore } from '@tabler/icons-react';
+import { IconGitMerge, IconRestore } from '@tabler/icons-react';
 import type { ReactNode } from 'react';
 
 import { pluralize } from '../../lib/format';
+import { EntityLink } from '../EntityLink';
 import { Timestamp } from '../Timestamp';
 import type { DeleteInfo } from './delete-info';
 import classes from './trash.module.css';
@@ -19,6 +21,8 @@ interface TrashRowData {
   deletedAt: string | null;
   info: DeleteInfo | undefined;
   onUndelete: () => void;
+  /** A merged record: its survivor, and Unmerge instead of Undelete. */
+  merged?: { survivorId: string; onUnmerge: () => void } | undefined;
 }
 
 function DeletedTogether({ info }: { info: DeleteInfo | undefined }) {
@@ -51,7 +55,15 @@ export function TrashTable({ rows }: { rows: readonly TrashRowData[] }) {
         <Table.Tbody>
           {rows.map((row) => (
             <Table.Tr key={row.id}>
-              <Table.Td className={classes.cell}>{row.record}</Table.Td>
+              <Table.Td className={classes.cell}>
+                {row.record}
+                {row.merged && (
+                  <Text span size="sm" c="dimmed">
+                    {' '}
+                    · Merged into <EntityLink id={row.merged.survivorId} />
+                  </Text>
+                )}
+              </Table.Td>
               <Table.Td className={classes.cell}>
                 <Timestamp value={row.deletedAt} />
               </Table.Td>
@@ -60,14 +72,26 @@ export function TrashTable({ rows }: { rows: readonly TrashRowData[] }) {
               </Table.Td>
               <Table.Td className={`${classes.cell} ${classes.note}`}>{row.info?.note}</Table.Td>
               <Table.Td className={classes.cell}>
-                <Button
-                  variant="light"
-                  leftSection={<IconRestore size={14} />}
-                  aria-label={`Undelete ${row.label}`}
-                  onClick={row.onUndelete}
-                >
-                  Undelete
-                </Button>
+                {row.merged ? (
+                  <Button
+                    variant="light"
+                    color="grape"
+                    leftSection={<IconGitMerge size={14} />}
+                    aria-label={`Unmerge ${row.label}`}
+                    onClick={row.merged.onUnmerge}
+                  >
+                    Unmerge…
+                  </Button>
+                ) : (
+                  <Button
+                    variant="light"
+                    leftSection={<IconRestore size={14} />}
+                    aria-label={`Undelete ${row.label}`}
+                    onClick={row.onUndelete}
+                  >
+                    Undelete
+                  </Button>
+                )}
               </Table.Td>
             </Table.Tr>
           ))}

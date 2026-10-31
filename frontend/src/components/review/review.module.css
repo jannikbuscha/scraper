@@ -1,0 +1,65 @@
+.card {
+  border-left: 3px solid var(--mantine-color-gray-3);
+}
+
+.card[data-state='open'] {
+  border-left-color: var(--mantine-color-blue-4);
+}
+
+.sideBySide {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--mantine-spacing-sm);
+}
+
+.textDiff {
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border: 1px solid var(--mantine-color-gray-3);
+  border-radius: var(--mantine-radius-sm);
+  background: var(--mantine-color-gray-0);
+}
+
+.added {
+  background: var(--mantine-color-green-0);
+  border-radius: var(--mantine-radius-xs);
+  padding-inline: 4px;
+}
+
+.quote {
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 3px solid var(--mantine-color-gray-4);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.quote mark {
+  background: var(--mantine-color-yellow-2);
+  padding: 0;
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--mantine-spacing-sm);
+}
+
+.definitions {
+  display: grid;
+  grid-template-columns: minmax(120px, 200px) minmax(0, 1fr);
+  gap: 2px var(--mantine-spacing-sm);
+  margin: 0;
+}
+
+.definitions dt {
+  font-weight: 500;
+  color: var(--mantine-color-gray-7);
+}
+
+.definitions dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}

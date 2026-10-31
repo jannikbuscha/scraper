@@ -1,12 +1,16 @@
-// Overview (docs/UI.md §2): counts per entity type from /api/stats, open
-// comments and links. The dashboard proper arrives in Phase 3.
+// Overview (docs/UI.md §2, §8.8): counts per entity type from /api/stats,
+// open comments, open proposals, the last finished collector run with a
+// running-run indicator, and links. The dashboard proper arrives in Phase 3.
 import { Card, Group, Loader, SimpleGrid, Stack, Table, Text, Title } from '@mantine/core';
 import { useDocumentTitle } from '@mantine/hooks';
 
+import type { RunsSummary } from '../api/acquisition-types';
 import { useMeta, useStats } from '../api/queries';
 import { ENTITY_TYPES, TABLE_ENTITY_TYPES, type EntityStats, type Meta, type TableEntityType } from '../api/types';
 import { AnchorLink } from '../components/AnchorLink';
 import { ErrorAlert } from '../components/feedback';
+import { RunStatusBadge } from '../components/runs/RunStatusBadge';
+import { Timestamp } from '../components/Timestamp';
 import { TABLE_PATHS } from '../lib/entity';
 import { searchFromQuery } from '../lib/query-string';
 
@@ -34,6 +38,52 @@ function StatCard({ type, meta, stats }: { type: TableEntityType; meta: Meta; st
         )}
         <AnchorLink to="/trash" search={{ type }} size="sm" c="dimmed">
           {count.format(stats?.deleted ?? 0)} in trash
+        </AnchorLink>
+      </Group>
+    </Card>
+  );
+}
+
+/** The last finished run and, while one runs, the running run (docs/UI.md §8.8). */
+function RunsCard({ runs }: { runs: RunsSummary }) {
+  const { running, last_finished: last } = runs;
+  return (
+    <Card withBorder padding="sm">
+      <AnchorLink to="/runs" fw={600}>
+        Collector runs
+      </AnchorLink>
+      {last ? (
+        <Stack gap={4} mt={6}>
+          <Text size="sm">Last finished run:</Text>
+          <Group gap={6}>
+            <AnchorLink to="/runs/$id" params={{ id: last.id }}>
+              <code>{last.collector}</code>
+            </AnchorLink>
+            <RunStatusBadge status={last.status} />
+            <Text span size="sm" c="dimmed">
+              <Timestamp value={last.finished_at} />
+            </Text>
+          </Group>
+        </Stack>
+      ) : (
+        <Text size="sm" c="dimmed" mt={6}>
+          No run has finished yet.
+        </Text>
+      )}
+      {running && (
+        <Group gap={6} mt={6}>
+          <RunStatusBadge status="running" />
+          <AnchorLink to="/runs/$id" params={{ id: running.id }} size="sm">
+            <code>{running.collector}</code> since <Timestamp value={running.started_at} />
+          </AnchorLink>
+        </Group>
+      )}
+      <Group gap="md" mt={6}>
+        <AnchorLink to="/sources" size="sm">
+          Sources
+        </AnchorLink>
+        <AnchorLink to="/import" size="sm">
+          Import
         </AnchorLink>
       </Group>
     </Card>
@@ -80,6 +130,23 @@ export function OverviewPage() {
             </AnchorLink>
           </Group>
         </Card>
+        <Card withBorder padding="sm">
+          <AnchorLink to="/review" fw={600}>
+            Open proposals
+          </AnchorLink>
+          <Text fz={28} fw={600} lh={1.2} mt={4}>
+            {count.format(stats.data.open_proposals)}
+          </Text>
+          <Group gap="md" mt={4}>
+            <AnchorLink to="/review" size="sm">
+              Review inbox
+            </AnchorLink>
+            <AnchorLink to="/review" search={{ tab: 'unverified' }} size="sm">
+              New unverified records
+            </AnchorLink>
+          </Group>
+        </Card>
+        <RunsCard runs={stats.data.runs} />
       </SimpleGrid>
 
       <Stack gap={4}>

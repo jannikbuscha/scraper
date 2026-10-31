@@ -1,7 +1,9 @@
 // Filters of Recent changes (docs/UI.md §5): record type (comments,
 // vocabulary terms and saved views included), channel, action, a date range
-// of local days and a batch. Every control writes the URL at once.
-import { Button, Group, MultiSelect } from '@mantine/core';
+// of local days and a batch; a run and a proposal appear as removable chips
+// when the URL carries them (links from the run and review pages). Every
+// control writes the URL at once.
+import { Badge, Button, CloseButton, Group } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconFilterOff } from '@tabler/icons-react';
 
@@ -9,59 +11,14 @@ import type { Meta } from '../../api/types';
 import type { SearchUpdate, SetSearchOptions } from '../../hooks/useUrlSearch';
 import type { SearchRecord } from '../../lib/query-string';
 import { DebouncedParamInput } from './DebouncedParamInput';
-import {
-  clearFilterParams,
-  dayParam,
-  hasChangeFilters,
-  listParam,
-  withListParam,
-  withParam,
-  type ChangeListParam,
-} from './feed-query';
+import { clearFilterParams, dayParam, hasChangeFilters, withParam } from './feed-query';
+import { ListParamFilter as ListFilter } from './ListParamFilter';
 import { ACTION_OPTIONS, CHANNEL_OPTIONS, RECORD_TYPES, recordTypeLabel } from './record-labels';
-
-interface Option {
-  value: string;
-  label: string;
-}
 
 interface ChangeFeedFiltersProps {
   meta: Meta;
   search: SearchRecord;
   setSearch: (update: SearchUpdate, options?: SetSearchOptions) => void;
-}
-
-interface ListFilterProps extends Omit<ChangeFeedFiltersProps, 'meta'> {
-  param: ChangeListParam;
-  label: string;
-  options: readonly Option[];
-  width: number;
-}
-
-/** A multi-select over one comma-separated list parameter. */
-function ListFilter({ param, label, options, width, search, setSearch }: ListFilterProps) {
-  const values = listParam(search, param);
-  // Values from a shared URL stay selectable even if the option list lacks them.
-  const data = [
-    ...options,
-    ...values.filter((value) => !options.some((option) => option.value === value)).map((value) => ({ value, label: value })),
-  ];
-  return (
-    <MultiSelect
-      size="xs"
-      w={width}
-      label={label}
-      placeholder={values.length === 0 ? 'Any' : undefined}
-      data={data}
-      value={values}
-      searchable
-      clearable
-      onChange={(next) => {
-        setSearch((previous) => withListParam(previous, param, next));
-      }}
-      comboboxProps={{ withinPortal: true }}
-    />
-  );
 }
 
 export function ChangeFeedFilters({ meta, search, setSearch }: ChangeFeedFiltersProps) {
@@ -102,6 +59,29 @@ export function ChangeFeedFilters({ meta, search, setSearch }: ChangeFeedFilters
         }}
       />
       <DebouncedParamInput param="batch_id" label="Batch" placeholder="Batch ID" {...url} />
+      {(['run_id', 'proposal_id'] as const).map((param) => {
+        const value = search[param];
+        if (!value) return null;
+        const label = param === 'run_id' ? 'Run' : 'Proposal';
+        return (
+          <Badge
+            key={param}
+            variant="light"
+            size="lg"
+            rightSection={
+              <CloseButton
+                size="xs"
+                aria-label={`Remove the filter ${label}: ${value}`}
+                onClick={() => {
+                  setSearch((previous) => withParam(previous, param, null));
+                }}
+              />
+            }
+          >
+            {label}: {value}
+          </Badge>
+        );
+      })}
       {hasChangeFilters(search) && (
         <Button
           variant="subtle"

@@ -1,5 +1,6 @@
-// Revision list of one record (docs/UI.md §4.2): version, time, channel and
-// action, note, changed fields. Optionally selectable (show one
+// Revision list of one record (docs/UI.md §4.2, §8.7): version, time, channel
+// and action (with the collector run, the import or the accepted proposal),
+// note, changed fields. Optionally selectable (show one
 // revision's diff) and with a compare mode that picks two versions.
 import { Badge, Checkbox, Table, Text, UnstyledButton } from '@mantine/core';
 import type { ReactNode } from 'react';
@@ -7,7 +8,7 @@ import type { ReactNode } from 'react';
 import type { RevisionSummary } from '../../api/types';
 import { Timestamp } from '../Timestamp';
 import classes from './history.module.css';
-import { ActionBadge, ChangedFieldChips, ChannelBadge } from './RevisionBadges';
+import { ActionBadge, ChangedFieldChips, ChannelBadge, RevisionSource } from './RevisionBadges';
 
 export interface CompareSelection {
   /** Picked versions (at most two). */
@@ -108,6 +109,13 @@ export function RevisionList({
                 </Table.Td>
                 <Table.Td>
                   <ChannelBadge channel={revision.channel} /> <ActionBadge action={revision.action} />
+                  <RevisionSource
+                    channel={revision.channel}
+                    author={revision.author}
+                    batchId={revision.batch_id}
+                    runId={revision.run_id}
+                    proposalId={revision.proposal_id}
+                  />
                   {revision.restored_from_version !== null && (
                     <Text span size="xs" c="dimmed">
                       {' '}

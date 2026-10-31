@@ -29,10 +29,17 @@ const deletion = (id: number, entityId: string): ChangeFeedItem => ({
   changed_fields: ['deleted'],
   restored_from_version: null,
   batch_id: 'batch_1',
+  run_id: null,
+  proposal_id: null,
   context: null,
 });
 
-const STATS: StatsResponse = { entities: { project: { total: 19, unverified: 0, deleted: 1 } }, open_comments: 0 };
+const STATS: StatsResponse = {
+  entities: { project: { total: 19, unverified: 0, deleted: 1 } },
+  open_comments: 0,
+  open_proposals: 0,
+  runs: { running: null, last_finished: null },
+};
 
 /** Undelete responses in request order: a Response (an error) or undefined (success). */
 let undeleteResponses: (Response | undefined)[] = [];

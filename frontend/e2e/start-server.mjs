@@ -1,12 +1,17 @@
-// Starts the app for the Playwright E2E suite (docs/UI.md §7): a fresh
+// Starts the app for the Playwright E2E suite (docs/UI.md §7, §8.9): a fresh
 // temporary DATA_DIR, `mdt db upgrade` and `mdt seed`, then `mdt serve`, which
 // serves /api and the built frontend (frontend/dist) on one port.
 //
-//   node e2e/start-server.mjs <port>
+//   node e2e/start-server.mjs <port> [collectors]
 //
-// playwright.config.ts runs this as its webServer and passes a free port. The
-// temporary directory (under TMPDIR) is removed when the server stops (SIGTERM
-// or SIGINT; Playwright sends SIGTERM to the process group at the end).
+// playwright.config.ts runs this as its webServers and passes free ports. With
+// `collectors` (the Phase 2 project) the collectors answer from the stored
+// fixtures of backend/tests/fixtures/ministry_projects through the replay
+// transport (docs/COLLECTORS.md §4.10): no request leaves the machine, so the
+// CONTACT_EMAIL rule does not apply. The other server has no replay and runs
+// no collector. The temporary directory (under TMPDIR) is removed when the
+// server stops (SIGTERM or SIGINT; Playwright sends SIGTERM to the process
+// group at the end).
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -16,9 +21,10 @@ import { fileURLToPath } from 'node:url';
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const frontendDist = join(repoRoot, 'frontend', 'dist');
 const port = process.argv[2] ?? '';
+const mode = process.argv[3] ?? '';
 
-if (!/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535) {
-  console.error('usage: node e2e/start-server.mjs <port>');
+if (!/^[0-9]{1,5}$/.test(port) || Number(port) < 1 || Number(port) > 65535 || !['', 'collectors'].includes(mode)) {
+  console.error('usage: node e2e/start-server.mjs <port> [collectors]');
   process.exit(1);
 }
 if (!existsSync(join(frontendDist, 'index.html'))) {
@@ -44,6 +50,10 @@ const env = {
   MAX_COMMENT_CHARS: '10000',
   FOCAL_ORG_SEED_KEY: 'ministry-of-digital-transformation',
   LOG_LEVEL: 'WARNING',
+  SOURCES_FILE: join(repoRoot, 'sources.yaml'),
+  // Collector runs: replayed fixtures for the collectors project, none otherwise.
+  COLLECTOR_REPLAY_DIR: mode === 'collectors' ? join(repoRoot, 'backend', 'tests', 'fixtures', 'ministry_projects') : '',
+  COLLECTOR_RUN_INLINE: 'false',
 };
 
 let child = null;

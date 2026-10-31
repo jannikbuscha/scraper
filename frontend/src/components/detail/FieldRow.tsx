@@ -1,11 +1,14 @@
-// One field of the Details tab (docs/UI.md §4.1): label with help, value
-// (derived values with their explanation), provenance badge, lock icon,
+// One field of the Details tab (docs/UI.md §4.1, §8.7): label with help,
+// value (derived values with their explanation), provenance badge, the open
+// proposals for the field (linked to the review inbox), lock icon,
 // verification dot with its menu, and the comment-on-field button with the
 // number of open field threads.
 import { ActionIcon, Text, Tooltip } from '@mantine/core';
 import { IconLock, IconMessage } from '@tabler/icons-react';
 
 import type { FieldSpec, Item } from '../../api/types';
+import { pluralize } from '../../lib/format';
+import { AnchorLink } from '../AnchorLink';
 import { FieldLabel } from '../fields/FieldInput';
 import { FieldValue } from '../fields/FieldValue';
 import { ProvenanceBadge } from '../fields/ProvenanceBadge';
@@ -18,6 +21,8 @@ interface FieldRowProps {
   field: FieldSpec;
   item: Item;
   openComments: number;
+  /** Open `update_field` proposals for the field (Phase 2). */
+  openProposals: number;
   /** Offer the comment-on-field button (not for system columns). */
   commentable: boolean;
   /** A verification is being saved. */
@@ -30,6 +35,7 @@ export function FieldRow({
   field,
   item,
   openComments,
+  openProposals,
   commentable,
   verifying,
   onVerification,
@@ -49,6 +55,11 @@ export function FieldRow({
       </dd>
       <dd className={classes.rowMeta}>
         {meta && <ProvenanceBadge meta={meta} />}
+        {openProposals > 0 && (
+          <AnchorLink to="/review" search={{ subject_id: item.id, field: field.name }} size="xs">
+            {pluralize(openProposals, 'proposal')}
+          </AnchorLink>
+        )}
         {meta?.locked && (
           <Tooltip label="Locked: automatic collectors cannot overwrite this value; they can only propose changes.">
             <span role="img" aria-label="Locked" tabIndex={0}>

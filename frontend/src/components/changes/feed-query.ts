@@ -9,10 +9,12 @@ import { splitList, type SearchRecord } from '../../lib/query-string';
 
 /** List filters of GET /api/revisions, comma-separated in the URL and the request. */
 const CHANGE_LIST_PARAMS = ['entity_type', 'channel', 'action'] as const;
-export type ChangeListParam = (typeof CHANGE_LIST_PARAMS)[number];
+
+/** Exact-match filters; `run_id` and `proposal_id` come from links of the run and review pages (Phase 2). */
+const CHANGE_ID_PARAMS = ['batch_id', 'run_id', 'proposal_id'] as const;
 
 /** Every filter of the Recent changes page (paging excluded). */
-const CHANGE_FILTER_PARAMS: readonly string[] = [...CHANGE_LIST_PARAMS, 'since', 'until', 'batch_id'];
+const CHANGE_FILTER_PARAMS: readonly string[] = [...CHANGE_LIST_PARAMS, 'since', 'until', ...CHANGE_ID_PARAMS];
 
 /** Filters of the Comments page: GET /api/comments without `subject_id`. */
 const COMMENT_FILTER_PARAMS: readonly string[] = ['status', 'entity_type', 'q', 'deleted'];
@@ -48,7 +50,7 @@ export function dayParam(search: SearchRecord, key: 'since' | 'until'): string |
 
 /** The request of the change feed: the URL's filters and paging, local days as timestamps. */
 export function changeFeedRequest(search: SearchRecord): SearchRecord {
-  const request = keepKeys(search, [...CHANGE_LIST_PARAMS, 'batch_id', ...PAGING_PARAMS]);
+  const request = keepKeys(search, [...CHANGE_LIST_PARAMS, ...CHANGE_ID_PARAMS, ...PAGING_PARAMS]);
   const since = dayParam(search, 'since');
   const until = dayParam(search, 'until');
   const start = since === null ? null : localDayStart(since);

@@ -21,6 +21,8 @@ const change = (overrides: Partial<ChangeFeedItem>): ChangeFeedItem => ({
   changed_fields: ['name_en'],
   restored_from_version: null,
   batch_id: null,
+  run_id: null,
+  proposal_id: null,
   context: null,
   ...overrides,
 });
@@ -48,6 +50,8 @@ const REVISION: RevisionByIdResponse = {
     restored_from: null,
     restored_from_version: null,
     batch_id: null,
+    run_id: null,
+    proposal_id: null,
     snapshot: { fields: {}, field_meta: {}, state: {} },
     diff: { fields: { name_en: ['Old example name', 'New example name'] } },
     schema_revision: null,

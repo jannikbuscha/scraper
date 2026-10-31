@@ -1,6 +1,7 @@
 // Rows of Recent changes grouped by local day (docs/UI.md §5): time,
-// channel and action, the record (type and label, linked to its page),
-// version, changed fields and note. Expanding a row loads and shows its diff.
+// channel and action (Phase 2: with the run and proposal of the revision),
+// the record (type and label, linked to its page), version, changed fields
+// and note. Expanding a row loads and shows its diff.
 import { ActionIcon, Table, Text, Tooltip, VisuallyHidden } from '@mantine/core';
 import { IconChevronDown, IconChevronRight, IconStack2 } from '@tabler/icons-react';
 import dayjs from 'dayjs';
@@ -8,7 +9,7 @@ import { useState } from 'react';
 
 import type { ChangeFeedItem, Meta } from '../../api/types';
 import { formatUtcTimestamp, localDay, parseTimestamp } from '../../lib/format';
-import { ActionBadge, ChangedFieldChips, ChannelBadge } from '../history/RevisionBadges';
+import { ActionBadge, ChangedFieldChips, ChannelBadge, RevisionSource } from '../history/RevisionBadges';
 import classes from './changes.module.css';
 import { recordFieldLabels, recordTypeLabel } from './record-labels';
 import { RevisionDiffPanel } from './RevisionDiffPanel';
@@ -91,6 +92,13 @@ function ChangeRow({ change, meta, expanded, onToggle, batchFilter, onShowBatch 
           <span className={classes.chips}>
             <ChannelBadge channel={change.channel} />
             <ActionBadge action={change.action} />
+            <RevisionSource
+              channel={change.channel}
+              author={change.author}
+              batchId={change.batch_id}
+              runId={change.run_id}
+              proposalId={change.proposal_id}
+            />
             {change.batch_id !== null && change.batch_id !== batchFilter && (
               <BatchButton batchId={change.batch_id} onShowBatch={onShowBatch} />
             )}

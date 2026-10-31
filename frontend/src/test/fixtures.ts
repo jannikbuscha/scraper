@@ -108,7 +108,7 @@ export const exampleMeta: Meta = {
   entity_types: { project: projectMeta },
 };
 
-function term(code: string, label: string, sortOrder: number): VocabTerm {
+export function term(code: string, label: string, sortOrder: number): VocabTerm {
   return {
     id: `voc_${code}`,
     code,
@@ -128,7 +128,7 @@ function term(code: string, label: string, sortOrder: number): VocabTerm {
   };
 }
 
-function vocabulary(name: string, terms: VocabTerm[]): Vocabulary {
+export function vocabulary(name: string, terms: VocabTerm[]): Vocabulary {
   return { name, label: name, description: null, multi: false, fixed_codes: false, terms };
 }
 

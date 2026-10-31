@@ -1,7 +1,8 @@
 // Table toolbar (docs/UI.md §3): title with total count, search, quick
-// filters, saved views, columns, export, "+ New" and a link to the trash.
+// filters, saved views, columns, export, "+ New" (documents also "+ Add
+// document", §8.6) and a link to the trash.
 import { Badge, Button, CloseButton, Group, Stack, Text, Title } from '@mantine/core';
-import { IconPlus, IconTrash } from '@tabler/icons-react';
+import { IconFilePlus, IconPlus, IconTrash } from '@tabler/icons-react';
 
 import { getDeletedMode, withDeletedMode } from '../../lib/query-string';
 import { AnchorLink } from '../AnchorLink';
@@ -18,6 +19,8 @@ interface TableToolbarProps {
   /** Rows matching the current filters; undefined while loading. */
   total: number | undefined;
   onCreate: () => void;
+  /** Documents: upload a file or fetch a URL (docs/UI.md §8.6). */
+  onAddDocument?: (() => void) | undefined;
 }
 
 /** A URL with `deleted=only|include` shows deleted rows; say so and offer to stop. */
@@ -44,7 +47,7 @@ function DeletedModeNotice() {
   );
 }
 
-export function TableToolbar({ total, onCreate }: TableToolbarProps) {
+export function TableToolbar({ total, onCreate, onAddDocument }: TableToolbarProps) {
   const { type, typeMeta } = useTableContext();
   return (
     <Stack gap="xs">
@@ -59,6 +62,11 @@ export function TableToolbar({ total, onCreate }: TableToolbarProps) {
           <SavedViewsMenu />
           <ColumnsMenu />
           <ExportMenu />
+          {onAddDocument && (
+            <Button variant="light" leftSection={<IconFilePlus size={14} />} onClick={onAddDocument}>
+              Add document
+            </Button>
+          )}
           <Button leftSection={<IconPlus size={14} />} onClick={onCreate}>
             New
           </Button>

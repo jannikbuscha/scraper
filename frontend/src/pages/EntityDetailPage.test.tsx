@@ -112,6 +112,8 @@ const revision = (version: number, changed: string[]): RevisionSummary => ({
   restored_from: null,
   restored_from_version: null,
   batch_id: null,
+  run_id: null,
+  proposal_id: null,
 });
 
 const exampleComment = (overrides: Partial<Comment>): Comment => ({

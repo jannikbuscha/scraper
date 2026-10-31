@@ -17,6 +17,8 @@ const change = (overrides: Partial<ChangeFeedItem>): ChangeFeedItem => ({
   changed_fields: ['name_en'],
   restored_from_version: null,
   batch_id: null,
+  run_id: null,
+  proposal_id: null,
   context: null,
   ...overrides,
 });
