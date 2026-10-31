@@ -383,7 +383,7 @@ Matched on normalised text (apostrophes unified to `ʼ`) near a project or servi
 | `discontinuation` | `припин-`, `закри-` | discontinued, closed |
 | `legal_basis_adopted` | `ухвалив постанову`, `затвердив`, `постанова №` | resolution adopted, approved |
 
-The precision of each pattern (share of accepted proposals) is reported in the collector-run statistics, so the list can be improved on the basis of evidence.
+The precision of each pattern (the share of accepted, also edited and accepted, among its decided `create_event` proposals) is reported in the review inbox ("Pattern precision", from `GET /api/proposals/summary`; `docs/API.md` §7.4, `docs/UI.md` §8.2), not in the statistics of a run, so the list can be improved on the basis of evidence.
 
 **Implementation:** `codebook/event_patterns.yaml` holds this list (one entry per Ukrainian stem or phrase and one per English cell, nothing added); the matching rules are in `docs/COLLECTORS.md` §7.7. Like `parameters.yaml` it is not a vocabulary.
 

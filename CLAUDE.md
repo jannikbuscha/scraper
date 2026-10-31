@@ -22,10 +22,10 @@ The app has **one user**: the data lead provides the server, and one other perso
 | Phase | Content | State |
 |---|---|---|
 | 0 | Exploration and plan: `PLAN.md`, drafts of `docs/SOURCES.md` and `docs/CODEBOOK.md` | done |
-| 0b | Hands-on source checks and fixture capture | partially done (2026-10-29): every source except S5 (Wayback Machine) and S6 (zakon.rada.gov.ua) checked from the development environment; results and every S1–S5 hypothesis resolved in `docs/SOURCES.md`; 103 fixtures in `backend/tests/fixtures/` (checked by `test_fixtures.py`). Open: S5, S6 and a geo-blocking re-check from the target server, and the data lead's decisions in `docs/SOURCES.md` §5 |
+| 0b | Hands-on source checks and fixture capture | partially done (2026-10-29): every source except S5 (Wayback Machine) and S6 (zakon.rada.gov.ua) checked from the development environment; results and every S1–S5 hypothesis resolved in `docs/SOURCES.md`; real fixtures in `backend/tests/fixtures/` (checked by `test_fixtures.py`). Open: on the target server `mdt fixtures capture wayback` (S5) and `mdt sources check` (geo-blocking re-check); S6 is replaced by the ministry's legislation documents until Phase 3 (data lead's check: the rada subdomains do not resolve); the data lead's decisions in `docs/SOURCES.md` §5 |
 | 1 | Skeleton: repository structure, data model and migrations, seed (19 + 1 projects, vocabulary drafts), revisions with diff and restore, comments, API, tables with filters and sorting, detail pages with editing, start via Docker | done (2026-10-29): DoD items 1, 2, 4 and 6 hold on seed data; adversarial review findings fixed; simplified the same day for one user without concurrent editing or a security layer (D-15); all gates, the E2E suite and CI green on the simplified state |
-| **2** | **Data acquisition:** collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | **next**, after the data lead's go; C5 (Wayback) and C6 need the Phase 0b checks from the target server first |
-| 3 | Analysis: document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | planned |
+| 2 | Data acquisition: collectors C1–C5, raw snapshots, reconciliation and review inbox, importer, manual documents | done (2026-10-31): DoD items 3 and 5 hold (acceptance tests, E2E and replay runs of every collector); short live runs of C1–C4b succeeded; adversarial review findings fixed. C5 uses synthetic fixtures in the documented CDX format until `mdt fixtures capture wayback` runs on the server |
+| **3** | **Analysis:** document view with evidence, organisations, participations, components and relations (D2–D4), indicators, timeline, dashboard, exports | **next**, after the data lead's go |
 | 4 | Operations: releases with git tags, backups, schedules, documentation | planned |
 
 Content and "done when" per phase: `PLAN.md` §10. Phase 1 is done when items 1, 2, 4 and 6 below hold on seed data and the tests are green.
@@ -74,10 +74,9 @@ In practice:
 
 ## Stack
 
-- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI served by uvicorn, Pydantic v2 (pydantic-settings), SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py for comments, openpyxl for XLSX exports. Lint and types: ruff, mypy. Tests: pytest; the HTTP tests use Starlette's `TestClient` (dev dependency `httpx2`).
-- **Frontend** (`frontend/`): React 19, TypeScript (strict, ~6.0), Vite, Mantine, TanStack Router, Query and Table, jsdiff, dayjs. Lint and types: ESLint 9 (eslint-plugin-react does not support ESLint 10), tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests in `frontend/e2e/`.
-- **Operations:** one container and one process (FastAPI serves `/api` and the built frontend); multi-stage Dockerfile (node:22-alpine builds the frontend, python:3.13-slim runs the app); docker compose; Makefile; GitHub Actions CI.
-- Later phases add a polite HTTP client built on httpx, plus BeautifulSoup/lxml, trafilatura and APScheduler (`PLAN.md` §3.2).
+- **Backend** (`backend/`): Python 3.13 (3.12+), uv with `uv.lock`, FastAPI served by uvicorn, Pydantic v2 (pydantic-settings), SQLAlchemy 2 with Alembic (batch mode), SQLite (WAL, FTS5), Typer CLI `mdt`, markdown-it-py for comments, openpyxl for XLSX exports and imports. Collectors (Phase 2): httpx2 under the polite client, protego (robots.txt), beautifulsoup4 with Python's `html.parser`, pypdf (PDF text), tzdata (Europe/Kyiv); no lxml, no trafilatura (`docs/COLLECTORS.md` §13). Lint and types: ruff, mypy. Tests: pytest; the HTTP tests use Starlette's `TestClient`.
+- **Frontend** (`frontend/`): React 19, TypeScript (strict, ~6.0), Vite, Mantine, TanStack Router, Query and Table, jsdiff, dayjs. Lint and types: ESLint 9 (eslint-plugin-react does not support ESLint 10), tsc. Tests: Vitest; Playwright (`@playwright/test` 1.63.0, Chromium) for E2E smoke tests in `frontend/e2e/` (two Playwright projects with their own servers: the Phase 1 app and the collectors in replay mode).
+- **Operations:** one container and one process (FastAPI serves `/api` and the built frontend; collector runs started in the UI run in a thread of that process); multi-stage Dockerfile (node:22-alpine builds the frontend, python:3.13-slim runs the app); docker compose; Makefile; GitHub Actions CI. Schedules (APScheduler) are Phase 4.
 
 ## Repository layout
 
@@ -120,13 +119,13 @@ In practice:
 | `make check` | All quality gates: lint, typecheck, unit tests, frontend build, E2E |
 | `make migrate` · `make seed` · `make recompute` · `make db-check` | `mdt db upgrade` · `mdt seed` · `mdt recompute` · `mdt check` on the local database |
 | `uv run --project backend mdt reindex` | Rebuild both full-text search tables in batches; the app stays usable (no make target) |
-| `make collect SOURCE=<name> [MODE=full]` · `make fixtures SOURCE=wayback` · `make sources-check` | (Phase 2, once implemented) run a collector in the foreground · record its fixture list · re-check every source host from this machine (`docs/COLLECTORS.md` §11) |
+| `make collect SOURCE=<name> [MODE=full]` · `make fixtures SOURCE=wayback` · `make sources-check` | run a collector in the foreground · record its fixture list · re-check every source host from this machine (`docs/COLLECTORS.md` §11) |
 | `make up` · `make down` · `make logs` · `make docker-build` | Docker Compose: build and start (waits until healthy) · stop · follow logs · build the image |
 
 Direct commands:
 - Backend quality gates: `cd backend && uv run ruff check . && uv run ruff format --check . && uv run mypy src && uv run pytest -q`
 - Frontend: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build && npm run e2e`
-- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check`, `reindex`, `serve [--host] [--port] [--reload]`. Phase 2 adds (once implemented): `collect <name> [--mode] [--limit N] …`, `runs [show <id>]`, `fixtures capture <name>`, `sources check`, `import <file> --type <type> [--dry-run] …` and `check --deep` (`docs/COLLECTORS.md` §11). `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
+- CLI: `uv run --project backend mdt <command>` from the repository root (this is what the Makefile does). Commands: `db upgrade`, `seed [--dry-run]`, `recompute`, `check [--deep]`, `reindex`, `serve [--host] [--port] [--reload]`, and for data acquisition `collect <name> [--mode] [--limit N] …`, `runs [show <id>]`, `fixtures capture <name>`, `sources check`, `import <file> --type <type> [--dry-run] …` (`docs/COLLECTORS.md` §11). Collector runs with network access and manual fetches need `CONTACT_EMAIL` in `.env` (the placeholder is refused); `COLLECTOR_REPLAY_DIR` makes collectors replay the test fixtures instead. `mdt serve` never creates, migrates or seeds the database: it refuses to start (`error: …`, exit 1) while the database file is missing or not at the current schema, so run `mdt db upgrade` and `mdt seed` first. Every command creates a missing `DATA_DIR`.
 - E2E needs Chromium: where `/opt/pw-browsers` exists, the Makefile sets `PLAYWRIGHT_BROWSERS_PATH` to it; elsewhere run `cd frontend && npx playwright install chromium` once.
 
 ## Docker and configuration
